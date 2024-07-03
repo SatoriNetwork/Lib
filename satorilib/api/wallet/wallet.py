@@ -42,29 +42,35 @@ class Wallet():
         reserve: float = .01,
         isTestnet: bool = False,
         password: str = None,
+        use: 'Wallet' = None,
     ):
-        self.satoriFee = 1
+        self.satoriFee = .01  # ~50 cents
         self.isTestnet = isTestnet
         self.password = password
         self._entropy = None
         self._privateKeyObj = None
-        self._addressObj = None
-        self.publicKey = None
         self.privateKey = None
         self.words = None
-        self.address = None
-        self.scripthash = None
-        self.stats = None
-        self.alias = None
-        self.banner = None
-        self.currency = None
-        self.balance = None
-        self.currencyAmount = 0
-        self.balanceAmount = 0
-        self.divisibility = 0
-        self.transactionHistory: list[dict] = None
-        self.transactions = []  # TransactionStruct
-        self.assetTransactions = []
+        self._addressObj = None if use is None else use._addressObj
+        self.publicKey = None if use is None else use.publicKey
+        self.address = None if use is None else use.address
+        self.scripthash = None if use is None else use.scripthash
+        self.stats = {} if use is None else use.stats
+        self.alias = None if use is None else use.alias
+        self.banner = None if use is None else use.banner
+        self.currency = None if use is None else use.currency
+        self.balance = None if use is None else use.balance
+        self.currencyAmount = 0 if use is None else use.currencyAmount
+        self.balanceAmount = 0 if use is None else use.balanceAmount
+        self.divisibility = 0 if use is None else use.divisibility
+        self.transactionHistory: list[dict] = None if use is None else use.transactionHistory
+        self.transactions = [] if use is None else use.transactions  # TransactionStruct
+        self.assetTransactions = [] if use is None else use.assetTransactions
+        self.electrumx = None if use is None else use.electrumx
+        self.currencyOnChain = None if use is None else use.currencyOnChain
+        self.balanceOnChain = None if use is None else use.balanceOnChain
+        self.unspentCurrency = None if use is None else use.unspentCurrency
+        self.unspentAssets = None if use is None else use.unspentAssets
         self.walletPath = walletPath
         self.temporary = temporary
         # maintain minimum amount of currency at all times to cover fees - server only
@@ -118,6 +124,15 @@ class Wallet():
     @property
     def isDecrypted(self) -> bool:
         return not self.isEncrypted
+
+    def close(self) -> None:
+        # if self.password is not None:
+        self.password = None
+        self._entropy = None
+        self._entropyStr = ''
+        self._privateKeyObj = None
+        self.privateKey = ''
+        self.words = ''
 
     def setAlias(self, alias: Union[str, None] = None) -> None:
         self.alias = alias
@@ -175,9 +190,15 @@ class Wallet():
 
     def initRaw(self):
         ''' try to load, else generate and save '''
-        if not self.loadRaw():
-            self.generate()
-            self.save()
+        if isinstance(self.password, str):
+            if not self.load():
+                if not self.loadRaw():
+                    self.generate()
+                    self.save()
+        else:
+            if not self.loadRaw():
+                self.generate()
+                self.save()
 
     def decryptWallet(self, encrypted: dict) -> dict:
         if isinstance(self.password, str):
@@ -187,8 +208,9 @@ class Wallet():
                     encrypted=encrypted,
                     password=self.password,
                     keys=['entropy', 'privateKey', 'words',
+                          # we used to encrypt these, but we don't anymore...
                           'address' if len(encrypted.get(self.symbol, {}).get(
-                              'address', '')) != 34 else '',  # == 108 else '',
+                              'address', '')) > 34 else '',  # == 108 else '',
                           'scripthash' if len(encrypted.get(
                               'scripthash', '')) != 64 else '',  # == 152 else '',
                           'publicKey' if len(encrypted.get(
@@ -347,6 +369,7 @@ class Wallet():
 
     def _generateEntropy(self):
         # return m.to_entropy(m.generate())
+        # return b64encode(x.to_seed(x.generate(strength=128))).decode('utf-8')
         return os.urandom(32)
 
     def _generateWords(self):
@@ -371,12 +394,36 @@ class Wallet():
                 logging.error('openSafely err:', supposedDict, e)
                 return None
 
+        def getBalanceTheHardWay() -> int:
+            '''
+            using unspents get all transactions
+            cycle through the vouts to find the asset you want and that was sent to your address:
+            'vout': [{
+                'n': 0,
+                'scriptPubKey': {
+                    'type': 'transfer_asset',
+                    'asset': {
+                        'name': 'KINKAJOU/GROOMER1',
+                        'amount': 1.0},
+                    'addresses': ['Eevy1hooby2SmCMZHcGbFVArPMYUY8EThs']}}]
+            OR you could get a list of all addresses that hold the asset and find your address in the list:
+            e.send('blockchain.asset.list_addresses_by_asset', 'SATORI')
+            {
+                'Eagq7rNFUEnR7kciQafV38kzpocef74J44': 1.0,
+                'EbdsuYpb3URjafVLaSCzfnjGAc9gzH8gwg': 136.0,
+                'EdLRYNrPVJLqXz9Pxp6fwD4gNdvk4dZNnP': 1.0
+            }
+            '''
+            return self.electrumx.getAssetHolders(self.address).get(self.address, 0)
+
         # x = Evrmore(self.address, self.scripthash, config.electrumxServers())
         # todo: this list of servers should be parameterized from configuration
 
         # todo:
         # on connect ask for peers, add each to our list of electrumxServers
         # if unable to connect, remove that server from our list
+        if not hasattr(self, 'electrumx'):
+            self.connect()
         self.electrumx.get(allWalletInfo)
         self.currencyOnChain = self.electrumx.currency
         self.balanceOnChain = self.electrumx.balance
@@ -396,17 +443,52 @@ class Wallet():
             openSafely(x, 'value')
         self.currency = sum([x.get('value') for x in self.unspentCurrency])
         # for logging purposes
-        for x in self.unspentAssets:
-            openSafely(x, 'value')
-            openSafely(x, 'name')
+        # for x in self.unspentAssets:
+        #    openSafely(x, 'value')
+        #    openSafely(x, 'name')
+        # don't need this anymore because we're getting it from the server correctly
+        # if (
+        #    isinstance(self.unspentAssets, dict)
+        #    and self.unspentAssets.get('message') == 'unknown method "blockchain.scripthash.listassets"'
+        # ):
+        #    self.balance = getBalanceTheHardWay()
+        #    unspents, assetUnspents = self.getUnspentsFromHistory()
+        #    if sum([x.get('value', 0) for x in unspents]) == sum([x.get('value', 0) for x in self.unspentCurrency]):
+        #        self.unspentAssets = assetUnspents
+        # else:
         self.balance = sum([
             x.get('value') for x in self.unspentAssets
-            if x.get('name') == 'SATORI' and x.get('value') > 0])
+            if x.get('name', x.get('asset')) == 'SATORI' and x.get('value') > 0])
         self.currencyAmount = TxUtils.asAmount(self.currency or 0, 8)
         self.balanceAmount = TxUtils.asAmount(
             self.balance or 0, self.divisibility)
         # self.currencyVouts = self.electrumx.evrVouts
         # self.assetVouts = self.electrumx.assetVouts
+
+    def getUnspentsFromHistory(self) -> tuple[list, list]:
+        '''
+            get unspents from transaction history
+            I have to figure out what the VOUTs are myself -
+            and I have to split them into lists of currency and Satori outputs
+            get history, loop through all transactions, gather all vouts
+            loop through all transactions again, remove the vouts that are referenced by vins
+            loop through the remaining vouts which are the unspent vouts
+            and throw the ones away that are assets but not satori,
+            and save the others as currency or satori outputs
+            self.transactionHistory structure: [{
+                "height": 215008,
+                "tx_hash": "f3e1bf48975b8d6060a9de8884296abb80be618dc00ae3cb2f6cee3085e09403"
+            }]
+            unspents structure: [{
+                "tx_pos": 0,
+                "value": 45318048,
+                "tx_hash": "9f2c45a12db0144909b5db269415f7319179105982ac70ed80d76ea79d923ebf",
+                "height": 437146 # optional
+            }]
+        '''
+
+        for txRef in self.transactionHistory:
+            txRef['tx_hash']
 
     def sign(self, message: str):
         ''' signs a message with the private key '''
@@ -415,7 +497,7 @@ class Wallet():
         ''' verifies a message with the public key '''
 
     def _checkSatoriValue(self, output: 'CMutableTxOut') -> bool:
-        ''' 
+        '''
         returns true if the output is a satori output of self.satoriFee
         '''
 
@@ -502,10 +584,11 @@ class Wallet():
         randomly: bool = False
     ) -> tuple[list, int]:
         unspentSatori = [x for x in self.unspentAssets if x.get(
-            'name') == 'SATORI' and x.get('value') > 0]
+            'name', x.get('asset')) == 'SATORI' and x.get('value') > 0]
         unspentSatori = sorted(unspentSatori, key=lambda x: x['value'])
         haveSatori = sum([x.get('value') for x in unspentSatori])
         if not (haveSatori >= sats > 0):
+            logging.debug('not enough', haveSatori, sats, color='magenta')
             raise TransactionFailure('tx: not enough satori to send')
         # gather satori utxos at random
         gatheredSatoriSats = 0
@@ -577,7 +660,7 @@ class Wallet():
     def _compileMemoOutput(self, memo: str) -> 'CMutableTxOut':
         '''
         compile op_return memo output
-        for example: 
+        for example:
             {"value":0,
             "n":0,
             "scriptPubKey":{"asm":"OP_RETURN 1869440365",
@@ -913,14 +996,14 @@ class Wallet():
         '''
         if people do not have a balance of rvn, they can still send satori.
         they have to pay the fee in satori, so it's a higher fee, maybe twice
-        as much on average as a normal transaction. this is because the 
+        as much on average as a normal transaction. this is because the
         variability of the satori price. So this function produces a partial
-        transaction that can be sent to the server and the rest of the network 
+        transaction that can be sent to the server and the rest of the network
         to be completed. he who completes the transaction will pay the rvn fee
         and collect the satori fee. we will probably broadcast as a json object.
 
-        Because the Sighash_single is too complex this simple version was 
-        created which allows others (ie the server) to add inputs but not 
+        Because the Sighash_single is too complex this simple version was
+        created which allows others (ie the server) to add inputs but not
         outputs. This makes it simple because we can add the output on our side
         and keep the rest of the code basically the same while using
         SIGHASH_ANYONECANPAY | SIGHASH_ALL
@@ -928,7 +1011,7 @@ class Wallet():
         dealing with the limitations of this signature we need to provide all
         outputs on our end, includeing the rvn fee output. so that needs to be
         an input to this function. Which means we have to call the server ask it
-        to reserve an input for us and ask it how much that input is going to 
+        to reserve an input for us and ask it how much that input is going to
         be, then include the Raven output change back to the server. Then when
         the server gets this transaction it will have to inspect it to verify
         that the last output is the raven fee change and that the second to last
@@ -993,7 +1076,7 @@ class Wallet():
         completerAddress: Union[str, None] = None,
     ) -> str:
         '''
-        a companion function to satoriOnlyPartialSimple which completes the 
+        a companion function to satoriOnlyPartialSimple which completes the
         transaction by injecting the necessary rvn inputs to cover the fee.
         address is the address claim satori fee address.
         '''
@@ -1064,7 +1147,7 @@ class Wallet():
                 'sendAllTransaction: not enough currency for fee')
         # grab everything
         gatheredSatoriUnspents = [
-            x for x in self.unspentAssets if x.get('name') == 'SATORI']
+            x for x in self.unspentAssets if x.get('name', x.get('asset')) == 'SATORI']
         gatheredCurrencyUnspents = self.unspentCurrency
         currencySats = sum([x.get('value') for x in gatheredCurrencyUnspents])
         # compile inputs
@@ -1157,7 +1240,7 @@ class Wallet():
     #            'sendAllTransaction: not enough Satori for fee')
     #    # grab everything
     #    gatheredSatoriUnspents = [
-    #        x for x in self.unspentAssets if x.get('name') == 'SATORI']
+    #        x for x in self.unspentAssets if x.get('name', x.get('asset')) == 'SATORI']
     #    gatheredCurrencyUnspents = self.unspentCurrency
     #    currencySats = sum([x.get('value') for x in gatheredCurrencyUnspents])
     #    # compile inputs
@@ -1197,7 +1280,7 @@ class Wallet():
                 'sendAllTransaction: not enough Satori for fee')
         # grab everything
         gatheredSatoriUnspents = [
-            x for x in self.unspentAssets if x.get('name') == 'SATORI']
+            x for x in self.unspentAssets if x.get('name', x.get('asset')) == 'SATORI']
         gatheredCurrencyUnspents = self.unspentCurrency
         currencySats = sum([x.get('value') for x in gatheredCurrencyUnspents])
         # compile inputs

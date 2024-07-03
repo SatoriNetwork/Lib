@@ -21,13 +21,15 @@ class RavencoinWallet(Wallet):
         reserve: float = .1,
         isTestnet: bool = True,
         password: Union[str, None] = None,
+        use: Wallet = None,
     ):
         super().__init__(
             walletPath,
             temporary=temporary,
             reserve=reserve,
             isTestnet=isTestnet,
-            password=password)
+            password=password,
+            use=use)
 
     def connect(self):
         self.electrumx = ElectrumXAPI(
@@ -36,7 +38,7 @@ class RavencoinWallet(Wallet):
             scripthash=self.scripthash,
             servers=[
                 'moontree.com:50002',
-                '146.190.149.237:50002',
+                # '146.190.149.237:50002',
                 # 'rvn4lyfe.com:50002', running 1.12  {"jsonrpc":"2.0","error":{"code":-32601,"message":"unknown method \"blockchain.scripthash.get_asset_balance\""},"id":1705041163840}
                 # 'ravennode-01.beep.pw:50002', dead
                 # 'ravennode-02.beep.pw:50002', dead

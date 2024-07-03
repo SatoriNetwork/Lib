@@ -21,13 +21,15 @@ class EvrmoreWallet(Wallet):
         reserve: float = .1,
         isTestnet: bool = False,
         password: Union[str, None] = None,
+        use: Wallet = None,
     ):
         super().__init__(
             walletPath,
             temporary=temporary,
             reserve=reserve,
             isTestnet=isTestnet,
-            password=password)
+            password=password,
+            use=use)
 
     def connect(self):
         self.electrumx = ElectrumXAPI(
@@ -35,7 +37,11 @@ class EvrmoreWallet(Wallet):
             address=self.address,
             scripthash=self.scripthash,
             servers=[
-                'moontree.com:50022',  # mainnet ssl evr
+                # 'moontree.com:50022',  # mainnet ssl evr
+                '146.190.149.237:50002',  # unspentCurrency issue? can't recreate
+                'electrum1-mainnet.evrmorecoin.org:50002',
+                'electrum2-mainnet.evrmorecoin.org:50002',
+
                 # '146.190.149.237:50022',  # mainnet ssl evr # not working yet
 
                 # updated to more recent version, now getting errors:
@@ -122,7 +128,7 @@ class EvrmoreWallet(Wallet):
                     AssetTransaction.satoriHex(self.symbol) +
                     TxUtils.padHexStringTo8Bytes(
                         TxUtils.intToLittleEndianHex(
-                            TxUtils.toSats(self.satoriFee)))))
+                            TxUtils.asSats(self.satoriFee)))))
             if x == OP_EVR_ASSET:
                 nextOne = True
         return False
@@ -264,6 +270,8 @@ class EvrmoreWallet(Wallet):
     def _createPartialOriginatorSimple(self, txins: list, txinScripts: list, txouts: list) -> CMutableTransaction:
         ''' simple version SIGHASH_ANYONECANPAY | SIGHASH_ALL '''
         tx = CMutableTransaction(txins, txouts)
+        # logging.debug('txins', txins)
+        # logging.debug('txouts', txouts)
         for i, (txin, txinScriptPubKey) in enumerate(zip(txins, txinScripts)):
             self._signInput(
                 tx=tx,

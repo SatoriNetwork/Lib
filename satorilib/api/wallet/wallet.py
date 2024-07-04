@@ -995,9 +995,7 @@ class Wallet():
     ) -> tuple[str, int]:
         '''
         if people do not have a balance of rvn, they can still send satori.
-        they have to pay the fee in satori, so it's a higher fee, maybe twice
-        as much on average as a normal transaction. this is because the
-        variability of the satori price. So this function produces a partial
+        they have to pay the fee in satori. So this function produces a partial
         transaction that can be sent to the server and the rest of the network
         to be completed. he who completes the transaction will pay the rvn fee
         and collect the satori fee. we will probably broadcast as a json object.
@@ -1058,6 +1056,12 @@ class Wallet():
             returnSats=True)
         if currencyChangeOut is None:
             raise TransactionFailure('unable to generate currency change')
+        # logging.debug('txins', txins, color='magenta')
+        # logging.debug('txinScripts', txinScripts, color='magenta')
+        # logging.debug('satoriOuts', satoriOuts, color='magenta')
+        # logging.debug('satoriChangeOut', satoriChangeOut, color='magenta')
+        # logging.debug('satoriFeeOut', satoriFeeOut, color='magenta')
+        # logging.debug('currencyChangeOut', currencyChangeOut, color='magenta')
         tx = self._createPartialOriginatorSimple(
             txins=txins,
             txinScripts=txinScripts,
@@ -1065,6 +1069,8 @@ class Wallet():
                 x for x in [satoriChangeOut]
                 if x is not None] + [satoriFeeOut, currencyChangeOut])
         reportedFeeSats = feeSatsReserved - currencyChange
+        # logging.debug('reportedFeeSats', reportedFeeSats, color='magenta')
+        # logging.debug('reportedFeeSats', reportedFeeSats, color='magenta')
         return tx.serialize(), reportedFeeSats
 
     def satoriOnlyCompleterSimple(
@@ -1325,13 +1331,13 @@ class Wallet():
         changeAddress: str = None,
         feeSatsReserved: int = 0
     ) -> TransactionResult:
-        # logging.debug('amount', amount, color='yellow')
-        # logging.debug('address', address, color='yellow')
-        # logging.debug('sweep', sweep, color='yellow')
-        # logging.debug('pullFeeFromAmount', pullFeeFromAmount, color='yellow')
-        # logging.debug('completerAddress', completerAddress, color='yellow')
-        # logging.debug('changeAddress', changeAddress, color='yellow')
-        # logging.debug('feeSatsReserved', feeSatsReserved, color='yellow')
+        logging.debug('amount', amount, color='yellow')
+        logging.debug('address', address, color='yellow')
+        logging.debug('sweep', sweep, color='yellow')
+        logging.debug('pullFeeFromAmount', pullFeeFromAmount, color='yellow')
+        logging.debug('completerAddress', completerAddress, color='yellow')
+        logging.debug('changeAddress', changeAddress, color='yellow')
+        logging.debug('feeSatsReserved', feeSatsReserved, color='yellow')
         if sweep:
             try:
                 if self.currency < self.reserve:
@@ -1396,7 +1402,7 @@ class Wallet():
                             success=True,
                             tx=None,
                             msg='creating partial, need feeSatsReserved.')
-                    # logging.debug('m', color='magenta')
+                    logging.debug('m', color='magenta')
                     result = self.satoriOnlyPartialSimple(
                         amount=amount,
                         address=address,

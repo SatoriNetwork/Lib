@@ -115,7 +115,7 @@ class EvrmoreWallet(Wallet):
         return evrmore.verify(address=address or self.address, message=message, signature=sig)
 
     def _checkSatoriValue(self, output: CMutableTxOut) -> bool:
-        ''' 
+        '''
         returns true if the output is a satori output of self.satoriFee
         '''
         nextOne = False
@@ -145,12 +145,16 @@ class EvrmoreWallet(Wallet):
             txin = CMutableTxIn(COutPoint(lx(
                 utxo.get('tx_hash')),
                 utxo.get('tx_pos')))
-            txinScriptPubKey = CScript([
-                OP_DUP,
-                OP_HASH160,
-                Hash160(self.publicKeyBytes),
-                OP_EQUALVERIFY,
-                OP_CHECKSIG])
+            if 'scriptPubKey' in utxo:
+                txinScriptPubKey = CScript(
+                    bytes.fromhex(utxo.get('scriptPubKey')))
+            else:
+                txinScriptPubKey = CScript([
+                    OP_DUP,
+                    OP_HASH160,
+                    Hash160(self.publicKeyBytes),
+                    OP_EQUALVERIFY,
+                    OP_CHECKSIG])
             txins.append(txin)
             txinScripts.append(txinScriptPubKey)
         # satori vins
@@ -158,19 +162,22 @@ class EvrmoreWallet(Wallet):
             txin = CMutableTxIn(COutPoint(lx(
                 utxo.get('tx_hash')),
                 utxo.get('tx_pos')))
-            txinScriptPubKey = CScript([
-                OP_DUP,
-                OP_HASH160,
-                Hash160(self.publicKeyBytes),
-                OP_EQUALVERIFY,
-                OP_CHECKSIG,
-                OP_EVR_ASSET,
-                bytes.fromhex(
-                    AssetTransaction.satoriHex(self.symbol) +
-                    TxUtils.padHexStringTo8Bytes(
-                        TxUtils.intToLittleEndianHex(int(utxo.get('value'))))),
-                OP_DROP,
-            ])
+            if 'scriptPubKey' in utxo:
+                txinScriptPubKey = CScript(
+                    bytes.fromhex(utxo.get('scriptPubKey')))
+            else:
+                txinScriptPubKey = CScript([
+                    OP_DUP,
+                    OP_HASH160,
+                    Hash160(self.publicKeyBytes),
+                    OP_EQUALVERIFY,
+                    OP_CHECKSIG,
+                    OP_EVR_ASSET,
+                    bytes.fromhex(
+                        AssetTransaction.satoriHex(self.symbol) +
+                        TxUtils.padHexStringTo8Bytes(
+                            TxUtils.intToLittleEndianHex(int(utxo.get('value'))))),
+                    OP_DROP])
             txins.append(txin)
             txinScripts.append(txinScriptPubKey)
         return txins, txinScripts

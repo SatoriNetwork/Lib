@@ -134,6 +134,12 @@ class Wallet():
         self.privateKey = ''
         self.words = ''
 
+    def open(self, password: str = None) -> None:
+        # if self.password is not None:
+        self.password = password
+        self.initRaw()
+        self.regenerate()
+
     def setAlias(self, alias: Union[str, None] = None) -> None:
         self.alias = alias
 
@@ -199,6 +205,8 @@ class Wallet():
             if not self.loadRaw():
                 self.generate()
                 self.save()
+        if self.address is None:
+            self.regenerate()
 
     def decryptWallet(self, encrypted: dict) -> dict:
         if isinstance(self.password, str):
@@ -295,7 +303,8 @@ class Wallet():
         self.words = self.yaml.get('words')
         self.publicKey = self.yaml.get('publicKey')
         self.privateKey = self.yaml.get('privateKey')
-        self.address = self.yaml.get(self.symbol, {}).get('address')
+        self.address = self.yaml.get(self.symbol, {}).get(
+            'address')
         self.scripthash = self.yaml.get('scripthash')
         if self._entropy is None:
             return False
@@ -384,6 +393,62 @@ class Wallet():
     def _generateScriptPubKeyFromAddress(self, address: str):
         ''' returns CScript object from address '''
 
+    def getUnspentSignatures(self) -> bool:
+        '''
+        we don't need to get the scriptPubKey every time we open the wallet,
+        and it requires lots of calls for individual transactions.
+        we just need them available when we're creating transactions.
+
+        '''
+        if (
+            len([
+                u for u in self.unspentCurrency + self.unspentAssets
+                if 'scriptPubKey' not in u]) == 0
+        ):
+            # already have them all
+            return True
+
+        try:
+            # make sure we're connected
+            if not hasattr(self, 'electrumx'):
+                self.connect()
+                self.get()
+            elif not self.electrumx.connected():
+                self.connect()
+
+            # get transactions, save their scriptPubKey hex to the unspents
+            for uc in self.unspentCurrency:
+                if len([tx for tx in self.transactions if tx['txid'] == uc['tx_hash']]) == 0:
+                    self.transactions.append(
+                        self.electrumx.getTransaction(uc['tx_hash']))
+                tx = [tx for tx in self.transactions if tx['txid'] == uc['tx_hash']]
+                if len(tx) > 0:
+                    vout = [vout for vout in tx[0].get(
+                        'vout', []) if vout.get('n') == uc['tx_pos']]
+                    if len(vout) > 0:
+                        scriptPubKey = vout[0].get(
+                            'scriptPubKey', {}).get('hex', None)
+                        if scriptPubKey is not None:
+                            uc['scriptPubKey'] = scriptPubKey
+            for ua in self.unspentAssets:
+                if len([tx for tx in self.transactions if tx['txid'] == ua['tx_hash']]) == 0:
+                    self.transactions.append(
+                        self.electrumx.getTransaction(ua['tx_hash']))
+                tx = [tx for tx in self.transactions if tx['txid'] == ua['tx_hash']]
+                if len(tx) > 0:
+                    vout = [vout for vout in tx[0].get(
+                        'vout', []) if vout.get('n') == ua['tx_pos']]
+                    if len(vout) > 0:
+                        scriptPubKey = vout[0].get(
+                            'scriptPubKey', {}).get('hex', None)
+                        if scriptPubKey is not None:
+                            ua['scriptPubKey'] = scriptPubKey
+        except Exception as e:
+            logging.warning(
+                'unable to acquire signatures of unspent transactions, maybe unable to send', e)
+            return False
+        return True
+
     def get(self, allWalletInfo=False):
         ''' gets data from the blockchain, saves to attributes '''
 
@@ -422,7 +487,7 @@ class Wallet():
         # todo:
         # on connect ask for peers, add each to our list of electrumxServers
         # if unable to connect, remove that server from our list
-        if not hasattr(self, 'electrumx'):
+        if not hasattr(self, 'electrumx') or not self.electrumx.connected():
             self.connect()
         self.electrumx.get(allWalletInfo)
         self.currencyOnChain = self.electrumx.currency
@@ -441,7 +506,9 @@ class Wallet():
         # for logging purposes
         for x in self.unspentCurrency:
             openSafely(x, 'value')
-        self.currency = sum([x.get('value') for x in self.unspentCurrency])
+        self.currency = sum([
+            x.get('value')for x in self.unspentCurrency
+            if x.get('asset') == None])
         # for logging purposes
         # for x in self.unspentAssets:
         #    openSafely(x, 'value')
@@ -1331,13 +1398,6 @@ class Wallet():
         changeAddress: str = None,
         feeSatsReserved: int = 0
     ) -> TransactionResult:
-        logging.debug('amount', amount, color='yellow')
-        logging.debug('address', address, color='yellow')
-        logging.debug('sweep', sweep, color='yellow')
-        logging.debug('pullFeeFromAmount', pullFeeFromAmount, color='yellow')
-        logging.debug('completerAddress', completerAddress, color='yellow')
-        logging.debug('changeAddress', changeAddress, color='yellow')
-        logging.debug('feeSatsReserved', feeSatsReserved, color='yellow')
         if sweep:
             try:
                 if self.currency < self.reserve:
@@ -1402,7 +1462,6 @@ class Wallet():
                             success=True,
                             tx=None,
                             msg='creating partial, need feeSatsReserved.')
-                    logging.debug('m', color='magenta')
                     result = self.satoriOnlyPartialSimple(
                         amount=amount,
                         address=address,

@@ -260,13 +260,18 @@ class SatoriServerClient(object):
 
     def minedToVault(self) -> Union[bool, None]:
         '''  '''
-        response = self._makeAuthenticatedCall(
-            function=requests.get,
-            endpoint='/mine_to_vault/status')
-        if response.status_code > 399:
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/mine_to_vault/status')
+            if response.status_code > 399:
+                return None
+            if response.text in ['', 'null', 'None', 'NULL']:
+                return False
+        except Exception as e:
+            logging.warning(
+                'unable to determine status of Mine-To-Vault feature due to connection timeout; try again Later.', e, color='yellow')
             return None
-        if response.text in ['', 'null', 'None', 'NULL']:
-            return False
         return True
 
     def enableMineToVault(
@@ -281,15 +286,20 @@ class SatoriServerClient(object):
             walletSignature = walletSignature.decode()
         if isinstance(vaultSignature, bytes):
             vaultSignature = vaultSignature.decode()
-        response = self._makeAuthenticatedCall(
-            function=requests.post,
-            endpoint='/mine_to_vault/enable',
-            json=json.dumps({
-                'walletSignature': walletSignature,
-                'vaultSignature': vaultSignature,
-                'vaultPubkey': vaultPubkey,
-                'address': address}))
-        return response.status_code < 400, response.text
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/mine_to_vault/enable',
+                json=json.dumps({
+                    'walletSignature': walletSignature,
+                    'vaultSignature': vaultSignature,
+                    'vaultPubkey': vaultPubkey,
+                    'address': address}))
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to enable status of Mine-To-Vault feature due to connection timeout; try again Later.', e, color='yellow')
+            return False, ''
 
     def disableMineToVault(
         self,
@@ -303,27 +313,43 @@ class SatoriServerClient(object):
             walletSignature = walletSignature.decode()
         if isinstance(vaultSignature, bytes):
             vaultSignature = vaultSignature.decode()
-        response = self._makeAuthenticatedCall(
-            function=requests.post,
-            endpoint='/mine_to_vault/disable',
-            json=json.dumps({
-                'walletSignature': walletSignature,
-                'vaultSignature': vaultSignature,
-                'vaultPubkey': vaultPubkey,
-                'address': address}))
-        return response.status_code < 400, response.text
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/mine_to_vault/disable',
+                json=json.dumps({
+                    'walletSignature': walletSignature,
+                    'vaultSignature': vaultSignature,
+                    'vaultPubkey': vaultPubkey,
+                    'address': address}))
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to disable status of Mine-To-Vault feature due to connection timeout; try again Later.', e, color='yellow')
+            return False, ''
 
     def betaStatus(self) -> tuple[bool, dict]:
         ''' removes a stream from the server '''
-        response = self._makeAuthenticatedCall(
-            function=requests.get,
-            endpoint='/beta/status')
-        return response.status_code < 400,  response.json()
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/beta/status')
+            return response.status_code < 400, response.json()
+        except Exception as e:
+            logging.warning(
+                'unable to get beta status due to connection timeout; try again Later.', e, color='yellow')
+            return False, {}
 
     def betaClaim(self, ethAddress: str) -> tuple[bool, dict]:
         ''' removes a stream from the server '''
-        response = self._makeAuthenticatedCall(
-            function=requests.post,
-            endpoint='/beta/claim',
-            json=json.dumps({'ethAddress': ethAddress}))
-        return response.status_code < 400,  response.json()
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/beta/claim',
+                json=json.dumps({'ethAddress': ethAddress}))
+            return response.status_code < 400,  response.json()
+        except Exception as e:
+            logging.warning(
+                'unable to claim beta due to connection timeout; try again Later.', e, color='yellow')
+            return False, {}
+

@@ -23,25 +23,91 @@ class SatoriPubSubConn(object):
         router: Union['function', None] = None, listening: bool = True,
         then: Union[str, None] = None, command: str = 'key', threaded: bool = True,
         onConnect: callable = None, onDisconnect: callable = None,
+        emergencyRestart: callable = None,
         *args, **kwargs
     ):
         self.uid = uid
-        self.url = url or 'ws://satorinet.io:3000'
+        self.url = url or 'ws://pubsub.satorinet.io:3000'
         self.onConnect = onConnect
         self.onDisconnect = onDisconnect
         self.router = router
         self.payload = payload
         self.command = command
-        self.connect()
+        self.topicTime: dict[str, float] = {}
         self.listening = listening
         self.threaded = threaded
         self.shouldReconnect = True
+        self.ws = None
+        self.then = then
+        self.emergencyRestart = emergencyRestart
         if self.threaded:
-            self.ear = threading.Thread(target=self.listen, daemon=True)
+            self.ear = threading.Thread(
+                target=self.connectThenListen, daemon=True)
             self.ear.start()
-        if then is not None:
-            time.sleep(3)
-            self.send(then)
+
+    def connectThenListen(self):
+        while True:
+            self.connect()
+            if self.ws and self.ws.connected:
+                if self.then is not None:
+                    time.sleep(3)
+                    self.send(self.then)
+                    # don't send again
+                    self.then = None
+                self.listen()
+            time.sleep(60)
+
+    def connect(self):
+        import websocket
+        self.ws = self.ws or websocket.WebSocket()
+        while not self.ws.connected:
+            try:
+                self.ws.connect(f'{self.url}?uid={self.uid}')
+                if isinstance(self.onConnect, Callable):
+                    self.onConnect()
+                self.send(self.command + ':' + self.payload)
+                logging.info('connected to:', self.url, 'for', 'publishing' if self.router ==
+                             None else 'subscriptions', color='green')
+                return self.ws
+            except Exception as e:
+                # except OSError as e:
+                # OSError: [Errno 99] Cannot assign requested address
+                # pubsub server went down
+                logging.error(
+                    e, f'\ndropped {"publishing" if self.router is None else "subscribing"} {self.url}, retrying in 60 seconds...')
+                if isinstance(self.onDisconnect, Callable):
+                    self.onDisconnect()
+                time.sleep(60)
+
+    def listen(self):
+        while True:
+            if not self.ws or not self.ws.connected:
+                logging.error('WebSocket is not connected, reconnecting...')
+                time.sleep(60)
+                break
+            try:
+                response = self.ws.recv()
+                try:
+                    if response == '---STOP!---':
+                        self.emergencyRestart()
+                except Exception as _:
+                    pass
+                # don't break listener because of router behavior
+                try:
+                    if self.router is not None:
+                        self.router(response)
+                except Exception as _:
+                    pass
+            except Exception as e:
+                # except WebSocketConnectionClosedException as e:
+                # except ConnectionResetError:
+                logging.error(
+                    e, '\nfailed while listening Satori Pubsub, reconnecting in 60 seconds...', print=True)
+                time.sleep(60)
+                break
+
+    def setTopicTime(self, topic: str):
+        self.topicTime[topic] = time.time()
 
     # old never called, necessary?
     def reestablish(self, err: str = '', payload: str = None):
@@ -68,63 +134,25 @@ class SatoriPubSubConn(object):
             command=self.command,
             then=payload)
 
-    def listen(self):
-        logging.info('listening to Satori Pubsub', print=True)
-        while True:
-            try:
-                response = self.ws.recv()
-                # don't break listener because of router behavior
-                try:
-                    self.router(response)
-                except Exception as _:
-                    pass
-            except Exception as e:
-                # except WebSocketConnectionClosedException as e:
-                # except ConnectionResetError:
-                logging.error(
-                    e, '\nfailed while listening Satori Pubsub, reconnecting in 30 seconds...', print=True)
-                time.sleep(30)
-                self.connect()
-
-    def connect(self):
-        import websocket
-        ws = websocket.WebSocket()
-        while not ws.connected:
-            try:
-                ws.connect(f'{self.url}?uid={self.uid}')
-                if isinstance(self.onConnect, Callable):
-                    self.onConnect()
-                self.ws = ws
-                self.send(self.command + ':' + self.payload)
-                logging.info('connected to Satori Pubsub', print=True)
-                return ws
-            except Exception as e:
-                # except OSError as e:
-                # OSError: [Errno 99] Cannot assign requested address
-                # pubsub server went down
-                logging.error(
-                    e, '\nfailed to connect to Satori Pubsub, retrying in 30 seconds...', print=True)
-                if isinstance(self.onDisconnect, Callable):
-                    self.onDisconnect()
-                time.sleep(30)
-
     def send(
         self,
         payload: Union[str, None] = None,
         title: Union[str, None] = None,
         topic: Union[str, None] = None,
         data: Union[str, None] = None,
-        time: Union[str, None] = None,
+        observationTime: Union[str, None] = None,
         observationHash: Union[str, None] = None,
     ):
+        if self.ws.connected == False:
+            return
         if payload is None and title is None and topic is None and data is None:
             raise ValueError(
                 'payload or (title, topic, data) must not be None')
         payload = payload or (
             title + ':' + json.dumps({
                 'topic': topic,
-                'time': str(time),
                 'data': str(data),
+                'time': str(observationTime),
                 'hash': str(observationHash),
             }))
         try:
@@ -135,13 +163,19 @@ class SatoriPubSubConn(object):
             # WebSocketTimeoutException
             logging.error(
                 e, '\nfailed while sending to Satori Pubsub, reconnecting in 30 seconds...', print=True)
-            import time as t
-            t.sleep(30)
+            time.sleep(30)
             self.connect()
 
-    def publish(self, topic: str, data: str, time: str, observationHash: str):
-        self.send(title='publish', topic=topic, data=data,
-                  time=time, observationHash=observationHash)
+    def publish(self, topic: str, data: str, observationTime: str, observationHash: str):
+        if self.topicTime.get('topic', 0) > time.time() - 55:
+            return
+        self.setTopicTime(topic)
+        self.send(
+            title='publish',
+            topic=topic,
+            data=data,
+            observationTime=observationTime,
+            observationHash=observationHash)
 
     def disconnect(self, reconnect: bool = False):
         self.shouldReconnect = reconnect

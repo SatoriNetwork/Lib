@@ -53,7 +53,8 @@ class ModelApi(ModelDiskApi):
                 return joblib.load(modelPath)
             except Exception as e:
                 # returning False should overwrite the problematic model
-                logging.error(e)
+                os.path.remove(modelPath)
+                logging.error('model err', modelPath, streamId, e)
         return False
 
     @staticmethod

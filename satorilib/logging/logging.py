@@ -4,6 +4,12 @@ import logging
 from typing import Union, Callable
 from satorilib.utils import colored, colors, styles
 
+DEBUG = logging.DEBUG
+INFO = logging.INFO
+WARNING = logging.WARNING
+ERROR = logging.ERROR
+CRITICAL = logging.CRITICAL
+
 
 class ColoredFormatter(logging.Formatter):
     DEFAULT_COLOR_MAP = {
@@ -56,7 +62,9 @@ def setup(
         stream_handler.setLevel(level)
         stream_handler.setFormatter(formatter)
         handlers = [stream_handler]
-    logging.basicConfig(handlers=handlers)
+    logging.basicConfig(
+        level=level,
+        handlers=handlers)
 
     def log_unhandled_exception(exc_type, exc_value, exc_traceback):
         logging.critical("Unhandled exception", exc_info=(

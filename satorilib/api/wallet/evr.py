@@ -18,7 +18,7 @@ class EvrmoreWallet(Wallet):
         self,
         walletPath: str,
         temporary: bool = False,
-        reserve: float = .1,
+        reserve: float = .0001,
         isTestnet: bool = False,
         password: Union[str, None] = None,
         use: Wallet = None,
@@ -32,35 +32,46 @@ class EvrmoreWallet(Wallet):
             use=use)
 
     def connect(self):
-        self.electrumx = ElectrumXAPI(
-            chain=self.chain,
-            address=self.address,
-            scripthash=self.scripthash,
-            servers=[
-                # 'moontree.com:50022',  # mainnet ssl evr
-                '146.190.149.237:50002',  # unspentCurrency issue? can't recreate
-                'electrum1-mainnet.evrmorecoin.org:50002',
-                'electrum2-mainnet.evrmorecoin.org:50002',
+        i = 0
+        while i < 3:
+            i += 1
+            try:
+                self.electrumx = ElectrumXAPI(
+                    chain=self.chain,
+                    address=self.address,
+                    scripthash=self.scripthash,
+                    servers=[
+                        # 'moontree.com:50022',  # mainnet ssl evr
+                        '146.190.149.237:50002',  # unspentCurrency issue? can't recreate
+                        'electrum1-mainnet.evrmorecoin.org:50002',
+                        'electrum2-mainnet.evrmorecoin.org:50002',
 
-                # '146.190.149.237:50022',  # mainnet ssl evr # not working yet
+                        # '146.190.149.237:50022',  # mainnet ssl evr # not working yet
 
-                # updated to more recent version, now getting errors:
-                # """{'code': -32601, 'message': 'unknown method "blockchain.scripthash.listassets"'} <class 'dict'>"""
-                # 'electrum1-mainnet.evrmorecoin.org:50002',  # ssl
-                # 'electrum2-mainnet.evrmorecoin.org:50002',  # ssl
+                        # updated to more recent version, now getting errors:
+                        # """{'code': -32601, 'message': 'unknown method "blockchain.scripthash.listassets"'} <class 'dict'>"""
+                        # 'electrum1-mainnet.evrmorecoin.org:50002',  # ssl
+                        # 'electrum2-mainnet.evrmorecoin.org:50002',  # ssl
 
-                # no good:
-                # 'electrum1-mainnet.evrmorecoin.org:50001',  # tcp
-                # 'electrum2-mainnet.evrmorecoin.org:50001',  # tcp
-                # 'moontree.com:50021',  # mainnet tcp evr
-                # 'moontree.com:50031', # testnet tcp evr
-                # 'moontree.com:50032', # testnet ssl evr
-                # 'electrum1-mainnet.evrmorecoin.org:50004', # wss
-                # 'electrum2-mainnet.evrmorecoin.org:50004', # wss
-                # 'electrum1-testnet.evrmorecoin.org:50001', # tcp
-                # 'electrum1-testnet.evrmorecoin.org:50002', # ssl
-                # 'electrum1-testnet.evrmorecoin.org:50004', # wss
-            ])
+                        # no good:
+                        # 'electrum1-mainnet.evrmorecoin.org:50001',  # tcp
+                        # 'electrum2-mainnet.evrmorecoin.org:50001',  # tcp
+                        # 'moontree.com:50021',  # mainnet tcp evr
+                        # 'moontree.com:50031', # testnet tcp evr
+                        # 'moontree.com:50032', # testnet ssl evr
+                        # 'electrum1-mainnet.evrmorecoin.org:50004', # wss
+                        # 'electrum2-mainnet.evrmorecoin.org:50004', # wss
+                        # 'electrum1-testnet.evrmorecoin.org:50001', # tcp
+                        # 'electrum1-testnet.evrmorecoin.org:50002', # ssl
+                        # 'electrum1-testnet.evrmorecoin.org:50004', # wss
+                    ])
+                break
+            except Exception as e:
+                logging.warning(
+                    'unable to connect to Evrmore servers, continuing with limited wallet ability', e)
+                # import time
+                # time.sleep(30)
+                break
 
     @property
     def symbol(self) -> str:

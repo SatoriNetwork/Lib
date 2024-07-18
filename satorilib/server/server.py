@@ -4,6 +4,7 @@ it returns a key you use to make a websocket connection with the pubsub server.
 '''
 from typing import Union
 from functools import partial
+import time
 import json
 import requests
 from satorilib import logging
@@ -15,30 +16,39 @@ class SatoriServerClient(object):
         self,
         wallet: Wallet,
         url: str = None,
+        sendingUrl: str = None,
         *args, **kwargs
     ):
         self.wallet = wallet
-        self.url = url or 'https://satorinet.io'
+        self.url = url or 'https://central.satorinet.io'
+        self.sendingUrl = sendingUrl or 'https://mundo.satorinet.io'
+        self.topicTime: dict[str, float] = {}
+
+    def setTopicTime(self, topic: str):
+        self.topicTime[topic] = time.time()
 
     def _getChallenge(self):
-        return requests.get(self.url + '/time').text
+        # return requests.get(self.url + '/time').text
+        return str(time.time())
 
     def _makeAuthenticatedCall(
         self,
         function: callable,
         endpoint: str,
+        url: str = None,
         json: Union[str, None] = None,
         challenge: str = None,
         useWallet: Wallet = None,
         extraHeaders: Union[dict, None] = None,
-    ):
+        raiseForStatus: bool = True,
+    ) -> requests.Response:
         if json is not None:
             logging.info(
-                'outgoing Satori server message:',
+                'outgoing:',
                 json[0:40], f'{"..." if len(json) > 40 else ""}',
                 print=True)
         r = function(
-            self.url + endpoint,
+            (url or self.url) + endpoint,
             headers={
                 **(useWallet or self.wallet).authPayload(
                     asDict=True,
@@ -46,13 +56,15 @@ class SatoriServerClient(object):
                 **(extraHeaders or {}),
             },
             json=json)
-        try:
-            r.raise_for_status()
-        except requests.exceptions.HTTPError as e:
-            logging.error('authenticated server err:', r.text, e, color='red')
-            r.raise_for_status()
+        if raiseForStatus:
+            try:
+                r.raise_for_status()
+            except requests.exceptions.HTTPError as e:
+                logging.error('authenticated server err:',
+                              r.text, e, color='red')
+                r.raise_for_status()
         logging.info(
-            'incoming Satori server message:',
+            'incoming:',
             r.text[0:40], f'{"..." if len(r.text) > 40 else ""}',
             print=True)
         return r
@@ -61,6 +73,7 @@ class SatoriServerClient(object):
         self,
         function: callable,
         endpoint: str,
+        url: str = None,
         headers: Union[dict, None] = None,
         payload: Union[str, bytes, None] = None,
     ):
@@ -79,7 +92,7 @@ class SatoriServerClient(object):
         else:
             headers = headers or {}
         r = function(
-            self.url + endpoint,
+            (url or self.url) + endpoint,
             headers=headers,
             json=json,
             data=data)
@@ -115,14 +128,14 @@ class SatoriServerClient(object):
             json=payload or json.dumps(subscription))
 
     def registerPin(self, pin: dict, payload: str = None):
-        ''' 
+        '''
         report a pin to the server.
         example: {
-            'author': {'pubkey': '22a85fb71485c6d7c62a3784c5549bd3849d0afa3ee44ce3f9ea5541e4c56402d8'}, 
-            'stream': {'source': 'satori', 'pubkey': '22a85fb71485c6d7c62a3784c5549bd3849d0afa3ee44ce3f9ea5541e4c56402d8', 'stream': 'stream1', 'target': 'target', 'cadence': None, 'offset': None, 'datatype': None, 'url': None, 'description': 'raw data'},, 
-            'ipns': 'ipns', 
-            'ipfs': 'ipfs', 
-            'disk': 1, 
+            'author': {'pubkey': '22a85fb71485c6d7c62a3784c5549bd3849d0afa3ee44ce3f9ea5541e4c56402d8'},
+            'stream': {'source': 'satori', 'pubkey': '22a85fb71485c6d7c62a3784c5549bd3849d0afa3ee44ce3f9ea5541e4c56402d8', 'stream': 'stream1', 'target': 'target', 'cadence': None, 'offset': None, 'datatype': None, 'url': None, 'description': 'raw data'},,
+            'ipns': 'ipns',
+            'ipfs': 'ipfs',
+            'disk': 1,
             'count': 27},
         '''
         return self._makeAuthenticatedCall(
@@ -161,17 +174,25 @@ class SatoriServerClient(object):
 
     def checkin(self, referrer: str = None) -> dict:
         challenge = self._getChallenge()
-        return self._makeAuthenticatedCall(
+        response = self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/checkin',
             json=self.wallet.registerPayload(challenge=challenge),
             challenge=challenge,
-            extraHeaders={'referrer': referrer} if referrer else {}).json()
+            extraHeaders={'referrer': referrer} if referrer else {},
+            raiseForStatus=False)
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            logging.error('unable to checkin:', response.text, e, color='red')
+            return {'ERROR': response.text}
+        return response.json()
 
     def requestSimplePartial(self, network: str):
         ''' sends a satori partial transaction to the server '''
         return self._makeUnauthenticatedCall(
             function=requests.get,
+            url=self.sendingUrl,
             endpoint=f'/simple_partial/request/{network}').json()
 
     def broadcastSimplePartial(
@@ -179,12 +200,14 @@ class SatoriServerClient(object):
         tx: bytes,
         feeSatsReserved: float,
         reportedFeeSats: float,
+        walletId: float,
         network: str
     ):
         ''' sends a satori partial transaction to the server '''
         return self._makeUnauthenticatedCall(
             function=requests.post,
-            endpoint=f'/simple_partial/broadcast/{network}/{feeSatsReserved}/{reportedFeeSats}',
+            url=self.sendingUrl,
+            endpoint=f'/simple_partial/broadcast/{network}/{feeSatsReserved}/{reportedFeeSats}/{walletId}',
             payload=tx)
 
     def removeWalletAlias(self):
@@ -353,3 +376,39 @@ class SatoriServerClient(object):
                 'unable to claim beta due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
 
+    def publish(
+        self,
+        topic: str,
+        data: str,
+        observationTime: str,
+        observationHash: str,
+        isPrediction: bool = True,
+    ) -> Union[bool, None]:
+        ''' publish predictions '''
+        if isPrediction and self.topicTime.get(topic, 0) > time.time() - 60*60*6:
+            return
+        self.setTopicTime(topic)
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.post,
+                endpoint='/record/prediction' if isPrediction else '/record/observation',
+                payload=json.dumps({
+                    'topic': topic,
+                    'data': str(data),
+                    'time': str(observationTime),
+                    'hash': str(observationHash),
+                }))
+            # response = self._makeAuthenticatedCall(
+            #    function=requests.get,
+            #    endpoint='/record/prediction')
+            if response.status_code == 200:
+                return True
+            if response.status_code > 399:
+                return None
+            if response.text.lower() in ['fail', 'null', 'none', 'error']:
+                return False
+        except Exception as _:
+            # logging.warning(
+            #    'unable to determine if prediction was accepted; try again Later.', e, color='yellow')
+            return None
+        return True

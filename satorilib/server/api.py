@@ -7,6 +7,7 @@ Satroi Neurons
 class CheckinDetails:
     ''' 
         {'key': '...',
+        'oracleKey': '...',
         'idKey': '...',
         'subscriptionKeys': [],
         'publicationKeys': [],
@@ -16,8 +17,16 @@ class CheckinDetails:
     '''
 
     def __init__(self, raw: dict):
+        # thwart
+        if 'ERROR' in raw:
+            import time
+            time.sleep(60*10)
+            if raw['ERROR'] == 'Encountered one Neuron per machine limitation. Please Try Again Later.':
+                time.sleep(60*60*24)
+
         self.raw = raw
         self.key: str = raw.get('key')
+        self.oracleKey: str = raw.get('oracleKey')
         self.idKey: str = raw.get('idKey')
         self.subscriptionKeys: list[str] = raw.get('subscriptionKeys')
         self.publicationKeys: list[str] = raw.get('publicationKeys')
@@ -29,6 +38,7 @@ class CheckinDetails:
         return (
             'CheckinDetails('
             f'\n\tkey: {self.key},'
+            f'\n\toracleKey: {self.oracleKey},'
             f'\n\tidKey: {self.idKey},'
             f'\n\tsubscriptionKeys: {self.subscriptionKeys},'
             f'\n\tpublicationKeys: {self.publicationKeys},'

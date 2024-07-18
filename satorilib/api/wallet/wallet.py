@@ -39,12 +39,12 @@ class Wallet():
         self,
         walletPath: str,
         temporary: bool = False,
-        reserve: float = .01,
+        reserve: float = .003,
         isTestnet: bool = False,
         password: str = None,
         use: 'Wallet' = None,
     ):
-        self.satoriFee = .01  # ~50 cents
+        self.satoriFee = 0.00000001
         self.isTestnet = isTestnet
         self.password = password
         self._entropy = None
@@ -205,7 +205,7 @@ class Wallet():
             if not self.loadRaw():
                 self.generate()
                 self.save()
-        if self.address is None:
+        if self.address or self._privateKeyObj is None:
             self.regenerate()
 
     def decryptWallet(self, encrypted: dict) -> dict:
@@ -488,8 +488,20 @@ class Wallet():
         # on connect ask for peers, add each to our list of electrumxServers
         # if unable to connect, remove that server from our list
         if not hasattr(self, 'electrumx') or not self.electrumx.connected():
-            self.connect()
-        self.electrumx.get(allWalletInfo)
+            try:
+                self.connect()
+            except Exception as e:
+                return
+
+        try:
+            self.electrumx.get(allWalletInfo)
+        except Exception as e:
+            try:
+                self.connect()
+                self.electrumx.get(allWalletInfo)
+            except Exception as e:
+                return
+
         self.currencyOnChain = self.electrumx.currency
         self.balanceOnChain = self.electrumx.balance
         self.stats = self.electrumx.stats
@@ -604,7 +616,7 @@ class Wallet():
         unspentCurrency = [
             x for x in self.unspentCurrency if x.get('value') == exactSats]
         if len(unspentCurrency) == 0:
-            return False
+            return None
         return unspentCurrency[0]
 
     def _gatherOneCurrencyUnspent(self, atleastSats: int = 0) -> tuple:

@@ -8,6 +8,7 @@ import time
 import json
 import requests
 from satorilib import logging
+from satorilib.api.time.time import timeToTimestamp
 from satorilib.api.wallet import Wallet
 
 
@@ -23,6 +24,7 @@ class SatoriServerClient(object):
         self.url = url or 'https://central.satorinet.io'
         self.sendingUrl = sendingUrl or 'https://mundo.satorinet.io'
         self.topicTime: dict[str, float] = {}
+        self.lastCheckin: int = 0
 
     def setTopicTime(self, topic: str):
         self.topicTime[topic] = time.time()
@@ -186,7 +188,24 @@ class SatoriServerClient(object):
         except requests.exceptions.HTTPError as e:
             logging.error('unable to checkin:', response.text, e, color='red')
             return {'ERROR': response.text}
+        self.lastCheckin = time.time()
         return response.json()
+
+    def checkinCheck(self) -> bool:
+        challenge = self._getChallenge()
+        response = self._makeAuthenticatedCall(
+            function=requests.post,
+            endpoint='/checkin/check',
+            json=self.wallet.registerPayload(challenge=challenge),
+            challenge=challenge,
+            extraHeaders={'changesSince': timeToTimestamp(self.lastCheckin)},
+            raiseForStatus=False)
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            logging.error('unable to checkin:', response.text, e, color='red')
+            return False
+        return response.text.lower() == 'true'
 
     def requestSimplePartial(self, network: str):
         ''' sends a satori partial transaction to the server '''
@@ -385,7 +404,9 @@ class SatoriServerClient(object):
         isPrediction: bool = True,
     ) -> Union[bool, None]:
         ''' publish predictions '''
-        if isPrediction and self.topicTime.get(topic, 0) > time.time() - 60*60:
+        if isPrediction and self.topicTime.get(topic, 0) > time.time() - 30:
+            return
+        if isPrediction and self.topicTime.get(topic, 0) > time.time() - 55:
             return
         self.setTopicTime(topic)
         try:

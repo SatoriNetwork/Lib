@@ -27,7 +27,7 @@ class SatoriPubSubConn(object):
         *args, **kwargs
     ):
         self.uid = uid
-        self.url = url or 'ws://pubsub.satorinet.io:3000'
+        self.url = url or 'ws://pubsub.satorinet.io:24603'
         self.onConnect = onConnect
         self.onDisconnect = onDisconnect
         self.router = router
@@ -180,7 +180,7 @@ class SatoriPubSubConn(object):
     def disconnect(self, reconnect: bool = False):
         self.shouldReconnect = reconnect
         self.listening = False
-        self.send(title='notify', topic='connection', data='False')
+        self.send(title='notic', topic='connection', data='False')
         if isinstance(self.onDisconnect, Callable):
             self.onDisconnect()
         self.ws.close()  # server should detect we closed the connection

@@ -66,7 +66,7 @@ class Wallet():
         self.transactionHistory: list[dict] = None if use is None else use.transactionHistory
         self.transactions = [] if use is None else use.transactions  # TransactionStruct
         self.assetTransactions = [] if use is None else use.assetTransactions
-        self.electrumx = None if use is None else use.electrumx
+        self.electrumx = None if use is None else use.electrumx #ElectrumXAPI
         self.currencyOnChain = None if use is None else use.currencyOnChain
         self.balanceOnChain = None if use is None else use.balanceOnChain
         self.unspentCurrency = None if use is None else use.unspentCurrency

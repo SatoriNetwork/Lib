@@ -42,9 +42,10 @@ class EvrmoreWallet(Wallet):
                     scripthash=self.scripthash,
                     servers=[
                         # 'moontree.com:50022',  # mainnet ssl evr
-                        '146.190.149.237:50002',  # unspentCurrency issue? can't recreate
+                        '146.190.149.237:50002',
+                        '146.190.38.120:50002',  # backup - maybe just use for server
                         'electrum1-mainnet.evrmorecoin.org:50002',
-                        'electrum2-mainnet.evrmorecoin.org:50002',
+                        'electrum2-mainnet.evrmorecoin.org:50002',  # keeps erroring out
 
                         # '146.190.149.237:50022',  # mainnet ssl evr # not working yet
 

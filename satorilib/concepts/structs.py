@@ -259,6 +259,9 @@ class StreamIdMap():
 
 
 class Stream:
+    
+    minimumCadence = 60*10
+    
     def __init__(
         self,
         streamId: StreamId,
@@ -309,6 +312,7 @@ class Stream:
     def id(self):
         return self.streamId
 
+        
     @staticmethod
     def fromMap(rep: dict = None):
         def extractKnownKwarg(key: str, rep: dict = None):

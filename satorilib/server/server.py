@@ -10,6 +10,7 @@ import requests
 from satorilib import logging
 from satorilib.api.time.time import timeToTimestamp
 from satorilib.api.wallet import Wallet
+from satorilib.concepts.structs import Stream
 
 
 class SatoriServerClient(object):
@@ -404,9 +405,11 @@ class SatoriServerClient(object):
         isPrediction: bool = True,
     ) -> Union[bool, None]:
         ''' publish predictions '''
-        if isPrediction and self.topicTime.get(topic, 0) > time.time() - 30:
-            return
-        if isPrediction and self.topicTime.get(topic, 0) > time.time() - 55:
+        # if not isPrediction and self.topicTime.get(topic, 0) > time.time() - (Stream.minimumCadence*.95):
+        #    return
+        # if isPrediction and self.topicTime.get(topic, 0) > time.time() - 60*60:
+        #    return
+        if self.topicTime.get(topic, 0) > time.time() - (Stream.minimumCadence*.95):
             return
         self.setTopicTime(topic)
         try:

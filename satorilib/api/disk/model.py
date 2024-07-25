@@ -54,7 +54,7 @@ class ModelApi(ModelDiskApi):
             except Exception as e:
                 # returning False should overwrite the problematic model
                 os.remove(modelPath)
-                logging.error('model err', modelPath, streamId, e)
+                # logging.error('model err', modelPath, streamId, e)
         return False
 
     @staticmethod

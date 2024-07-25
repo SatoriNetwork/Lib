@@ -180,7 +180,7 @@ class SatoriPubSubConn(object):
     def disconnect(self, reconnect: bool = False):
         self.shouldReconnect = reconnect
         self.listening = False
-        self.send(title='notic', topic='connection', data='False')
+        self.send(title='notice', topic='connection', data='False')
         if isinstance(self.onDisconnect, Callable):
             self.onDisconnect()
         self.ws.close()  # server should detect we closed the connection

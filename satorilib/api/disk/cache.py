@@ -493,9 +493,10 @@ class Cached:
             from satorineuron.init.start import getStart
             self._disk = getStart().cacheOf(self.streamId)
             if not hasattr(self, '_disk') or self._disk is None:
-                logging.error(
-                    'self.disk for this stream missing, subscribed',
-                    self.streamId, self.streamId.generateHash)
+                # logging.error(
+                #    'self.disk for this stream missing, subscribed',
+                #    self.streamId, self.streamId.generateHash)
+                pass
         return self._disk
 
     @property

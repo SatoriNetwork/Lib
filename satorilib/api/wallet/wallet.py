@@ -1,6 +1,7 @@
 from typing import Union
 import os
 import json
+import sqlite3
 from base64 import b64encode, b64decode
 from random import randrange
 import mnemonic
@@ -72,6 +73,7 @@ class Wallet():
         self.unspentCurrency = None if use is None else use.unspentCurrency
         self.unspentAssets = None if use is None else use.unspentAssets
         self.walletPath = walletPath
+        self.walletSQLitePath = walletPath + '.sqlite'
         self.temporary = temporary
         # maintain minimum amount of currency at all times to cover fees - server only
         self.reserveAmount = reserve
@@ -1220,10 +1222,11 @@ class Wallet():
             txinScripts=txinScripts)
         return self._broadcast(self._txToHex(tx))
 
-    def sendAllTransaction(self, address: str) -> str:
+    def sendAllTransaction(self, address: str, include_currency: bool = False) -> str:
         '''
-        sweeps all Satori and currency to the address. so it has to take the fee
-        out of whatever is in the wallet rather than tacking it on at the end.
+        sweeps all Satori to the address. Sweeps all currency to a single transaction unless 
+        include_currency == True. So it has to take the fee out of whatever is in the wallet
+        rather than tacking it on at the end.
         '''
         if not Validate.address(address, self.symbol):
             raise TransactionFailure('sendAllTransaction')
@@ -1242,9 +1245,11 @@ class Wallet():
             txins, txinScripts = self._compileInputs(
                 gatheredCurrencyUnspents=gatheredCurrencyUnspents,
                 gatheredSatoriUnspents=gatheredSatoriUnspents)
-        else:
+        elif include_currency:
             txins, txinScripts = self._compileInputs(
                 gatheredCurrencyUnspents=gatheredCurrencyUnspents)
+        else:
+            raise TransactionFailure('sendAllTransaction: no satori to send')
         # determin how much currency to send: take out fee
         currencySatsLessFee = currencySats - TxUtils.estimatedFee(
             inputCount=(
@@ -1254,7 +1259,7 @@ class Wallet():
         if currencySatsLessFee < 0:
             raise TransactionFailure('tx: not enough currency to send')
         # since it's a send all, there's no change outputs
-        if len(gatheredSatoriUnspents) > 0:
+        if len(gatheredSatoriUnspents) > 0 and include_currency:
             txouts = (
                 self._compileSatoriOutputs({
                     address: TxUtils.roundSatsDownToDivisibility(
@@ -1263,8 +1268,21 @@ class Wallet():
                 (
                     self._compileCurrencyOutputs(currencySatsLessFee, address)
                     if currencySatsLessFee > 0 else []))
+        elif len(gatheredSatoriUnspents) > 0:
+            txouts = (
+                self._compileSatoriOutputs({
+                    address: TxUtils.roundSatsDownToDivisibility(
+                        sats=TxUtils.asSats(self.balanceAmount),
+                        divisibility=self.divisibility)}) +
+                (
+                    self._compileCurrencyOutputs(currencySatsLessFee, self.address)
+                    if currencySatsLessFee > 0 else []))
+        elif include_currency:
+            txouts = (
+                self._compileCurrencyOutputs(currencySatsLessFee, address)
+                if currencySatsLessFee > 0 else [])
         else:
-            txouts = self._compileCurrencyOutputs(currencySatsLessFee, address)
+            raise TransactionFailure('sendAllTransaction: no satori to send')
         tx = self._createTransaction(
             txins=txins,
             txinScripts=txinScripts,
@@ -1407,6 +1425,7 @@ class Wallet():
         amount: float,
         address: str,
         sweep: bool = False,
+        sweepCurrency: bool = False,
         pullFeeFromAmount: bool = False,
         completerAddress: str = None,
         changeAddress: str = None,
@@ -1445,7 +1464,7 @@ class Wallet():
                         reportedFeeSats=result[1],
                         msg='send transaction requires fee.')
                 # logging.debug('e', color='magenta')
-                result = self.sendAllTransaction(address)
+                result = self.sendAllTransaction(address, include_currency=sweepCurrency)
                 # logging.debug('f', result, color='magenta')
                 if result is None:
                     # logging.debug('g', color='magenta')

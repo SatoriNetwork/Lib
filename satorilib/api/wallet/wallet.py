@@ -39,7 +39,7 @@ class Wallet():
         self,
         walletPath: str,
         temporary: bool = False,
-        reserve: float = .003,
+        reserve: float = .25,
         isTestnet: bool = False,
         password: str = None,
         use: 'Wallet' = None,
@@ -66,7 +66,7 @@ class Wallet():
         self.transactionHistory: list[dict] = None if use is None else use.transactionHistory
         self.transactions = [] if use is None else use.transactions  # TransactionStruct
         self.assetTransactions = [] if use is None else use.assetTransactions
-        self.electrumx = None if use is None else use.electrumx #ElectrumXAPI
+        self.electrumx = None if use is None else use.electrumx  # ElectrumXAPI
         self.currencyOnChain = None if use is None else use.currencyOnChain
         self.balanceOnChain = None if use is None else use.balanceOnChain
         self.unspentCurrency = None if use is None else use.unspentCurrency
@@ -393,29 +393,27 @@ class Wallet():
     def _generateScriptPubKeyFromAddress(self, address: str):
         ''' returns CScript object from address '''
 
-    def getUnspentSignatures(self) -> bool:
+    def getUnspentSignatures(self, force: bool = False) -> bool:
         '''
         we don't need to get the scriptPubKey every time we open the wallet,
         and it requires lots of calls for individual transactions.
         we just need them available when we're creating transactions.
 
         '''
-        if (
+        if (not force and
             len([
-                u for u in self.unspentCurrency + self.unspentAssets
-                if 'scriptPubKey' not in u]) == 0
-        ):
+                        u for u in self.unspentCurrency + self.unspentAssets
+                        if 'scriptPubKey' not in u]) == 0
+            ):
             # already have them all
             return True
 
         try:
             # make sure we're connected
-            if not hasattr(self, 'electrumx'):
-                self.connect()
-                self.get()
-            elif not self.electrumx.connected():
+            if not hasattr(self, 'electrumx') or not self.electrumx.connected():
                 self.connect()
 
+            self.get()
             # get transactions, save their scriptPubKey hex to the unspents
             for uc in self.unspentCurrency:
                 if len([tx for tx in self.transactions if tx['txid'] == uc['tx_hash']]) == 0:
@@ -445,7 +443,7 @@ class Wallet():
                             ua['scriptPubKey'] = scriptPubKey
         except Exception as e:
             logging.warning(
-                'unable to acquire signatures of unspent transactions, maybe unable to send', e)
+                'unable to acquire signatures of unspent transactions, maybe unable to send', e, print=True)
             return False
         return True
 
@@ -514,7 +512,11 @@ class Wallet():
         self.transactions = self.electrumx.transactions or []
         self.unspentCurrency = self.electrumx.unspentCurrency
         self.unspentAssets = self.electrumx.unspentAssets
-        # get mempool balance
+        # mempool sends all unspent transactions in currency and assets so we have to filter them here:
+        self.unspentCurrency = [
+            x for x in self.unspentCurrency if x.get('asset') == None]
+        self.unspentAssets = [
+            x for x in self.unspentAssets if x.get('asset') != None]
         # for logging purposes
         for x in self.unspentCurrency:
             openSafely(x, 'value')
@@ -641,6 +643,7 @@ class Wallet():
                 'tx: must retain a reserve of currency to cover fees')
         gatheredCurrencySats = 0
         gatheredCurrencyUnspents = []
+        encounteredDust = False
         while (
             gatheredCurrencySats < sats + TxUtils.estimatedFee(
                 inputCount=inputCount + len(gatheredCurrencyUnspents),
@@ -652,9 +655,38 @@ class Wallet():
                 gatheredCurrencyUnspents.append(randomUnspent)
                 gatheredCurrencySats += randomUnspent.get('value')
             else:
-                smallestUnspent = unspentCurrency.pop(0)
-                gatheredCurrencyUnspents.append(smallestUnspent)
-                gatheredCurrencySats += smallestUnspent.get('value')
+                try:
+                    smallestUnspent = unspentCurrency.pop(0)
+                    gatheredCurrencyUnspents.append(smallestUnspent)
+                    gatheredCurrencySats += smallestUnspent.get('value')
+                except IndexError as _:
+                    # this usually happens when people have lots of dust.
+                    encounteredDust = True
+                    break
+        if encounteredDust:
+            unspentCurrency = gatheredCurrencyUnspents
+            gatheredCurrencySats = 0
+            gatheredCurrencyUnspents = []
+            while (
+                gatheredCurrencySats < sats + TxUtils.estimatedFee(
+                    inputCount=inputCount + len(gatheredCurrencyUnspents),
+                    outputCount=outputCount)
+            ):
+                if randomly:
+                    randomUnspent = unspentCurrency.pop(
+                        randrange(len(unspentCurrency)))
+                    gatheredCurrencyUnspents.append(randomUnspent)
+                    gatheredCurrencySats += randomUnspent.get('value')
+                else:
+                    try:
+                        largestUnspent = unspentCurrency.pop()
+                        gatheredCurrencyUnspents.append(largestUnspent)
+                        gatheredCurrencySats += largestUnspent.get('value')
+                    except IndexError as _:
+                        # they simply do not have enough currency to send
+                        # it might all be dust.
+                        # at least we can still try to make the transaction...
+                        break
         return (gatheredCurrencyUnspents, gatheredCurrencySats)
 
     def _gatherSatoriUnspents(

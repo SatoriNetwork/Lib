@@ -364,7 +364,7 @@ class StreamOverview():
         errs=None,
         pinned=False,
         predictions=None,
-        dataset=None,
+        # dataset=None,
         subscribers: int = '-',
         accuracy: float = '-',
         prediction: float = '-',
@@ -378,7 +378,7 @@ class StreamOverview():
         self.values = values or []
         self.errs = errs or []
         self.predictions = predictions or []
-        self.dataset = dataset
+        # self.dataset = dataset
 
     def load(self, streamOverview: 'StreamOverview'):
         self.streamId = streamOverview.streamId
@@ -390,7 +390,7 @@ class StreamOverview():
         self.values = streamOverview.values
         self.errs = streamOverview.errs
         self.predictions = streamOverview.predictions
-        self.dataset = streamOverview.dataset
+        # self.dataset = streamOverview.dataset
 
     def __str__(self):
         # return str(vars(self))
@@ -463,7 +463,7 @@ class StreamOverviews():
                 value='3548.00',
                 pinned=True,
                 errs=[],
-                dataset=None,
+                # dataset=None,
                 values=[1, 2, 3],
                 predictions=[1, 2, 3])]
 
@@ -481,7 +481,7 @@ class StreamOverviews():
                 value='-',
                 pinned=False,
                 errs=[],
-                dataset=None,
+                # dataset=None,
                 values=[1, 1, 1],
                 predictions=[1, 1, 1])]
 

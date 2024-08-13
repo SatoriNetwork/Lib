@@ -18,7 +18,7 @@ class EvrmoreWallet(Wallet):
         self,
         walletPath: str,
         temporary: bool = False,
-        reserve: float = .0001,
+        reserve: float = .25,
         isTestnet: bool = False,
         password: Union[str, None] = None,
         use: Wallet = None,

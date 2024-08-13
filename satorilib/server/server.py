@@ -383,6 +383,48 @@ class SatoriServerClient(object):
                 'unable to disable status of Mine-To-Vault feature due to connection timeout; try again Later.', e, color='yellow')
             return ''
 
+    def ticketApplication(self, tx: str) -> bool:
+        ''' gets wallet stats '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint=f'/ticket/application/{tx}')
+            if response.text in ('OK', 'OK, ALREADY EXISTS'):
+                return True
+        except Exception as e:
+            logging.warning(
+                'unable to disable status of Mine-To-Vault feature due to connection timeout; try again Later.', e, color='yellow')
+        # if response.text in ('INVALID TX', 'FAILED'):
+        return False
+
+    def ticketCheck(self) -> bool:
+        ''' gets wallet stats '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/ticket/check')
+            if response.text in ('True', 'Probably'):
+                return True
+        except Exception as e:
+            logging.warning(
+                'unable to disable status of Mine-To-Vault feature due to connection timeout; try again Later.', e, color='yellow')
+            return False
+        return False
+
+    def stakeCheck(self) -> bool:
+        ''' gets wallet stats '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/stake/check')
+            if response.text == 'TRUE':
+                return True
+        except Exception as e:
+            logging.warning(
+                'unable to disable status of Mine-To-Vault feature due to connection timeout; try again Later.', e, color='yellow')
+            return False
+        return False
+
     def betaStatus(self) -> tuple[bool, dict]:
         ''' removes a stream from the server '''
         try:

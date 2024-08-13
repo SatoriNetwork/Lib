@@ -18,7 +18,7 @@ class RavencoinWallet(Wallet):
         self,
         walletPath: str,
         temporary: bool = False,
-        reserve: float = .003,
+        reserve: float = .25,
         isTestnet: bool = True,
         password: Union[str, None] = None,
         use: Wallet = None,

@@ -6,7 +6,9 @@ Satroi Neurons
 
 class CheckinDetails:
     ''' 
-        {'key': '...',
+        {
+        'wallet': {},
+        'key': '...',
         'oracleKey': '...',
         'idKey': '...',
         'subscriptionKeys': [],
@@ -25,6 +27,7 @@ class CheckinDetails:
                 time.sleep(60*60*24)
 
         self.raw = raw
+        self.wallet: dict = raw.get('wallet')
         self.key: str = raw.get('key')
         self.oracleKey: str = raw.get('oracleKey')
         self.idKey: str = raw.get('idKey')
@@ -38,6 +41,7 @@ class CheckinDetails:
         return (
             'CheckinDetails('
             f'\n\tkey: {self.key},'
+            f'\n\twallet: {self.wallet},'
             f'\n\toracleKey: {self.oracleKey},'
             f'\n\tidKey: {self.idKey},'
             f'\n\tsubscriptionKeys: {self.subscriptionKeys},'

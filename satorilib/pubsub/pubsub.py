@@ -60,6 +60,12 @@ class SatoriPubSubConn(object):
 
     def connect(self):
         import websocket
+        if self.ws is not None:
+            try:
+                self.ws.close()
+                self.ws = None
+            except:
+                pass
         self.ws = self.ws or websocket.WebSocket()
         while not self.ws.connected:
             try:
@@ -188,6 +194,7 @@ class SatoriPubSubConn(object):
             self.onDisconnect()
         self.ws.close()  # server should detect we closed the connection
         assert (self.ws.connected == False)
+        self.ws = None
 
     def setRouter(self, router: 'function' = None):
         self.router = router

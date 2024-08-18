@@ -317,6 +317,33 @@ class SatoriServerClient(object):
             return None
         return True
 
+    def reportVault(
+        self,
+        walletSignature: Union[str, bytes],
+        vaultSignature: Union[str, bytes],
+        vaultPubkey: str,
+        address: str,
+    ) -> tuple[bool, str]:
+        ''' removes a stream from the server '''
+        if isinstance(walletSignature, bytes):
+            walletSignature = walletSignature.decode()
+        if isinstance(vaultSignature, bytes):
+            vaultSignature = vaultSignature.decode()
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/vault/report',
+                json=json.dumps({
+                    'walletSignature': walletSignature,
+                    'vaultSignature': vaultSignature,
+                    'vaultPubkey': vaultPubkey,
+                    'address': address}))
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to enable status of Mine-To-Vault feature due to connection timeout; try again Later.', e, color='yellow')
+            return False, ''
+
     def enableMineToVault(
         self,
         walletSignature: Union[str, bytes],
@@ -448,6 +475,72 @@ class SatoriServerClient(object):
         except Exception as e:
             logging.warning(
                 'unable to claim beta due to connection timeout; try again Later.', e, color='yellow')
+            return False, {}
+
+    def stakeProxyChildren(self) -> tuple[bool, dict]:
+        ''' removes a stream from the server '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/stake/proxy/children')
+            print(response.status_code < 400, response.text)
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to stakeProxyRequest due to connection timeout; try again Later.', e, color='yellow')
+            return False, {}
+
+    def stakeProxyRequest(self, address: str) -> tuple[bool, dict]:
+        ''' removes a stream from the server '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/stake/proxy/request',
+                json=json.dumps({'parent': address}))
+            print(response.status_code < 400, response.text)
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to stakeProxyRequest due to connection timeout; try again Later.', e, color='yellow')
+            return False, {}
+
+    def stakeProxyApprove(self, address: str, childId: int) -> tuple[bool, dict]:
+        ''' removes a stream from the server '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/stake/proxy/approve',
+                json=json.dumps({'child': address, 'childId': childId}))
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to stakeProxyApprove due to connection timeout; try again Later.', e, color='yellow')
+            return False, {}
+
+    def stakeProxyDeny(self, address: str, childId: int) -> tuple[bool, dict]:
+        ''' removes a stream from the server '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/stake/proxy/deny',
+                json=json.dumps({'child': address, 'childId': childId}))
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to stakeProxyDeny due to connection timeout; try again Later.', e, color='yellow')
+            return False, {}
+
+    def stakeProxyRemove(self, address: str, childId: int) -> tuple[bool, dict]:
+        ''' removes a stream from the server '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/stake/proxy/remove',
+                json=json.dumps({'child': address, 'childId': childId}))
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to stakeProxyRemove due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
 
     def publish(

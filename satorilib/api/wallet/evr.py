@@ -13,7 +13,6 @@ from satorilib.api.wallet.wallet import Wallet, TransactionFailure
 
 
 class EvrmoreWallet(Wallet):
-
     def __init__(
         self,
         walletPath: str,
@@ -66,6 +65,7 @@ class EvrmoreWallet(Wallet):
                         # 'electrum1-testnet.evrmorecoin.org:50002', # ssl
                         # 'electrum1-testnet.evrmorecoin.org:50004', # wss
                     ])
+                self.electrumx.handshake()
                 break
             except Exception as e:
                 logging.warning(

@@ -27,7 +27,7 @@ def devicePayload(asDict=False):
 
 def getDisk(path: str = '/Satori/Neuron'):
     '''
-    returns ints in gb total, used, free 
+    returns ints in gb total, used, free
     since we know this will run in a docker container and probably be mounted
     /Satori/Neuron or /Satori/Neuron/data represents the real disk of the host machine
     '''
@@ -61,6 +61,17 @@ def getRamDetails():
     ''' returns dictionary containing these keys ['total', 'available' 'percent', 'used', 'free'] '''
     return dict(psutil.virtual_memory()._asdict())
 
+def getSwapDetails():
+    ''' returns dictionary containing these keys ['total', 'available' 'percent', 'used', 'free'] '''
+    return dict(psutil.swap_memory()._asdict())
+
+def getDiskDetails():
+    ''' returns dictionary containing these keys ['total', 'available' 'percent', 'used', 'free'] '''
+    return dict(psutil.disk_usage('/')._asdict())
+
+def getUptime():
+    ''' returns dictionary containing these keys ['total', 'available' 'percent', 'used', 'free'] '''
+    return dict(psutil.boot_time())
 
 def getRamAvailablePercentage():
     ''' returns percentage of available ram as float '''

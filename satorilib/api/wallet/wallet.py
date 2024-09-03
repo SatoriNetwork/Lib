@@ -582,38 +582,6 @@ class Wallet():
         returns true if the output is a satori output of self.satoriFee
         '''
 
-    def shouldAutosecure(self):
-        return (
-            self.password is None and
-            self.balanceAmount > self.satoriFee and
-            self.autosecured())
-
-    def getAutosecureEntry(self):
-        for k, v in WalletApi.config.get('autosecure').items():
-            if k == self.address or v.get('address') == self.address:
-                return v
-
-    def autosecured(self) -> bool:
-        ''' verifies a message with the public key '''
-        config = WalletApi.config
-        entry = self.getAutosecureEntry()
-        if entry is None:
-            return False
-        # {'message': self.getRaw().get('publicKey'),
-        # 'pubkey': self.publicKey,
-        # 'address': self.address,
-        # 'signature': wallet.sign(challenge).decode()}
-        vault = config.get(config.walletPath('vault.yaml'))
-        return (
-            entry.get('message').startswith(entry.get('address')) and
-            entry.get('message').endswith(entry.get('pubkey')) and
-            entry.get('address') == vault.get(self.symbol).get('address') and
-            entry.get('pubkey') == vault.get('publicKey') and
-            self.verify(
-                address=entry.get('address'),
-                message=entry.get('message'),
-                sig=entry.get('signature')))
-
     def _gatherReservedCurrencyUnspent(self, exactSats: int = 0):
         unspentCurrency = [
             x for x in self.unspentCurrency if x.get('value') == exactSats]

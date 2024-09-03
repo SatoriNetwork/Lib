@@ -4,6 +4,7 @@ it returns a key you use to make a websocket connection with the pubsub server.
 '''
 from typing import Union
 from functools import partial
+import base64
 import time
 import json
 import requests
@@ -270,6 +271,7 @@ class SatoriServerClient(object):
             endpoint=f'/votes_for/sanction/{walletPubkey}/{vaultPubkey}').json()
 
     def submitMaifestVote(self, wallet: Wallet, votes: dict[str, int]):
+        # todo authenticate the vault instead
         return self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/vote_on/manifest',
@@ -316,6 +318,70 @@ class SatoriServerClient(object):
                 'unable to determine status of Mine-To-Vault feature due to connection timeout; try again Later.', e, color='yellow')
             return None
         return True
+
+    def mineToAddressStatus(self) -> Union[str, None]:
+        ''' get reward address '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/mine/to/address')
+            if response.status_code > 399:
+                return 'Unknown'
+            if response.text in ['null', 'None', 'NULL']:
+                return ''
+            return response.text
+        except Exception as e:
+            logging.warning(
+                'unable to get reward address; try again Later.', e, color='yellow')
+            return None
+        return None
+
+    def mineToAddress(
+        self,
+        vaultSignature: Union[str, bytes],
+        vaultPubkey: str,
+        address: str
+    ) -> tuple[bool, str]:
+        ''' set reward address '''
+        try:
+            if isinstance(vaultSignature, bytes):
+                vaultSignature = vaultSignature.decode()
+            js = json.dumps({
+                'vaultSignature': vaultSignature,
+                'vaultPubkey': vaultPubkey,
+                'address': address})
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/mine/to/address',
+                json=js)
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to set reward address; try again Later.', e, color='yellow')
+            return False, ''
+
+    def stakeForAddress(
+        self,
+        vaultSignature: Union[str, bytes],
+        vaultPubkey: str,
+        address: str
+    ) -> tuple[bool, str]:
+        ''' add stake address '''
+        try:
+            if isinstance(vaultSignature, bytes):
+                vaultSignature = vaultSignature.decode()
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/stake/for/address',
+                json=json.dumps({
+                    'vaultSignature': vaultSignature,
+                    'vaultPubkey': vaultPubkey,
+                    'address': address}))
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to determine status of mine to address feature due to connection timeout; try again Later.', e, color='yellow')
+            return False, ''
 
     def reportVault(
         self,
@@ -483,7 +549,6 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.get,
                 endpoint='/stake/proxy/children')
-            print(response.status_code < 400, response.text)
             return response.status_code < 400, response.text
         except Exception as e:
             logging.warning(

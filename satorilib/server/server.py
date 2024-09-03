@@ -542,6 +542,51 @@ class SatoriServerClient(object):
             logging.warning(
                 'unable to stakeProxyRemove due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
+        
+
+    def getProposals(self):
+        """
+        Mock function to retrieve a list of proposals.
+        This function will eventually call the server, but for now, it returns a mock list of proposals.
+        """
+        # Mocked data with vote counts included
+        proposals = [
+            {
+                "id": "123e4567-e89b-12d3-a456-426614174000",  # Use 'id' instead of 'uuid' for consistency
+                "title": "Proposal 1",
+                "description": "This is the first proposal.",
+                "proposal_date": "2024-09-01",
+                "complete_date": "2024-09-10",
+                "value": 100,
+                "image_url": "http://example.com/proposal1.png",
+                "yes_votes": 10,  # Include yes and no votes
+                "no_votes": 2
+            },
+            {
+                "id": "223e4567-e89b-12d3-a456-426614174001",
+                "title": "Proposal 2",
+                "description": "This is the second proposal.",
+                "proposal_date": "2024-09-02",
+                "complete_date": "2024-09-15",
+                "value": 200,
+                "image_url": "http://example.com/proposal2.png",
+                "yes_votes": 5,
+                "no_votes": 3
+            }
+        ]
+
+        return proposals
+
+    def proposalVote(self, wallet, vote):
+        """
+        Mock function to submit a vote for a proposal.
+        This function will eventually tell the server the vote, but for now, it returns True.
+        """
+        # In a real implementation, you would send the `wallet` and `vote` data to the server.
+        # For now, we mock the response as True indicating success.
+        return True
+
+        
 
     def publish(
         self,
@@ -583,3 +628,6 @@ class SatoriServerClient(object):
             #    'unable to determine if prediction was accepted; try again Later.', e, color='yellow')
             return None
         return True
+    
+
+    

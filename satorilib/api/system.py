@@ -1,4 +1,5 @@
 ''' the system api is how we talk to the machine, mainly to ask it about system resources '''
+from typing import Union
 import os
 import platform
 from numpy import mean
@@ -9,7 +10,7 @@ import multiprocessing
 import json
 from functools import lru_cache
 
-def devicePayload(asDict: bool = False) -> dict | str:
+def devicePayload(asDict: bool = False) -> Union[dict, str]:
     ''' returns payload of metrics '''
     total, _, free = getDisk()
     payload = {

@@ -37,12 +37,10 @@ def getRam() -> int:
     ''' returns number of GB of ram on system as int '''
     return round(psutil.virtual_memory().total / (1024.0 ** 3))
 
-@lru_cache(maxsize=None)
 def getProcessor() -> str:
     ''' name of processor as string '''
     return platform.processor()
 
-@lru_cache(maxsize=None)
 def getProcessorCount() -> int:
     ''' number of cpus '''
     return multiprocessing.cpu_count()

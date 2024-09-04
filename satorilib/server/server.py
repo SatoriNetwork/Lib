@@ -1,6 +1,23 @@
 '''
 Here's plan for the server - python server, you checkin with it,
 it returns a key you use to make a websocket connection with the pubsub server.
+
+# TODO:
+- [ ] implement DTOs for all the server calls
+- [ ] implement Swagger on the server / python packages...
+{
+    "DTO": "Proposal",
+    "error": null,
+    "data": {
+        "id": 1,
+        "author": "22a85fb71485c6d7c62a3784c5549bd3849d0afa3ee44ce3f9ea5541e4c56402d8",
+        "title": "Proposal Title",
+        "description": "Proposal Description",
+        ...
+    }
+}
+JSON -> EXTRACT DATA -> Python Object -> DTO -> JSON
+{{ proposal.author }}
 '''
 from typing import Union
 from functools import partial

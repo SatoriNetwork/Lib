@@ -7,9 +7,9 @@ import time
 import shutil
 import multiprocessing
 import json
+from functools import lru_cache
 
-
-def devicePayload(asDict=False):
+def devicePayload(asDict: bool = False) -> dict | str:
     ''' returns payload of metrics '''
     total, _, free = getDisk()
     payload = {
@@ -20,12 +20,9 @@ def devicePayload(asDict=False):
         'disk_free': free,
         # 'bandwidth': 'unknown'
     }
-    if asDict:
-        return payload
-    return json.dumps(payload)
+    return payload if asDict else json.dumps(payload)
 
-
-def getDisk(path: str = '/Satori/Neuron'):
+def getDisk(path: str = '/Satori/Neuron') -> tuple[int, int, int]:
     '''
     returns ints in gb total, used, free
     since we know this will run in a docker container and probably be mounted
@@ -36,58 +33,55 @@ def getDisk(path: str = '/Satori/Neuron'):
     total, used, free = shutil.disk_usage(path)
     return total // (2**30), used // (2**30), free // (2**30)
 
-
-def getRam():
+def getRam() -> int:
     ''' returns number of GB of ram on system as int '''
     return round(psutil.virtual_memory().total / (1024.0 ** 3))
 
-
-def getProcessor():
+@lru_cache(maxsize=None)
+def getProcessor() -> str:
     ''' name of processor as string '''
     return platform.processor()
 
-
-def getProcessorCount():
+@lru_cache(maxsize=None)
+def getProcessorCount() -> int:
     ''' number of cpus '''
     return multiprocessing.cpu_count()
 
-
-def getProcessorUsage():
+def getProcessorUsage() -> float:
     ''' returns percentage of cpu usage as float '''
     return psutil.cpu_percent()
 
-
-def getRamDetails():
+def getRamDetails() -> dict:
     ''' returns dictionary containing these keys ['total', 'available', 'percent', 'used', 'free'] '''
     return dict(psutil.virtual_memory()._asdict())
 
-def getSwapDetails():
+def getSwapDetails() -> dict:
     ''' returns dictionary containing these keys ['total', 'used', 'free', 'percent', 'sin', 'sout'] '''
     return dict(psutil.swap_memory()._asdict())
 
-def getDiskDetails():
+def getDiskDetails() -> dict:
     ''' returns dictionary containing these keys ['total', 'used', 'free', 'percent'] '''
     return dict(psutil.disk_usage('/')._asdict())
 
-def getBootTime():
+@lru_cache(maxsize=None)
+def getBootTime() -> float:
     ''' returns system boot time as a Unix timestamp '''
     return psutil.boot_time()
 
-def getUptime():
+def getUptime() -> float:
     ''' returns system uptime in seconds '''
-    return time.time() - psutil.boot_time()
+    return time.time() - getBootTime()
 
-def getRamAvailablePercentage():
+def getRamAvailablePercentage() -> float:
     ''' returns percentage of available ram as float '''
-    return psutil.virtual_memory().available * 100 / psutil.virtual_memory().total
+    mem = psutil.virtual_memory()
+    return mem.available * 100 / mem.total
 
-
-def getProcessorUsageOverTime(seconds: int):
+def getProcessorUsageOverTime(seconds: int) -> float:
     ''' returns average of cpu usage over a number of seconds as float '''
     return mean([psutil.cpu_percent(interval=1) for _ in range(seconds)])
 
-
-def directorySize(path):
+def directorySize(path: str) -> int:
     ''' returns total size of directory in bytes '''
     totalSize = 0
     if not os.path.exists(path):

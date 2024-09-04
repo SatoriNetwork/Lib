@@ -58,20 +58,24 @@ def getProcessorUsage():
 
 
 def getRamDetails():
-    ''' returns dictionary containing these keys ['total', 'available' 'percent', 'used', 'free'] '''
+    ''' returns dictionary containing these keys ['total', 'available', 'percent', 'used', 'free'] '''
     return dict(psutil.virtual_memory()._asdict())
 
 def getSwapDetails():
-    ''' returns dictionary containing these keys ['total', 'available' 'percent', 'used', 'free'] '''
+    ''' returns dictionary containing these keys ['total', 'used', 'free', 'percent', 'sin', 'sout'] '''
     return dict(psutil.swap_memory()._asdict())
 
 def getDiskDetails():
-    ''' returns dictionary containing these keys ['total', 'available' 'percent', 'used', 'free'] '''
+    ''' returns dictionary containing these keys ['total', 'used', 'free', 'percent'] '''
     return dict(psutil.disk_usage('/')._asdict())
 
+def getBootTime():
+    ''' returns system boot time as a Unix timestamp '''
+    return psutil.boot_time()
+
 def getUptime():
-    ''' returns dictionary containing these keys ['total', 'available' 'percent', 'used', 'free'] '''
-    return dict(psutil.boot_time())
+    ''' returns system uptime in seconds '''
+    return time.time() - psutil.boot_time()
 
 def getRamAvailablePercentage():
     ''' returns percentage of available ram as float '''
@@ -80,12 +84,7 @@ def getRamAvailablePercentage():
 
 def getProcessorUsageOverTime(seconds: int):
     ''' returns average of cpu usage over a number of seconds as float '''
-    x = []
-    for i in range(seconds):
-        x.append(psutil.cpu_percent())
-        if i <= seconds-1:
-            time.sleep(1)
-    return mean(x)
+    return mean([psutil.cpu_percent(interval=1) for _ in range(seconds)])
 
 
 def directorySize(path):

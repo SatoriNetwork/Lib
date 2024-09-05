@@ -3,10 +3,7 @@ this file contains data structures for communication between the server and
 Satroi Neurons
 '''
 
-# API version 2.0
-# TODO: make a swagger/marshmallow model for proposal and vote endpoints here:
-
-from marshmallow import Schema, fields
+from marshmallow import Schema, fields, validate
 
 
 class ProposalSchema(Schema):

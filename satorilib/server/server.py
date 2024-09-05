@@ -572,7 +572,6 @@ class SatoriServerClient(object):
                 'unable to stakeProxyRequest due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
 
-
     def stakeProxyCharity(self, address: str, childId: int) -> tuple[bool, dict]:
         ''' charity for stake '''
         try:
@@ -586,7 +585,6 @@ class SatoriServerClient(object):
                 'unable to stakeProxyCharity due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
 
-
     def stakeProxyCharityNot(self, address: str, childId: int) -> tuple[bool, dict]:
         ''' no charity for stake '''
         try:
@@ -599,7 +597,6 @@ class SatoriServerClient(object):
             logging.warning(
                 'unable to stakeProxyCharityNot due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
-
 
     def stakeProxyRequest(self, address: str) -> tuple[bool, dict]:
         ''' removes a stream from the server '''
@@ -653,6 +650,48 @@ class SatoriServerClient(object):
             logging.warning(
                 'unable to stakeProxyRemove due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
+
+    def getProposals(self):
+        """
+        Function to get all proposals by calling the API endpoint.
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/proposals')
+            if response.status_code == 200:
+                # # TODO: validate and convert respoonse json into DTO / marshmallow model / or whatever the api turns out to be.
+                # from satorilib.server.api import ProposalSchema
+                # return ProposalSchema().load(response.json())
+                return response.json()
+            else:
+                print(
+                    f"Failed to get proposals. Status code: {response.status_code}")
+                return []
+        except requests.RequestException as e:
+            print(f"Error occurred while fetching proposals: {str(e)}")
+            return []
+
+    def submitProposalVote(self, wallet: Wallet, proposal_id,  vote):
+        """
+        Function to submit a vote by calling the API endpoint.
+        """
+        try:
+            # # TODO: validate and convert respoonse json into DTO / marshmallow model / or whatever the api turns out to be.
+            # from satorilib.server.api import VoteSchema
+            # VoteSchema().load(response.json())
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/proposals/vote',
+                json=json.dumps({
+                    "proposal_id": str(proposal_id),
+                    "vote": vote}))
+            if response.status_code == 200:
+                return True, "Vote submitted successfully"
+            else:
+                return False, f"Failed to submit vote. Status code: {response.status_code}"
+        except requests.RequestException as e:
+            return False, f"Error occurred while submitting vote: {str(e)}"
 
     def publish(
         self,

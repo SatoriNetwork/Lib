@@ -48,7 +48,7 @@ class EthereumWallet():
         return 'Ethereum'
 
     def initRaw(self):
-        self.loadRaw()
+        return self.loadRaw()
 
     def init(self):
         self.load()

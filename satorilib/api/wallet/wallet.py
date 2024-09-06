@@ -347,6 +347,7 @@ class Wallet():
 
     def generate(self):
         self._entropy = self._entropy or self._generateEntropy()
+        # print(f"Debug: self._entropy = {self._entropy}")  # Add this line
         self._entropyStr = b64encode(self._entropy).decode('utf-8')
         self._privateKeyObj = self._generatePrivateKey()
         self._addressObj = self._generateAddress()

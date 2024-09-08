@@ -572,6 +572,56 @@ class SatoriServerClient(object):
                 'unable to stakeProxyRequest due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
 
+    def stakeProxyCharity(self, address: str, childId: int) -> tuple[bool, dict]:
+        ''' charity for stake '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/stake/proxy/charity',
+                json=json.dumps({'child': address, 'childId': childId}))
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to stakeProxyCharity due to connection timeout; try again Later.', e, color='yellow')
+            return False, {}
+
+    def stakeProxyCharityNot(self, address: str, childId: int) -> tuple[bool, dict]:
+        ''' no charity for stake '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/stake/proxy/charity/not',
+                json=json.dumps({'child': address, 'childId': childId}))
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to stakeProxyCharityNot due to connection timeout; try again Later.', e, color='yellow')
+            return False, {}
+
+    def delegateGet(self) -> tuple[bool, str]:
+        ''' my delegate '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/stake/proxy/delegate')
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to delegateGet due to connection timeout; try again Later.', e, color='yellow')
+            return False, {}
+
+    def delegateRemove(self) -> tuple[bool, str]:
+        ''' my delegate '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/stake/proxy/delegate/remove')
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to delegateRemove due to connection timeout; try again Later.', e, color='yellow')
+            return False, {}
+
     def stakeProxyRequest(self, address: str) -> tuple[bool, dict]:
         ''' removes a stream from the server '''
         try:

@@ -661,9 +661,14 @@ class SatoriServerClient(object):
         try:
             response = self._makeUnauthenticatedCall(
                 function=requests.get,
-                endpoint='/proposals/data')
+                endpoint='/proposals'
+            )
             if response.status_code == 200:
-                proposals = ProposalSchema(many=True).load(response.json()['proposals'])
+                # Fetch JSON data from the response
+                response_data = response.json()
+
+                # Load proposals using the schema
+                proposals = ProposalSchema(many=True).load(response_data)
                 return proposals
             else:
                 print(f"Failed to get proposals. Status code: {response.status_code}")
@@ -680,7 +685,7 @@ class SatoriServerClient(object):
             vote_data = VoteSchema().dump({"proposal_id": str(proposal_id), "vote": vote == 'yes'})
             response = self._makeAuthenticatedCall(
                 function=requests.post,
-                endpoint='/proposals/vote',
+                endpoint='/proposals_votes',
                 json=vote_data)
             if response.status_code == 200:
                 updated_proposal = response.json().get('proposal')
@@ -694,3 +699,19 @@ class SatoriServerClient(object):
             return False, f"Validation error: {str(ve)}"
         except requests.RequestException as e:
             return False, f"Error occurred while submitting vote: {str(e)}"
+        
+
+    def testConnection(self):
+        """
+        Function to test the API connection by calling the test endpoint.
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/test')
+            if response.status_code == 200:
+                return True, response.json()
+            else:
+                return False, f"Test failed. Status code: {response.status_code}"
+        except requests.RequestException as e:
+            return False, f"Error occurred while testing connection: {str(e)}"

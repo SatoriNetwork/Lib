@@ -15,7 +15,7 @@ class ProposalSchema(Schema):
         required=True, description='A detailed description of the proposal')
     proposal_date = fields.DateTime(
         required=True, description='The date when the proposal was submitted')
-    complete_date = fields.DateTime(
+    complete_date = fields.DateTime(allow_none=True,
         description='The date when the proposal was completed or closed')
     value = fields.Float(
         required=True, description='The monetary value or cost associated with the proposal')

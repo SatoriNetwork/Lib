@@ -4,6 +4,9 @@ from satorilib.api.wallet.wallet import Wallet
 from satorilib.api.wallet import RavencoinWallet, EvrmoreWallet
 from satorilib import logging
 from unittest.mock import patch, MagicMock
+from satorineuron import config
+from satorilib.api.disk import Disk
+Disk.setConfig(config)
 
 # Test Cases for satori wallet base class
 class TestWallet(unittest.TestCase):

@@ -127,12 +127,15 @@ class Wallet():
 
     def close(self) -> None:
         # if self.password is not None:
+        if not self.isEncrypted:
+            logging.info('Encrypt the wallet to close', color="green")
+            self.encryptWallet(self.yaml)
         self.password = None
-        self._entropy = None
-        self._entropyStr = ''
-        self._privateKeyObj = None
-        self.privateKey = ''
-        self.words = ''
+        # self._entropy = None
+        # self._entropyStr = ''
+        # self._privateKeyObj = None
+        # self.privateKey = ''
+        # self.words = ''
 
     def open(self, password: str = None) -> None:
         # if self.password is not None:
@@ -196,15 +199,18 @@ class Wallet():
 
     def initRaw(self):
         ''' try to load, else generate and save '''
-        if isinstance(self.password, str):
-            if not self.load():
-                if not self.loadRaw():
-                    self.generate()
-                    self.save()
-        else:
-            if not self.loadRaw():
-                self.generate()
-                self.save()
+        # if isinstance(self.password, str):
+        #     if not self.load():
+        #         if not self.loadRaw():
+        #             self.generate()
+        #             self.save()
+        # else:
+        #     if not self.loadRaw():
+        #         self.generate()
+        #         self.save()
+        if not self.load():
+            self.generate()
+            self.save()
         if self.address or self._privateKeyObj is None:
             self.regenerate()
 
@@ -223,7 +229,7 @@ class Wallet():
                               'scripthash', '')) != 64 else '',  # == 152 else '',
                           'publicKey' if len(encrypted.get(
                               'publicKey', '')) != 66 else '',  # == 152 else '',
-                          ])
+                          ]) 
             except Exception as _:
                 return encrypted
         return encrypted
@@ -290,28 +296,61 @@ class Wallet():
         self.yaml = self.getRaw()
         if self.yaml == False:
             return False
+        
+        self.cleanYaml()
         self.yaml = self.decryptWallet(self.yaml)
-
-        self._entropy = self.yaml.get('entropy')
-        if isinstance(self._entropy, bytes):
-            self._entropyStr = b64encode(self._entropy).decode('utf-8')
-        if isinstance(self._entropy, str):
-            self._entropyStr = self._entropy
-            self._entropy = b64decode(self._entropy)
-
-        # # these are regenerated from entropy in every case
-        self.words = self.yaml.get('words')
-        self.publicKey = self.yaml.get('publicKey')
-        self.privateKey = self.yaml.get('privateKey')
-        self.address = self.yaml.get(self.symbol, {}).get(
-            'address')
-        self.scripthash = self.yaml.get('scripthash')
-        if self._entropy is None:
+        if not self.yaml:
+            logging.error('Failed to decrypt wallet data.')
             return False
-        logging.info('load', self.publicKey, self.walletPath)
+
+        self._setWalletAttributes(self.yaml)
         return True
 
+        # self._entropy = self.yaml.get('entropy')
+        # if isinstance(self._entropy, bytes):
+        #     self._entropyStr = b64encode(self._entropy).decode('utf-8')
+        # if isinstance(self._entropy, str):
+        #     self._entropyStr = self._entropy
+        #     self._entropy = b64decode(self._entropy)
+
+        # # # these are regenerated from entropy in every case
+        # self.words = self.yaml.get('words')
+        # self.publicKey = self.yaml.get('publicKey')
+        # self.privateKey = self.yaml.get('privateKey')
+        # self.address = self.yaml.get(self.symbol, {}).get(
+        #     'address')
+        # self.scripthash = self.yaml.get('scripthash')
+        # if self._entropy is None:
+        #     return False
+        # logging.info('load', self.publicKey, self.walletPath)
+        # return True
+
+    def _setWalletAttributes(self, wallet_data: dict) -> None:
+        ''' Set wallet attributes from loaded data '''
+        self._entropy = wallet_data.get('entropy')
+        self.words = wallet_data.get('words')
+        self.publicKey = wallet_data.get('publicKey')
+        self.privateKey = wallet_data.get('privateKey')
+        self.address = wallet_data.get(self.symbol, {}).get('address')
+        self.scripthash = wallet_data.get('scripthash')
+        if self._entropy is None:
+            logging.error('Entropy is missing from wallet data.')
+            raise ValueError('Missing entropy in wallet data.')
+        self._processEntropy()
+
+    def _processEntropy(self) -> None:
+        ''' Process entropy for further use '''
+        if isinstance(self._entropy, bytes):
+            self._entropyStr = b64encode(self._entropy).decode('utf-8')
+        elif isinstance(self._entropy, str):
+            self._entropyStr = self._entropy
+            self._entropy = b64decode(self._entropy)
+        else:
+            logging.error('Invalid entropy format.')
+            raise ValueError('Invalid entropy format.')
+
     def save(self):
+        ''' Save wallet data to the specified path '''
         WalletApi.save(
             wallet={
                 **(
@@ -543,6 +582,10 @@ class Wallet():
         self.currencyAmount = TxUtils.asAmount(self.currency or 0, 8)
         self.balanceAmount = TxUtils.asAmount(
             self.balance or 0, self.divisibility)
+        
+        # Subscribe method to listen the changes for scripthash
+        # self.electrumx.subscribeScriptHash()
+
         # self.currencyVouts = self.electrumx.evrVouts
         # self.assetVouts = self.electrumx.assetVouts
 

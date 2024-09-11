@@ -677,41 +677,25 @@ class SatoriServerClient(object):
             print(f"Error occurred while fetching proposals: {str(e)}")
             return []
 
-    def submitProposalVote(self, wallet: Wallet, proposal_id, vote):
-        """
-        Function to submit a vote by calling the API endpoint.
-        """
+    def submitProposalVote(self, proposal_id: str, vote: str) -> tuple[bool, dict]:
+        '''Submits a vote for a proposal'''
         try:
-            vote_data = VoteSchema().dump({"proposal_id": str(proposal_id), "vote": vote == 'yes'})
+            print(f"Submitting vote: proposal_id={proposal_id}, vote={vote}")
+            vote_data = {
+                "proposal_id": str(proposal_id),
+                "vote": vote == 'yes'
+            }
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/proposals_votes',
-                json=vote_data)
-            if response.status_code == 200:
-                updated_proposal = response.json().get('proposal')
-                if updated_proposal:
-                    return True, updated_proposal
-                else:
-                    return False, "No updated proposal data received"
-            else:
-                return False, f"Failed to submit vote. Status code: {response.status_code}"
-        except ValidationError as ve:
-            return False, f"Validation error: {str(ve)}"
-        except requests.RequestException as e:
-            return False, f"Error occurred while submitting vote: {str(e)}"
-        
-
-    def testConnection(self):
-        """
-        Function to test the API connection by calling the test endpoint.
-        """
-        try:
-            response = self._makeUnauthenticatedCall(
-                function=requests.get,
-                endpoint='/test')
-            if response.status_code == 200:
-                return True, response.json()
-            else:
-                return False, f"Test failed. Status code: {response.status_code}"
-        except requests.RequestException as e:
-            return False, f"Error occurred while testing connection: {str(e)}"
+                json=json.dumps(vote_data)
+            )
+            print(f"Response status code: {response.status_code}")
+            print(f"Response content: {response.text}")
+            return response.status_code < 400, response.json() if response.status_code < 400 else {}
+        except Exception as e:
+            logging.warning(
+                'Unable to submitProposalVote due to an error; try again later.', 
+                exc_info=e
+            )
+            return False, {}

@@ -600,44 +600,28 @@ class SatoriServerClient(object):
                 'unable to stakeProxyCharityNot due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
 
-    def stakeProxyRequest(self, address: str) -> tuple[bool, dict]:
-        ''' removes a stream from the server '''
+    def delegateGet(self) -> tuple[bool, str]:
+        ''' my delegate '''
         try:
             response = self._makeAuthenticatedCall(
-                function=requests.post,
-                endpoint='/stake/proxy/request',
-                json=json.dumps({'parent': address}))
-            print(response.status_code < 400, response.text)
+                function=requests.get,
+                endpoint='/stake/proxy/delegate')
             return response.status_code < 400, response.text
         except Exception as e:
             logging.warning(
-                'unable to stakeProxyRequest due to connection timeout; try again Later.', e, color='yellow')
+                'unable to delegateGet due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
 
-    def stakeProxyApprove(self, address: str, childId: int) -> tuple[bool, dict]:
-        ''' removes a stream from the server '''
+    def delegateRemove(self) -> tuple[bool, str]:
+        ''' my delegate '''
         try:
             response = self._makeAuthenticatedCall(
-                function=requests.post,
-                endpoint='/stake/proxy/approve',
-                json=json.dumps({'child': address, 'childId': childId}))
+                function=requests.get,
+                endpoint='/stake/proxy/delegate/remove')
             return response.status_code < 400, response.text
         except Exception as e:
             logging.warning(
-                'unable to stakeProxyApprove due to connection timeout; try again Later.', e, color='yellow')
-            return False, {}
-
-    def stakeProxyDeny(self, address: str, childId: int) -> tuple[bool, dict]:
-        ''' removes a stream from the server '''
-        try:
-            response = self._makeAuthenticatedCall(
-                function=requests.post,
-                endpoint='/stake/proxy/deny',
-                json=json.dumps({'child': address, 'childId': childId}))
-            return response.status_code < 400, response.text
-        except Exception as e:
-            logging.warning(
-                'unable to stakeProxyDeny due to connection timeout; try again Later.', e, color='yellow')
+                'unable to delegateRemove due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
 
     def stakeProxyRemove(self, address: str, childId: int) -> tuple[bool, dict]:
@@ -653,7 +637,6 @@ class SatoriServerClient(object):
                 'unable to stakeProxyRemove due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
 
-    
     def getProposals(self):
         """
         Function to get all proposals by calling the API endpoint.
@@ -671,7 +654,8 @@ class SatoriServerClient(object):
                 proposals = ProposalSchema(many=True).load(response_data)
                 return proposals
             else:
-                print(f"Failed to get proposals. Status code: {response.status_code}")
+                print(
+                    f"Failed to get proposals. Status code: {response.status_code}")
                 return []
         except requests.RequestException as e:
             print(f"Error occurred while fetching proposals: {str(e)}")
@@ -695,7 +679,7 @@ class SatoriServerClient(object):
             return response.status_code < 400, response.json() if response.status_code < 400 else {}
         except Exception as e:
             logging.warning(
-                'Unable to submitProposalVote due to an error; try again later.', 
+                'Unable to submitProposalVote due to an error; try again later.',
                 exc_info=e
             )
             return False, {}

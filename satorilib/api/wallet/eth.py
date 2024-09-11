@@ -10,14 +10,14 @@ from satorilib.api.disk.wallet import WalletApi
 class EthereumWallet():
     '''
     instead of inheriting from Wallet like RavencoinWallet and EvrmoreWallet
-    we'll just use this class to generate a wallet details for ethereum on the 
-    fly. Our only need right now is to generate an address and private key, 
+    we'll just use this class to generate a wallet details for ethereum on the
+    fly. Our only need right now is to generate an address and private key,
     (and as a stretch goal, a pubkey for signing and verifying messages) so that
     we can inform the server of what address to associate with the user's
     account so that when we wrap tokens for them we can send the wrapped tokens
     to the right address. we should also key this off the vault rather than the
     wallet. alternatively we could just ask the user to provide an address...
-    If they're wrapping tokens to trade they'll probably know how to use 
+    If they're wrapping tokens to trade they'll probably know how to use
     metamask already...
     '''
 
@@ -112,7 +112,7 @@ class EthereumWallet():
         return Account.from_key(entropy)
 
     def _generatePublicKey(self):
-        ''' 
+        '''
         In Ethereum, the eth-account library's Account class does not directly
         provide the public key. However, you can derive the public key from the
         private key using the eth_keys library, which is internally used by

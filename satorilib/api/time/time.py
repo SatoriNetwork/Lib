@@ -84,3 +84,11 @@ def isValidTimestamp(time: str) -> bool:
             return False
 
     return isinstance(time, str) and 18 < len(time) < 27 and tryTimeConvert()
+
+
+def isValidDate(date: str) -> bool:
+    try:
+        dt.datetime.strptime(date, '%Y-%m-%d')
+        return True
+    except ValueError:
+        return False

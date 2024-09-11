@@ -6,6 +6,7 @@ from Crypto.Util.Padding import pad, unpad
 import base64
 
 
+
 def encrypt(content, password: str) -> str:
     """
     Encrypts the content using AES encryption with a key derived from the given password.

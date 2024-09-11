@@ -92,7 +92,7 @@ class RavencoinWallet(Wallet):
         return ravencoin.verify(address=address or self.address, message=message, signature=sig)
 
     def _checkSatoriValue(self, output: CMutableTxOut) -> bool:
-        ''' 
+        '''
         returns true if the output is a satori output of self.satoriFee
         '''
         nextOne = False

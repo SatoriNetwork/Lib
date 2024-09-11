@@ -1,11 +1,11 @@
 '''
-this file contains data structures for communication between the server and 
+this file contains data structures for communication between the server and
 Satroi Neurons
 '''
 
 
 class CheckinDetails:
-    ''' 
+    '''
         {
         'wallet': {},
         'key': '...',
@@ -15,7 +15,7 @@ class CheckinDetails:
         'publicationKeys': [],
         'subscriptions': '[]',
         'publications': '[]',
-        'pins': '[]'} 
+        'pins': '[]'}
     '''
 
     def __init__(self, raw: dict):
@@ -27,12 +27,12 @@ class CheckinDetails:
                 time.sleep(60*60*24)
 
         self.raw = raw
-        self.wallet: dict = raw.get('wallet')
+        self.wallet: dict = raw.get('wallet', {})
         self.key: str = raw.get('key')
         self.oracleKey: str = raw.get('oracleKey')
         self.idKey: str = raw.get('idKey')
-        self.subscriptionKeys: list[str] = raw.get('subscriptionKeys')
-        self.publicationKeys: list[str] = raw.get('publicationKeys')
+        self.subscriptionKeys: list[str] = raw.get('subscriptionKeys', [])
+        self.publicationKeys: list[str] = raw.get('publicationKeys', [])
         self.subscriptions: str = raw.get('subscriptions')
         self.publications: str = raw.get('publications')
         self.pins: str = raw.get('pins')

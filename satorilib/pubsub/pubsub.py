@@ -111,7 +111,7 @@ class SatoriPubSubConn(object):
                 # except WebSocketConnectionClosedException as e:
                 # except ConnectionResetError:
                 logging.error(
-                    e, '\nfailed while listening Satori Pubsub, reconnecting in 60 seconds...', print=True)
+                    e, f'\nfailed while listening {self.url}, reconnecting in 60 seconds...', print=True)
                 time.sleep(60)
                 break
 
@@ -126,8 +126,9 @@ class SatoriPubSubConn(object):
             try:
                 logging.debug('re-establishing pubsub connection')
                 self.restart(payload)
-            except Exception as _:
-                logging.debug('restarting pubsub connection failed', e)
+            except Exception as e:
+                logging.debug(
+                    'restarting pubsub connection failed', e, self.url)
                 pass
             time.sleep(2)
             if (self.ws.connected):

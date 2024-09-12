@@ -29,6 +29,8 @@ from satorilib import logging
 from satorilib.api.time.time import timeToTimestamp
 from satorilib.api.wallet import Wallet
 from satorilib.concepts.structs import Stream
+from satorilib.server.api import ProposalSchema, VoteSchema
+from marshmallow import ValidationError
 
 
 class SatoriServerClient(object):
@@ -493,34 +495,6 @@ class SatoriServerClient(object):
                 'unable to disable status of Mine-To-Vault feature due to connection timeout; try again Later.', e, color='yellow')
             return ''
 
-    def ticketApplication(self, tx: str) -> bool:
-        ''' gets wallet stats '''
-        try:
-            response = self._makeAuthenticatedCall(
-                function=requests.get,
-                endpoint=f'/ticket/application/{tx}')
-            if response.text in ('OK', 'OK, ALREADY EXISTS'):
-                return True
-        except Exception as e:
-            logging.warning(
-                'unable to disable status of Mine-To-Vault feature due to connection timeout; try again Later.', e, color='yellow')
-        # if response.text in ('INVALID TX', 'FAILED'):
-        return False
-
-    def ticketCheck(self) -> bool:
-        ''' gets wallet stats '''
-        try:
-            response = self._makeAuthenticatedCall(
-                function=requests.get,
-                endpoint='/ticket/check')
-            if response.text in ('True', 'Probably'):
-                return True
-        except Exception as e:
-            logging.warning(
-                'unable to disable status of Mine-To-Vault feature due to connection timeout; try again Later.', e, color='yellow')
-            return False
-        return False
-
     def stakeCheck(self) -> bool:
         ''' gets wallet stats '''
         try:
@@ -622,46 +596,6 @@ class SatoriServerClient(object):
                 'unable to delegateRemove due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
 
-    def stakeProxyRequest(self, address: str) -> tuple[bool, dict]:
-        ''' removes a stream from the server '''
-        try:
-            response = self._makeAuthenticatedCall(
-                function=requests.post,
-                endpoint='/stake/proxy/request',
-                json=json.dumps({'parent': address}))
-            print(response.status_code < 400, response.text)
-            return response.status_code < 400, response.text
-        except Exception as e:
-            logging.warning(
-                'unable to stakeProxyRequest due to connection timeout; try again Later.', e, color='yellow')
-            return False, {}
-
-    def stakeProxyApprove(self, address: str, childId: int) -> tuple[bool, dict]:
-        ''' removes a stream from the server '''
-        try:
-            response = self._makeAuthenticatedCall(
-                function=requests.post,
-                endpoint='/stake/proxy/approve',
-                json=json.dumps({'child': address, 'childId': childId}))
-            return response.status_code < 400, response.text
-        except Exception as e:
-            logging.warning(
-                'unable to stakeProxyApprove due to connection timeout; try again Later.', e, color='yellow')
-            return False, {}
-
-    def stakeProxyDeny(self, address: str, childId: int) -> tuple[bool, dict]:
-        ''' removes a stream from the server '''
-        try:
-            response = self._makeAuthenticatedCall(
-                function=requests.post,
-                endpoint='/stake/proxy/deny',
-                json=json.dumps({'child': address, 'childId': childId}))
-            return response.status_code < 400, response.text
-        except Exception as e:
-            logging.warning(
-                'unable to stakeProxyDeny due to connection timeout; try again Later.', e, color='yellow')
-            return False, {}
-
     def stakeProxyRemove(self, address: str, childId: int) -> tuple[bool, dict]:
         ''' removes a stream from the server '''
         try:
@@ -715,3 +649,60 @@ class SatoriServerClient(object):
             #    'unable to determine if prediction was accepted; try again Later.', e, color='yellow')
             return None
         return True
+
+    def getProposalVotes(self):
+        ''' add to get all votes on this proposal'''
+
+    def submitProposal(self,) -> tuple[bool, dict]:
+        '''submits proposal'''
+        # finish
+
+    def getProposals(self):
+        """
+        Function to get all proposals by calling the API endpoint.
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/proposals/get'
+                # json= could request a subset - active, historic, etc.
+            )
+            if response.status_code == 200:
+                # Fetch JSON data from the response
+                response_data = response.json()
+
+                # Load proposals using the schema
+                proposals = ProposalSchema(many=True).load(response_data)
+                return proposals
+            else:
+                print(
+                    f"Failed to get proposals. Status code: {response.status_code}")
+                return []
+        except requests.RequestException as e:
+            print(f"Error occurred while fetching proposals: {str(e)}")
+            return []
+
+    def submitProposalVote(self, proposal_id: str, vote: str) -> tuple[bool, dict]:
+        '''Submits a vote for a proposal'''
+        try:
+            print(f"Submitting vote: proposal_id={proposal_id}, vote={vote}")
+            # VoteSchema
+            vote_data = {
+                "proposal_id": str(proposal_id),
+                "vote": vote
+            }
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/proposals_votes',
+                # turn this into an api object for the server
+                json=json.dumps(vote_data)
+            )
+            print(f"Response status code: {response.status_code}")
+            print(f"Response content: {response.text}")
+            return response.status_code < 400, response.json() if response.status_code < 400 else {}
+        except Exception as e:
+            logging.warning(
+                'Unable to submitProposalVote due to an error; try again later.',
+                exc_info=e
+            )
+            return False, {}

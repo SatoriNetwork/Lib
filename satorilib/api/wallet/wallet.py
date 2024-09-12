@@ -401,10 +401,10 @@ class Wallet():
 
         '''
         if (not force and
-            len([
-                        u for u in self.unspentCurrency + self.unspentAssets
-                        if 'scriptPubKey' not in u]) == 0
-            ):
+                len([
+                    u for u in self.unspentCurrency + self.unspentAssets
+                            if 'scriptPubKey' not in u]) == 0
+                ):
             # already have them all
             return True
 

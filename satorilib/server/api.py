@@ -3,6 +3,88 @@ this file contains data structures for communication between the server and
 Satroi Neurons
 '''
 
+from marshmallow import Schema, fields, validate
+
+
+class ProposalSchema(Schema):
+    id = fields.Integer(
+        required=False,
+        allow_none=True,
+        description='The unique identifier for the proposal')
+    wallet_id = fields.Integer(
+        required=False,
+        allow_none=True,
+        description='proposer')
+    title = fields.String(
+        required=True,
+        allow_none=True,
+        description='The title of the proposal')
+    description = fields.String(
+        required=True,
+        allow_none=True,
+        description='A detailed description of the proposal')
+    proposal_date = fields.DateTime(
+        required=False,
+        allow_none=True,
+        description='The date when the proposal was submitted')
+    complete_date = fields.DateTime(
+        required=False,
+        allow_none=True,
+        description='when the proposed work will be finished')
+    expires = fields.DateTime(
+        required=False,
+        allow_none=True,
+        description='voting is closed')
+    image_url = fields.String(
+        required=False,
+        allow_none=True,
+        description='URL to an image related to the proposal')
+    cost = fields.Float(
+        required=True,
+        allow_none=True,
+        description='The monetary value or cost associated with the proposal')
+    options = fields.String(
+        required=False,
+        allow_none=True,
+        description='json list of strings')
+    ts = fields.DateTime(
+        required=False,
+        allow_none=True,
+        description='The date when the proposal was submitted')
+    deleted = fields.DateTime(
+        required=False,
+        allow_none=True,
+        description='deleted')
+
+
+class VoteSchema(Schema):
+    proposal_id = fields.Integer(
+        required=True,
+        allow_none=True,
+        description='The unique identifier of the proposal being voted on')
+    wallet_id = fields.Integer(
+        required=False,
+        allow_none=True,
+        description='The unique identifier of the user casting the vote')
+    satori = fields.Float(
+        required=False,
+        allow_none=True,
+        description='weight')
+    vote = fields.String(
+        required=True,
+        allow_none=True,
+        description='The vote: True for Yes, False for No')
+    ts = fields.DateTime(
+        required=False,
+        allow_none=True,
+        description='The date when the proposal was submitted')
+    deleted = fields.DateTime(
+        required=False,
+        allow_none=True,
+        description='deleted')
+
+# api version 1.0:
+
 
 class CheckinDetails:
     '''

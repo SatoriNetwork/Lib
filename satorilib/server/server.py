@@ -30,7 +30,6 @@ from satorilib.api.time.time import timeToTimestamp
 from satorilib.api.wallet import Wallet
 from satorilib.concepts.structs import Stream
 from satorilib.server.api import ProposalSchema, VoteSchema
-from marshmallow import ValidationError
 
 
 class SatoriServerClient(object):
@@ -626,10 +625,10 @@ class SatoriServerClient(object):
             return
         self.setTopicTime(topic)
         try:
-            response = self._makeUnauthenticatedCall(
+            response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/record/prediction' if isPrediction else '/record/observation',
-                payload=json.dumps({
+                json=json.dumps({
                     'topic': topic,
                     'data': str(data),
                     'time': str(observationTime),

@@ -649,59 +649,82 @@ class SatoriServerClient(object):
             return None
         return True
 
-    def getProposalVotes(self):
-        ''' add to get all votes on this proposal'''
-
-    def submitProposal(self,) -> tuple[bool, dict]:
-        '''submits proposal'''
-        # finish
-
-    def getProposals(self):
-        """
-        Function to get all proposals by calling the API endpoint.
-        """
+    def getProposalVotes(self, proposal: str):
+        ''' get all votes on this proposal'''
         try:
             response = self._makeUnauthenticatedCall(
                 function=requests.get,
-                endpoint='/proposals/get'
-                # json= could request a subset - active, historic, etc.
+                endpoint=f'/proposal/votes/get/{proposal}'
             )
             if response.status_code == 200:
-                # Fetch JSON data from the response
-                response_data = response.json()
-
-                # Load proposals using the schema
-                proposals = ProposalSchema(many=True).load(response_data)
-                return proposals
+                votes = response.json()
+                return votes
             else:
-                print(
-                    f"Failed to get proposals. Status code: {response.status_code}")
+                print(f"Failed to get proposal votes. Status code: {response.status_code}")
                 return []
         except requests.RequestException as e:
-            print(f"Error occurred while fetching proposals: {str(e)}")
+            print(f"Error occurred while fetching proposal votes: {str(e)}")
             return []
 
-    def submitProposalVote(self, proposal_id: str, vote: str) -> tuple[bool, dict]:
-        '''Submits a vote for a proposal'''
-        try:
-            print(f"Submitting vote: proposal_id={proposal_id}, vote={vote}")
-            # VoteSchema
-            vote_data = {
-                "proposal_id": str(proposal_id),
-                "vote": vote
-            }
-            response = self._makeAuthenticatedCall(
-                function=requests.post,
-                endpoint='/proposals_votes',
-                # turn this into an api object for the server
-                json=json.dumps(vote_data)
-            )
-            print(f"Response status code: {response.status_code}")
-            print(f"Response content: {response.text}")
-            return response.status_code < 400, response.json() if response.status_code < 400 else {}
-        except Exception as e:
-            logging.warning(
-                'Unable to submitProposalVote due to an error; try again later.',
-                exc_info=e
-            )
-            return False, {}
+def submitProposal(self, proposal_data: dict) -> tuple[bool, dict]:
+    '''submits proposal'''
+    try:
+        response = self._makeAuthenticatedCall(
+            function=requests.post,
+            endpoint='/proposal/submit',
+            json=json.dumps(proposal_data)
+        )
+        print(f"Response status code: {response.status_code}")
+        print(f"Response content: {response.text}")
+        return response.status_code < 400, response.json() if response.status_code < 400 else {}
+    except Exception as e:
+        logging.warning(
+            'Unable to submit proposal due to an error; try again later.',
+            exc_info=e
+        )
+        return False, {}
+
+def getProposals(self):
+    """
+    Function to get all proposals by calling the API endpoint.
+    """
+    try:
+        response = self._makeUnauthenticatedCall(
+            function=requests.get,
+            endpoint='/proposals/get'
+        )
+        if response.status_code == 200:
+            # Fetch JSON data from the response
+            response_data = response.json()
+            # Load proposals using the schema
+            proposals = ProposalSchema(many=True).load(response_data)
+            return proposals
+        else:
+            print(f"Failed to get proposals. Status code: {response.status_code}")
+            return []
+    except requests.RequestException as e:
+        print(f"Error occurred while fetching proposals: {str(e)}")
+        return []
+
+def submitProposalVote(self, proposal_id: str, vote: str) -> tuple[bool, dict]:
+    '''Submits a vote for a proposal'''
+    try:
+        print(f"Submitting vote: proposal_id={proposal_id}, vote={vote}")
+        vote_data = {
+            "proposal_id": str(proposal_id),
+            "vote": vote
+        }
+        response = self._makeAuthenticatedCall(
+            function=requests.post,
+            endpoint='/proposal/vote/submit',
+            json=json.dumps(vote_data)
+        )
+        print(f"Response status code: {response.status_code}")
+        print(f"Response content: {response.text}")
+        return response.status_code < 400, response.json() if response.status_code < 400 else {}
+    except Exception as e:
+        logging.warning(
+            'Unable to submitProposalVote due to an error; try again later.',
+            exc_info=e
+        )
+        return False, {}

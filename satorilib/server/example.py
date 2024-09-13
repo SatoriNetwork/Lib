@@ -72,15 +72,35 @@ def submitProposalVote(wallet: Wallet):
 @authenticate
 @registered
 def submitProposal(wallet: Wallet):
-    ''' save a vote '''
-    try:  # FINISH
+    ''' save a proposal '''
+    try:
         payload = json.loads(request.get_json() or '{}')
-        # turn the data in to VoteSchema object, save to database
-        proposalId = int(payload.get('proposal_id'))
-        vote = payload.ginto vote (wallet_id, proposal_id, vote) values ( % s, % s, % s); ",
-            params = [str(wallet.id), str(proposalId), vote])
+        
+        # Validate required fields
+        required_fields = ['title', 'description', 'options', 'expires']
+        for field in required_fields:
+            if field not in payload:
+                raise ValueError(f"Missing required field: {field}")
+        
+        # Extract and validate data
+        title = payload['title']
+        description = payload['description']
+        options = json.dumps(payload['options'])  # Ensure options are stored as JSON string
+        expires = dt.datetime.fromisoformat(payload['expires'])
+        
+        if expires <= dt.datetime.now(dt.timezone.utc):
+            raise ValueError("Expiration date must be in the future")
+        
+        # Insert proposal into database
+        from satoricentral import database
+        success = database.write(
+            query="INSERT INTO proposal (wallet_id, title, description, options, expires) VALUES (%s, %s, %s, %s, %s);",
+            params=[str(wallet.id), title, description, options, expires]
+        )
+        
         if success:
-            return 'OK', 200
-        return 'FAILED', 200
+            return 'Proposal submitted successfully', 200
+        else:
+            return 'Failed to submit proposal', 500
     except Exception as e:
         return str(e), 400

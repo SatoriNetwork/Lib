@@ -660,11 +660,13 @@ class SatoriServerClient(object):
                 votes = response.json()
                 return votes
             else:
-                print(f"Failed to get proposal votes. Status code: {response.status_code}")
+                print(
+                    f"Failed to get proposal votes. Status code: {response.status_code}")
                 return []
         except requests.RequestException as e:
             print(f"Error occurred while fetching proposal votes: {str(e)}")
             return []
+
 
 def submitProposal(self, proposal_data: dict) -> tuple[bool, dict]:
     '''submits proposal'''
@@ -684,6 +686,7 @@ def submitProposal(self, proposal_data: dict) -> tuple[bool, dict]:
         )
         return False, {}
 
+
 def getProposals(self):
     """
     Function to get all proposals by calling the API endpoint.
@@ -700,11 +703,13 @@ def getProposals(self):
             proposals = ProposalSchema(many=True).load(response_data)
             return proposals
         else:
-            print(f"Failed to get proposals. Status code: {response.status_code}")
+            print(
+                f"Failed to get proposals. Status code: {response.status_code}")
             return []
     except requests.RequestException as e:
         print(f"Error occurred while fetching proposals: {str(e)}")
         return []
+
 
 def submitProposalVote(self, proposal_id: str, vote: str) -> tuple[bool, dict]:
     '''Submits a vote for a proposal'''

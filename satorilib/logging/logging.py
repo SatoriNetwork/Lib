@@ -63,6 +63,7 @@ def setup(
         stream_handler.setFormatter(formatter)
         handlers = [stream_handler]
     logging.basicConfig(
+        force=True,
         level=level,
         handlers=handlers)
 

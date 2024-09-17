@@ -615,25 +615,38 @@ class SatoriServerClient(object):
         observationTime: str,
         observationHash: str,
         isPrediction: bool = True,
+        useAuthorizedCall: bool = True,
     ) -> Union[bool, None]:
         ''' publish predictions '''
         # if not isPrediction and self.topicTime.get(topic, 0) > time.time() - (Stream.minimumCadence*.95):
         #    return
         # if isPrediction and self.topicTime.get(topic, 0) > time.time() - 60*60:
         #    return
+
         if self.topicTime.get(topic, 0) > time.time() - (Stream.minimumCadence*.95):
             return
         self.setTopicTime(topic)
         try:
-            response = self._makeUnauthenticatedCall(
-                function=requests.post,
-                endpoint='/record/prediction' if isPrediction else '/record/observation',
-                payload=json.dumps({
-                    'topic': topic,
-                    'data': str(data),
-                    'time': str(observationTime),
-                    'hash': str(observationHash),
-                }))
+            if useAuthorizedCall:
+                response = self._makeAuthenticatedCall(
+                    function=requests.post,
+                    endpoint='/record/prediction/authed' if isPrediction else '/record/observation/authed',
+                    json=json.dumps({
+                        'topic': topic,
+                        'data': str(data),
+                        'time': str(observationTime),
+                        'hash': str(observationHash),
+                    }))
+            else:
+                response = self._makeUnauthenticatedCall(
+                    function=requests.post,
+                    endpoint='/record/prediction' if isPrediction else '/record/observation',
+                    payload=json.dumps({
+                        'topic': topic,
+                        'data': str(data),
+                        'time': str(observationTime),
+                        'hash': str(observationHash),
+                    }))
             # response = self._makeAuthenticatedCall(
             #    function=requests.get,
             #    endpoint='/record/prediction')

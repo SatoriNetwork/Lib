@@ -34,6 +34,12 @@ from requests.exceptions import RequestException
 import json
 import traceback
 import datetime as dt
+from requests.exceptions import RequestException
+import json
+import traceback
+import datetime as dt
+
+
 
 
 class SatoriServerClient(object):
@@ -55,6 +61,7 @@ class SatoriServerClient(object):
 
     def _getChallenge(self):
         # return requests.get(self.url + '/time').text
+        print('hello')
         return str(time.time())
 
     def _makeAuthenticatedCall(
@@ -84,9 +91,13 @@ class SatoriServerClient(object):
                     challenge=challenge or self._getChallenge()),
                 **(extraHeaders or {}),
             },
+            json=json)
+        print('message')
             json=payload)
         if raiseForStatus:
             try:
+                print('mesage1111')
+                print(r.text)
                 r.raise_for_status()
             except requests.exceptions.HTTPError as e:
                 logging.error('authenticated server err:',
@@ -753,6 +764,139 @@ class SatoriServerClient(object):
             #    'unable to determine if prediction was accepted; try again Later.', e, color='yellow')
             return None
         return True
+
+    def submitProposal(self, proposal_data: dict) -> tuple[bool, dict]:
+        '''submits proposal'''
+        def custom_log(*args, **kwargs):
+            # Remove 'color' and 'print' kwargs if present
+            kwargs.pop('color', None)
+            kwargs.pop('print', None)
+            print(*args, **kwargs)
+
+        # Temporarily replace logging.info and logging.error
+        original_info = logging.info
+        original_error = logging.error
+        logging.info = custom_log
+        logging.error = custom_log
+
+        try:
+            print(f"Submitting proposal data: {json.dumps(proposal_data, indent=2)}")
+            
+            # Ensure options is a JSON string
+            if 'options' in proposal_data and isinstance(proposal_data['options'], list):
+                proposal_data['options'] = json.dumps(proposal_data['options'])
+            
+            # Convert the entire proposal_data to a JSON string
+            proposal_json_string = json.dumps(proposal_data)
+            
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/proposal/submit',
+                json=proposal_json_string
+            )
+            
+            print(f"Response status code: {response.status_code}")
+            print(f"Response content: {response.text[:1000]}")  # Print first 1000 characters of response
+            
+            if response.status_code < 400:
+                return True, response.text 
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                print(f"Error in submitProposal: {error_message}")
+                return False, {"error": error_message}
+        
+        except RequestException as re:
+            error_message = f"Request error in submitProposal: {str(re)}"
+            print(error_message)
+            print(traceback.format_exc())
+            return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Unexpected error in submitProposal: {str(e)}"
+            print(error_message)
+            print(traceback.format_exc())
+            return False, {"error": error_message}
+        finally:
+            # Restore original logging functions
+            logging.info = original_info
+            logging.error = original_error
+
+     
+    def getProposals(self):
+            """
+            Function to get all proposals by calling the API endpoint.
+            """
+            try:
+                response = self._makeUnauthenticatedCall(
+                    function=requests.get,
+                    endpoint='/proposals/get'
+                )
+                if response.status_code == 200:
+                    response_data = response.json()
+                    # Use load to deserialize JSON data into Python objects
+                    # proposals = ProposalSchema().load(response_data, many=True)
+                    proposals = response_data  # Directly use the JSON response
+                    return proposals
+                else:
+                    print(f"Failed to get proposals. Status code: {response.status_code}")
+                    return []
+            except requests.RequestException as e:
+                print(f"Error occurred while fetching proposals: {str(e)}")
+                return []
+            # except marshmallow.exceptions.ValidationError as e:
+            #     print(f"Error validating proposal data: {str(e)}")
+            #     return []
+
+
+
+    def getProposalVotes(self, proposal_id: str) -> dict:
+        """
+        Function to get all votes for a specific proposal by calling the API endpoint.
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint=f'/proposal/votes/get/{proposal_id}'
+            )
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"Failed to get proposal votes. Status code: {response.status_code}")
+                return {}
+        except requests.RequestException as e:
+            print(f"Error occurred while fetching proposal votes: {str(e)}")
+            return {}
+
+
+    def submitProposalVote(self, proposal_id: int, vote: str) -> tuple[bool, dict]:
+        """
+        Submits a vote for a proposal
+        """
+        try:
+            # Create the vote data with timestamp
+            vote_data = {
+                "proposal_id": int(proposal_id),  # Send proposal_id as integer
+                "vote": str(vote),
+                "ts": dt.datetime.now(dt.timezone.utc).isoformat()  # Add the current timestamp in UTC
+            }
+            print('calling server')
+            print(vote_data)
+
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/proposal/vote/submit',
+                json=vote_data  # Pass the vote_data dictionary directly
+            )
+            print(response.text)
+
+            if response.status_code == 200:
+                return True, response.json()
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+
+        except Exception as e:
+            error_message = f"Error in submitProposalVote: {str(e)}"
+            return False, {"error": error_message}
 
     def submitProposal(self, proposal_data: dict) -> tuple[bool, dict]:
         '''submits proposal'''

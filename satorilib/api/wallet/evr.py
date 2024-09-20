@@ -10,7 +10,7 @@ from satoriwallet import evrmore
 from satoriwallet import TxUtils, AssetTransaction
 from satorilib import logging
 from satorilib.api.wallet.wallet import Wallet, TransactionFailure
-
+from satoriwallet.api.blockchain import ElectrumX
 
 class EvrmoreWallet(Wallet):
     def __init__(
@@ -21,7 +21,13 @@ class EvrmoreWallet(Wallet):
         isTestnet: bool = False,
         password: Union[str, None] = None,
         use: Wallet = None,
+        connection: ElectrumX = None,
+        last_handshake = None,
+        type: str = None
     ):
+        self.connection: ElectrumX = connection;
+        self.last_handshake = last_handshake;
+        self.type = type;
         super().__init__(
             walletPath,
             temporary=temporary,
@@ -35,10 +41,14 @@ class EvrmoreWallet(Wallet):
         while i < 3:
             i += 1
             try:
+                logging.info("!!!!!!!!Address While Connecting!!!!!!!", self.address, color="green")
                 self.electrumx = ElectrumXAPI(
                     chain=self.chain,
                     address=self.address,
                     scripthash=self.scripthash,
+                    connection=self.connection,
+                    last_handshake=self.last_handshake,
+                    type=self.type,
                     servers=[
                         # 'moontree.com:50022',  # mainnet ssl evr
                         '146.190.149.237:50002',

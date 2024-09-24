@@ -9,6 +9,8 @@ from satoriwallet import TxUtils, Validate
 from satorilib import logging
 from satorilib.api import system
 from satorilib.api.disk.wallet import WalletApi
+from satoriwallet.lib.structs import TransactionStruct
+from satoriwallet import ElectrumxAPI
 
 
 class TransactionResult():
@@ -64,9 +66,9 @@ class Wallet():
         self.balanceAmount = 0 if use is None else use.balanceAmount
         self.divisibility = 0 if use is None else use.divisibility
         self.transactionHistory: list[dict] = None if use is None else use.transactionHistory
-        self.transactions = [] if use is None else use.transactions  # TransactionStruct
+        self.transactions: TransactionStruct = [] if use is None else use.transactions
         self.assetTransactions = [] if use is None else use.assetTransactions
-        self.electrumx = None if use is None else use.electrumx  # ElectrumXAPI
+        self.electrumx: ElectrumxAPI = None if use is None else use.electrumx
         self.currencyOnChain = None if use is None else use.currencyOnChain
         self.balanceOnChain = None if use is None else use.balanceOnChain
         self.unspentCurrency = None if use is None else use.unspentCurrency
@@ -398,22 +400,22 @@ class Wallet():
         we don't need to get the scriptPubKey every time we open the wallet,
         and it requires lots of calls for individual transactions.
         we just need them available when we're creating transactions.
-
         '''
         if (not force and
-                len([
-                    u for u in self.unspentCurrency + self.unspentAssets
-                            if 'scriptPubKey' not in u]) == 0
-                ):
+            len([
+                        u for u in self.unspentCurrency + self.unspentAssets
+                        if 'scriptPubKey' not in u]) == 0
+            ):
             # already have them all
             return True
 
         try:
+            # subscription is not necessary for this
             # make sure we're connected
-            if not hasattr(self, 'electrumx') or not self.electrumx.connected():
-                self.connect()
+            # if not hasattr(self, 'electrumx') or not self.electrumx.connected():
+            #    self.connect()
+            # self.get()
 
-            self.get()
             # get transactions, save their scriptPubKey hex to the unspents
             for uc in self.unspentCurrency:
                 if len([tx for tx in self.transactions if tx['txid'] == uc['tx_hash']]) == 0:
@@ -447,7 +449,10 @@ class Wallet():
             return False
         return True
 
-    def get(self, allWalletInfo=False):
+    def setupSubscription(self):
+        self.electrumx.subscribeScriptHash()
+
+    def get(self, *args, **kwargs):
         ''' gets data from the blockchain, saves to attributes '''
 
         def openSafely(supposedDict: dict, key: str, default: Union[str, int, dict, list] = None):
@@ -479,6 +484,34 @@ class Wallet():
             '''
             return self.electrumx.getAssetHolders(self.address).get(self.address, 0)
 
+        def getTransactions(transactionHistory: dict, limit: int = 0) -> list:
+            transactions = []
+            if limit < 0:
+                txHist = transactionHistory[limit:]
+            elif limit > 0:
+                txHist = transactionHistory[:limit]
+            else:
+                txHist = transactionHistory
+            for tx in txHist:
+                raw = self.electrumx.getTransaction(tx.get('tx_hash', ''))
+                txs = [self.electrumx.getTransaction(vin.get('txid', ''))
+                       for vin in raw.get('vin', [])]
+                transactions.append(
+                    TransactionStruct(raw=raw, vinVoutsTxs=txs))
+            return transactions
+
+        # unused - alternative to getTransactions - just gets the ones we need.
+        def getVouts(self, unspentCurrency, unspentAssets):
+            currencyVouts = [
+                self.electrumx.getTransaction(tx.get('tx_hash'))
+                for tx in unspentCurrency
+            ]
+            assetVouts = [
+                self.electrumx.getTransaction(tx.get('tx_hash'))
+                for tx in unspentAssets
+            ]
+            return currencyVouts, assetVouts
+
         # x = Evrmore(self.address, self.scripthash, config.electrumxServers())
         # todo: this list of servers should be parameterized from configuration
 
@@ -489,29 +522,21 @@ class Wallet():
             try:
                 self.connect()
             except Exception as e:
+                print(e)
                 return
 
-        try:
-            self.electrumx.get(allWalletInfo)
-        except Exception as e:
-            try:
-                self.connect()
-                self.electrumx.get(allWalletInfo)
-            except Exception as e:
-                return
-
-        self.currencyOnChain = self.electrumx.currency
-        self.balanceOnChain = self.electrumx.balance
-        self.stats = self.electrumx.stats
+        self.currencyOnChain = self.electrumx.getCurrency()
+        self.balanceOnChain = self.electrumx.getBalance()
+        self.stats = self.electrumx.getStats()
         # self.divisibility = self.stats.get('divisions', 8)
         self.divisibility = openSafely(self.stats, 'divisions', 8)
         self.divisibility = self.divisibility if self.divisibility is not None else 8
         # self.assetTransactions = self.electrumx.assetTransactions
-        self.banner = self.electrumx.banner
-        self.transactionHistory = self.electrumx.transactionHistory
-        self.transactions = self.electrumx.transactions or []
-        self.unspentCurrency = self.electrumx.unspentCurrency
-        self.unspentAssets = self.electrumx.unspentAssets
+        self.banner = self.electrumx.getBanner()
+        self.transactionHistory = self.electrumx.getTransactionHistory()
+        self.transactions = getTransactions(self.transactionHistory)
+        self.unspentCurrency = self.electrumx.getUnspentCurrency()
+        self.unspentAssets = self.electrumx.getUnspentAssets()
         # mempool sends all unspent transactions in currency and assets so we have to filter them here:
         self.unspentCurrency = [
             x for x in self.unspentCurrency if x.get('asset') == None]

@@ -5,7 +5,7 @@ from ravencoin.core.scripteval import VerifyScript, SCRIPT_VERIFY_P2SH
 from ravencoin.core.script import CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, OP_RVN_ASSET, OP_DROP, OP_RETURN, SIGHASH_ANYONECANPAY
 from ravencoin.core import b2x, lx, COIN, COutPoint, CMutableTxOut, CMutableTxIn, CMutableTransaction, Hash160
 from ravencoin.core.scripteval import EvalScriptError
-from satoriwallet import ElectrumXAPI
+from satoriwallet import ElectrumxAPI
 from satoriwallet import ravencoin
 from satoriwallet import TxUtils, AssetTransaction
 from satorilib import logging
@@ -32,7 +32,7 @@ class RavencoinWallet(Wallet):
             use=use)
 
     def connect(self):
-        self.electrumx = ElectrumXAPI(
+        self.electrumx = ElectrumxAPI(
             chain=self.chain,
             address=self.address,
             scripthash=self.scripthash,

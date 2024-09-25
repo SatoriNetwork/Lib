@@ -170,10 +170,7 @@ class Wallet():
     '''
 
     def authPayload(self, asDict: bool = False, challenge: str = None) -> Union[str, dict]:
-        print('before payload')
         payload = connection.authPayload(self, challenge)
-        print('after payload')
-        print(payload)
         if asDict:
             return payload
         return json.dumps(payload)

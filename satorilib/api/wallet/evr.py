@@ -13,6 +13,8 @@ from satorilib.api.wallet.wallet import Wallet, TransactionFailure
 from satoriwallet.api.blockchain import ElectrumX
 
 class EvrmoreWallet(Wallet):
+    _electrumxInstance: ElectrumXAPI = None
+    
     def __init__(
         self,
         walletPath: str,
@@ -42,19 +44,21 @@ class EvrmoreWallet(Wallet):
             i += 1
             try:
                 logging.info("!!!!!!!!Address While Connecting!!!!!!!", self.address, color="green")
-                self.electrumx = ElectrumXAPI(
-                    chain=self.chain,
-                    address=self.address,
-                    scripthash=self.scripthash,
-                    connection=self.connection,
-                    last_handshake=self.last_handshake,
-                    type=self.type,
-                    servers=[
-                        # 'moontree.com:50022',  # mainnet ssl evr
-                        '146.190.149.237:50002',
-                        '146.190.38.120:50002',  # backup - maybe just use for server
-                        'electrum1-mainnet.evrmorecoin.org:50002',
-                        'electrum2-mainnet.evrmorecoin.org:50002',  # keeps erroring out
+                if self._electrumxInstance is None:
+                    logging.info("!!!!!!!!!!!!!!!Creating New ElectrumX Instance!!!!!!!!!!", color="green")
+                    self._electrumxInstance = ElectrumXAPI(
+                        chain=self.chain,
+                        address=self.address,
+                        scripthash=self.scripthash,
+                        connection=self.connection,
+                        last_handshake=self.last_handshake,
+                        type=self.type,
+                        servers=[
+                            # 'moontree.com:50022',  # mainnet ssl evr
+                            '146.190.149.237:50002',
+                            '146.190.38.120:50002',  # backup - maybe just use for server
+                            'electrum1-mainnet.evrmorecoin.org:50002',
+                            'electrum2-mainnet.evrmorecoin.org:50002',  # keeps erroring out
 
                         # '146.190.149.237:50022',  # mainnet ssl evr # not working yet
 
@@ -75,7 +79,8 @@ class EvrmoreWallet(Wallet):
                         # 'electrum1-testnet.evrmorecoin.org:50002', # ssl
                         # 'electrum1-testnet.evrmorecoin.org:50004', # wss
                     ])
-                self.electrumx.handshake()
+                self.electrumx = self._electrumxInstance;
+                self._electrumxInstance.handshake()
                 break
             except Exception as e:
                 logging.warning(

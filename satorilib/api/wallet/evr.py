@@ -10,7 +10,7 @@ from satoriwallet import evrmore
 from satoriwallet import TxUtils, AssetTransaction
 from satorilib import logging
 from satorilib.api.wallet.wallet import Wallet, TransactionFailure
-from satoriwallet.api.blockchain import ElectrumX
+from satoriwallet.api.blockchain import Electrumx
 
 
 class EvrmoreWallet(Wallet):
@@ -18,19 +18,15 @@ class EvrmoreWallet(Wallet):
     def __init__(
         self,
         walletPath: str,
-        temporary: bool = False,
         reserve: float = .25,
         isTestnet: bool = False,
         password: Union[str, None] = None,
-        connection: ElectrumX = None,
-        last_handshake=None,
+        connection: Electrumx = None,
         use: Wallet = None,
     ):
         self.connection = connection
-        self.last_handshake = last_handshake
         super().__init__(
             walletPath,
-            temporary=temporary,
             reserve=reserve,
             isTestnet=isTestnet,
             password=password,
@@ -43,7 +39,6 @@ class EvrmoreWallet(Wallet):
                 address=self.address,
                 scripthash=self.scripthash,
                 connection=self.connection,
-                last_handshake=self.last_handshake,
                 onScripthashNotification=self.get,
                 onBlockNotification=None,
                 servers=[
@@ -72,7 +67,7 @@ class EvrmoreWallet(Wallet):
                     # 'electrum1-testnet.evrmorecoin.org:50002', # ssl
                     # 'electrum1-testnet.evrmorecoin.org:50004', # wss
                 ])
-            self.setupSubscription()
+            # self.setupSubscriptions()
         except Exception as e:
             logging.warning(
                 'ElectrumxAPI issue', e)

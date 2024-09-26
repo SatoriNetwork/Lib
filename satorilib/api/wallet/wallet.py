@@ -40,13 +40,12 @@ class Wallet():
     def __init__(
         self,
         walletPath: str,
-        temporary: bool = False,
         reserve: float = .25,
         isTestnet: bool = False,
         password: str = None,
         use: 'Wallet' = None,
     ):
-        self.satoriFee = 0.00000001
+        self.satoriFee = 0.00000010
         self.isTestnet = isTestnet
         self.password = password
         self._entropy = None
@@ -74,7 +73,6 @@ class Wallet():
         self.unspentCurrency = None if use is None else use.unspentCurrency
         self.unspentAssets = None if use is None else use.unspentAssets
         self.walletPath = walletPath
-        self.temporary = temporary
         # maintain minimum amount of currency at all times to cover fees - server only
         self.reserveAmount = reserve
         self.reserve = TxUtils.asSats(reserve)
@@ -192,9 +190,8 @@ class Wallet():
         else:
             self.generate()
             self.save()
-        if not self.temporary:
-            self.connect()
-            self.get()
+        self.connect()
+        self.get()
 
     def initRaw(self):
         ''' try to load, else generate and save '''
@@ -449,8 +446,8 @@ class Wallet():
             return False
         return True
 
-    def setupSubscription(self):
-        self.electrumx.subscribeScriptHash()
+    def setupSubscriptions(self):
+        self.electrumx.makeSubscriptions()
 
     def get(self, *args, **kwargs):
         ''' gets data from the blockchain, saves to attributes '''

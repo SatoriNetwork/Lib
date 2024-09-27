@@ -107,8 +107,8 @@ class EvrmoreWallet(Wallet):
         SelectParams('mainnet')
         return CEvrmoreSecret.from_secret_bytes(self._entropy)
 
-    def _generateAddress(self):
-        return P2PKHEvrmoreAddress.from_pubkey(self._privateKeyObj.pub)
+    def _generateAddress(self, pub=None):
+        return P2PKHEvrmoreAddress.from_pubkey(pub or self._privateKeyObj.pub)
 
     @staticmethod
     def generateAddress(pubkey: Union[bytes, str]) -> str:

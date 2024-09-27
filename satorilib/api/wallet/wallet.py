@@ -1,5 +1,6 @@
 from typing import Union
 import os
+import threading
 import json
 from base64 import b64encode, b64decode
 from random import randrange
@@ -7,7 +8,7 @@ import mnemonic
 from satoriwallet.lib import connection
 from satoriwallet import TxUtils, Validate
 from satorilib import logging
-from satorilib.config import config
+from satorilib import config
 from satorilib.api import system
 from satorilib.api.disk.utils import safetify
 from satoriwallet.lib.structs import TransactionStruct
@@ -57,19 +58,20 @@ class WalletBase():
         self.words = yaml.get('words')
         self.privateKey = yaml.get('privateKey')
         self.publicKey = yaml.get('publicKey')
-        self.address = yaml.get('address')
+        self.address = yaml.get(self.symbol, {}).get('address')
         self.scripthash = yaml.get('scripthash')
+        self.generateObjects()
 
     def verify(self) -> bool:
         _entropy = self._entropy
         _entropyStr = b64encode(_entropy).decode('utf-8')
         _privateKeyObj = self._generatePrivateKey()
-        _addressObj = self._generateAddress()
+        _addressObj = self._generateAddress(pub=_privateKeyObj.pub)
         words = self._generateWords()
         privateKey = str(_privateKeyObj)
         publicKey = _privateKeyObj.pub.hex()
         address = str(_addressObj)
-        scripthash = self._generateScripthash()
+        scripthash = self._generateScripthash(forAddress=address)
         return (
             _entropy == self._entropy and
             _entropyStr == self._entropyStr and
@@ -79,11 +81,14 @@ class WalletBase():
             address == self.address and
             scripthash == self.scripthash)
 
-    def generate(self):
+    def generateObjects(self):
         self._entropy = self._entropy or self._generateEntropy()
         self._entropyStr = b64encode(self._entropy).decode('utf-8')
         self._privateKeyObj = self._generatePrivateKey()
         self._addressObj = self._generateAddress()
+
+    def generate(self):
+        self.generateObjects()
         self.words = self.words or self._generateWords()
         self.privateKey = self.privateKey or str(self._privateKeyObj)
         self.publicKey = self.publicKey or self._privateKeyObj.pub.hex()
@@ -121,7 +126,7 @@ class WalletBase():
     def _generatePrivateKey(self):
         ''' returns a private key object '''
 
-    def _generateAddress(self):
+    def _generateAddress(self, pub=None):
         ''' returns an address object '''
 
     def _generateScriptPubKeyFromAddress(self, address: str):
@@ -207,7 +212,7 @@ class Wallet(WalletBase):
     ### Loading ################################################################
 
     def fileExists(self):
-        return os.path.exists(self.walletPath):
+        return os.path.exists(self.walletPath)
 
     def load(self) -> bool:
         if not self.fileExists():
@@ -219,9 +224,8 @@ class Wallet(WalletBase):
             return False
         self.yaml = self.decryptWallet(self.yaml)
         super().load(self.yaml)
-        if self.isDecrypted:
-            if not super().verify():
-                raise Exception('wallet or vault file corrupt')
+        if self.isDecrypted and not super().verify():
+            raise Exception('wallet or vault file corrupt')
         return True
 
     def close(self) -> None:
@@ -299,7 +303,7 @@ class Wallet(WalletBase):
 
     def get(self, *args, **kwargs):
         ''' gets data from the blockchain, saves to attributes '''
-        
+
         def openSafely(supposedDict: dict, key: str, default: Union[str, int, dict, list] = None):
             try:
                 return supposedDict.get(key, default)
@@ -330,7 +334,7 @@ class Wallet(WalletBase):
             return self.electrumx.getAssetHolders(self.address).get(self.address, 0)
 
         def getTransactions(transactionHistory: dict, limit: int = 0) -> list:
-            transactions = []
+            self.transactions = self.transactions or []
             if limit < 0:
                 txHist = transactionHistory[limit:]
             elif limit > 0:
@@ -341,9 +345,8 @@ class Wallet(WalletBase):
                 raw = self.electrumx.getTransaction(tx.get('tx_hash', ''))
                 txs = [self.electrumx.getTransaction(vin.get('txid', ''))
                        for vin in raw.get('vin', [])]
-                transactions.append(
+                self.transactions.append(
                     TransactionStruct(raw=raw, vinVoutsTxs=txs))
-            return transactions
 
         # unused - alternative to getTransactions - just gets the ones we need.
         def getVouts(self, unspentCurrency, unspentAssets):
@@ -380,15 +383,15 @@ class Wallet(WalletBase):
         # self.assetTransactions = self.electrumx.assetTransactions
         self.banner = self.electrumx.getBanner()
         self.transactionHistory = self.electrumx.getTransactionHistory()
-        self.transactions = getTransactions(self.transactionHistory)
+        # self.getTransactionsThread.join()
         self.unspentCurrency = self.electrumx.getUnspentCurrency()
         self.unspentAssets = self.electrumx.getUnspentAssets()
         # mempool sends all unspent transactions in currency and assets so we have to filter them here:
         self.unspentCurrency = [
-            x for x in self.unspentCurrency if x.get('asset') == None]        
+            x for x in self.unspentCurrency if x.get('asset') == None]
         self.unspentAssets = [
             x for x in self.unspentAssets if x.get('asset') != None]
-        
+
         # for logging purposes
         for x in self.unspentCurrency:
             openSafely(x, 'value')
@@ -417,6 +420,12 @@ class Wallet(WalletBase):
             self.balance or 0, self.divisibility)
         # self.currencyVouts = self.electrumx.evrVouts
         # self.assetVouts = self.electrumx.assetVouts
+
+        getTransactions(self.transactionHistory)
+        # threaded interferring with other calls...
+        # self.getTransactionsThread = threading.Thread(
+        #    target=getTransactions, args=(self.transactionHistory,), daemon=True)
+        # self.getTransactionsThread.start()
 
     ### Functions ##############################################################
 
@@ -478,9 +487,9 @@ class Wallet(WalletBase):
         we just need them available when we're creating transactions.
         '''
         if (not force and
-                len([
-                    u for u in self.unspentCurrency + self.unspentAssets
-                            if 'scriptPubKey' not in u]) == 0
+                    len([
+                        u for u in self.unspentCurrency + self.unspentAssets
+                        if 'scriptPubKey' not in u]) == 0
                 ):
             # already have them all
             return True

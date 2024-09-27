@@ -225,13 +225,11 @@ class Wallet(WalletBase):
         return True
 
     def close(self) -> None:
-        # if self.password is not None:
         self.password = None
         self.yaml = None
         super().close()
 
     def open(self, password: str = None) -> None:
-        # if self.password is not None:
         self.password = password
         self.load()
 

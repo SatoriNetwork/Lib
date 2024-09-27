@@ -217,11 +217,10 @@ class Wallet(WalletBase):
         self.yaml = config.get(self.walletPath)
         if self.yaml == False:
             return False
-        if self.password is None:
-            self.yaml = self.decryptWallet(self.yaml)
+        self.yaml = self.decryptWallet(self.yaml)
         super().load(self.yaml)
         if self.isDecrypted:
-            if not self.verify():
+            if not super().verify():
                 raise Exception('wallet or vault file corrupt')
         return True
 

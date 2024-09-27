@@ -7,8 +7,9 @@ import mnemonic
 from satoriwallet.lib import connection
 from satoriwallet import TxUtils, Validate
 from satorilib import logging
+from satorilib.config import config
 from satorilib.api import system
-from satorilib.api.disk.wallet import WalletApi
+from satorilib.api.disk.utils import safetify
 from satoriwallet.lib.structs import TransactionStruct
 from satoriwallet import ElectrumxAPI
 
@@ -35,314 +36,48 @@ class TransactionFailure(Exception):
         return f"{self.__class__.__name__}: {self.args[0]} {self.extra_data or ''}"
 
 
-class Wallet():
-
-    def __init__(
-        self,
-        walletPath: str,
-        reserve: float = .25,
-        isTestnet: bool = False,
-        password: str = None,
-        use: 'Wallet' = None,
-    ):
-        self.satoriFee = 0.00000010
-        self.isTestnet = isTestnet
-        self.password = password
-        self._entropy = None
-        self._privateKeyObj = None
-        self.privateKey = None
-        self.words = None
-        self._addressObj = None if use is None else use._addressObj
-        self.publicKey = None if use is None else use.publicKey
-        self.address = None if use is None else use.address
-        self.scripthash = None if use is None else use.scripthash
-        self.stats = {} if use is None else use.stats
-        self.alias = None if use is None else use.alias
-        self.banner = None if use is None else use.banner
-        self.currency = None if use is None else use.currency
-        self.balance = None if use is None else use.balance
-        self.currencyAmount = 0 if use is None else use.currencyAmount
-        self.balanceAmount = 0 if use is None else use.balanceAmount
-        self.divisibility = 0 if use is None else use.divisibility
-        self.transactionHistory: list[dict] = None if use is None else use.transactionHistory
-        self.transactions: TransactionStruct = [] if use is None else use.transactions
-        self.assetTransactions = [] if use is None else use.assetTransactions
-        self.electrumx: ElectrumxAPI = None if use is None else use.electrumx
-        self.currencyOnChain = None if use is None else use.currencyOnChain
-        self.balanceOnChain = None if use is None else use.balanceOnChain
-        self.unspentCurrency = None if use is None else use.unspentCurrency
-        self.unspentAssets = None if use is None else use.unspentAssets
-        self.walletPath = walletPath
-        # maintain minimum amount of currency at all times to cover fees - server only
-        self.reserveAmount = reserve
-        self.reserve = TxUtils.asSats(reserve)
-        self.initRaw()
-
-    def __call__(self):
-        x = 0
-        while x < 5:
-            try:
-                self.init()
-                break
-            except TimeoutError:
-                logging.error('init wallet connection attempts', x)
-                x += 1
-        return self
-
-    def __repr__(self):
-        return (
-            f'{self.chain}Wallet('
-            f'\n\tpublicKey: {self.publicKey},'
-            f'\n\tprivateKey: {self.privateKey},'
-            f'\n\twords: {self.words},'
-            f'\n\taddress: {self.address},'
-            f'\n\tscripthash: {self.scripthash},'
-            f'\n\tbalance: {self.balance},'
-            f'\n\tstats: {self.stats},'
-            f'\n\tbanner: {self.banner})')
-
-    @property
-    def symbol(self) -> str:
-        return 'wallet'
-
-    @property
-    def chain(self) -> str:
-        return ''
-
-    @property
-    def satoriOriginalTxHash(self) -> str:
-        return ''
-
-    @property
-    def publicKeyBytes(self) -> bytes:
-        return bytes.fromhex(self.publicKey)
-
-    @property
-    def isEncrypted(self) -> bool:
-        return ' ' not in self.words
-
-    @property
-    def isDecrypted(self) -> bool:
-        return not self.isEncrypted
+class WalletBase():
+    def __init__(self, entropy: Union[bytes, None] = None):
+        self._entropy: bytes = entropy
 
     def close(self) -> None:
-        # if self.password is not None:
-        self.password = None
         self._entropy = None
         self._entropyStr = ''
         self._privateKeyObj = None
         self.privateKey = ''
         self.words = ''
 
-    def open(self, password: str = None) -> None:
-        # if self.password is not None:
-        self.password = password
-        self.initRaw()
-        self.regenerate()
-
-    def setAlias(self, alias: Union[str, None] = None) -> None:
-        self.alias = alias
-
-    def hash160ToAddress(self, pubKeyHash: Union[str, bytes]) -> str:
-        return TxUtils.hash160ToAddress(pubKeyHash, self.networkByte)
-
-    def showStats(self):
-        ''' returns a string of stats properly formatted '''
-        def invertDivisibility(divisibility: int):
-            return (16 + 1) % (divisibility + 8 + 1)
-
-        divisions = self.stats.get('divisions', 8)
-        circulatingCoins = TxUtils.asAmount(int(self.stats.get(
-            'sats_in_circulation', 100000000000000)))
-        # circulatingSats = self.stats.get(
-        #    'sats_in_circulation', 100000000000000) / int('1' + ('0'*invertDivisibility(int(divisions))))
-        # headTail = str(circulatingSats).split('.')
-        # if headTail[1] == '0' or headTail[1] == '00000000':
-        #    circulatingSats = f"{int(headTail[0]):,}"
-        # else:
-        #    circulatingSats = f"{int(headTail[0]):,}" + '.' + \
-        #        f"{headTail[1][0:4]}" + '.' + f"{headTail[1][4:]}"
-        return f'''
-    Circulating Supply: {circulatingCoins}
-    Decimal Points: {divisions}
-    Reissuable: {self.stats.get('reissuable', False)}
-    Issuing Transactions: {self.stats.get('source', {}).get('tx_hash', self.satoriOriginalTxHash)}
-    '''
-
-    def authPayload(self, asDict: bool = False, challenge: str = None) -> Union[str, dict]:
-        payload = connection.authPayload(self, challenge)
-        if asDict:
-            return payload
-        return json.dumps(payload)
-
-    def registerPayload(self, asDict: bool = False, challenge: str = None) -> Union[str, dict]:
-        payload = {
-            **connection.authPayload(self, challenge),
-            **system.devicePayload(asDict=True)}
-        if asDict:
-            return payload
-        return json.dumps(payload)
-
-    def init(self):
-        ''' try to load, else generate and save '''
-        if self.load():
-            self.regenerate()
-        else:
-            self.generate()
-            self.save()
-        self.connect()
-        self.get()
-
-    def initRaw(self):
-        ''' try to load, else generate and save '''
-        if isinstance(self.password, str):
-            if not self.load():
-                if not self.loadRaw():
-                    self.generate()
-                    self.save()
-        else:
-            if not self.loadRaw():
-                self.generate()
-                self.save()
-        if self.address or self._privateKeyObj is None:
-            self.regenerate()
-
-    def decryptWallet(self, encrypted: dict) -> dict:
-        if isinstance(self.password, str):
-            from satorilib import secret
-            try:
-                return secret.decryptMapValues(
-                    encrypted=encrypted,
-                    password=self.password,
-                    keys=['entropy', 'privateKey', 'words',
-                          # we used to encrypt these, but we don't anymore...
-                          'address' if len(encrypted.get(self.symbol, {}).get(
-                              'address', '')) > 34 else '',  # == 108 else '',
-                          'scripthash' if len(encrypted.get(
-                              'scripthash', '')) != 64 else '',  # == 152 else '',
-                          'publicKey' if len(encrypted.get(
-                              'publicKey', '')) != 66 else '',  # == 152 else '',
-                          ])
-            except Exception as _:
-                return encrypted
-        return encrypted
-
-    def encryptWallet(self, content: dict) -> dict:
-        if isinstance(self.password, str):
-            from satorilib import secret
-            try:
-                return secret.encryptMapValues(
-                    content=content,
-                    password=self.password,
-                    keys=['entropy', 'privateKey', 'words'])
-            except Exception as _:
-                return content
-        return content
-
-    def getRaw(self):
-        return WalletApi.load(walletPath=self.walletPath)
-
-    def loadRaw(self):
-        self.yaml = self.getRaw()
-        if self.yaml == False:
-            return False
-        # leave this in for a few months then you can remove it.
-        self.cleanYaml()
-        self._entropy = self.yaml.get('entropy')
+    def load(self, yaml: dict):
+        self._entropy = yaml.get('entropy')
         if isinstance(self._entropy, bytes):
             self._entropyStr = b64encode(self._entropy).decode('utf-8')
         if isinstance(self._entropy, str):
             self._entropyStr = self._entropy
             self._entropy = b64decode(self._entropy)
-        self.words = self.yaml.get('words')
-        self.publicKey = self.yaml.get('publicKey')
-        self.privateKey = self.yaml.get('privateKey')
-        thisWallet = self.yaml.get(self.symbol, {})
-        self.address = thisWallet.get('address')
-        self.scripthash = self.yaml.get('scripthash')
-        if self._entropy is None:
-            return False
-        logging.info('load', self.publicKey, self.walletPath)
-        return True
+        self.words = yaml.get('words')
+        self.privateKey = yaml.get('privateKey')
+        self.publicKey = yaml.get('publicKey')
+        self.address = yaml.get('address')
+        self.scripthash = yaml.get('scripthash')
 
-    def cleanYaml(self):
-        ''' here we clean the yaml file such that the entropy is a string '''
-        self.yaml = self.getRaw()
-        if isinstance(self.yaml.get('entropy'), bytes):
-            self.yaml['entropy'] = b64encode(
-                self.yaml.get('entropy')).decode('utf-8')
-            self._entropyStr = self.yaml.get('entropy')
-            WalletApi.save(
-                wallet={
-                    **(
-                        self.yaml
-                        if hasattr(self, 'yaml') and isinstance(self.yaml, dict)
-                        else {}),
-                    **(self.encryptWallet(
-                        content={
-                            'entropy': self._entropyStr,
-                        }) if self.password is not None else {})
-                },
-                walletPath=self.walletPath)
-
-    def load(self):
-        self.yaml = self.getRaw()
-        if self.yaml == False:
-            return False
-        self.yaml = self.decryptWallet(self.yaml)
-
-        self._entropy = self.yaml.get('entropy')
-        if isinstance(self._entropy, bytes):
-            self._entropyStr = b64encode(self._entropy).decode('utf-8')
-        if isinstance(self._entropy, str):
-            self._entropyStr = self._entropy
-            self._entropy = b64decode(self._entropy)
-
-        # # these are regenerated from entropy in every case
-        self.words = self.yaml.get('words')
-        self.publicKey = self.yaml.get('publicKey')
-        self.privateKey = self.yaml.get('privateKey')
-        self.address = self.yaml.get(self.symbol, {}).get(
-            'address')
-        self.scripthash = self.yaml.get('scripthash')
-        if self._entropy is None:
-            return False
-        logging.info('load', self.publicKey, self.walletPath)
-        return True
-
-    def save(self):
-        WalletApi.save(
-            wallet={
-                **(
-                    self.encryptWallet(self.yaml)
-                    if hasattr(self, 'yaml') and isinstance(self.yaml, dict)
-                    else {}),
-                **self.encryptWallet(
-                    content={
-                        'entropy': self._entropyStr,
-                        'words': self.words,
-                        'privateKey': self.privateKey,
-                    }),
-                **{
-                    'publicKey': self.publicKey,
-                    'scripthash': self.scripthash,
-                    self.symbol: {
-                        'address': self.address,
-                    }
-                }
-            },
-            walletPath=self.walletPath)
-
-    def regenerate(self):
-        saveIt = False
-        if not hasattr(self, 'privateKey') or self.privateKey is None:
-            saveIt = True
-        # entire file is encrypted (only part is supposed to be encrypted)
-        elif self.isDecrypted and (self.getRaw() or {}).get('publicKey') != self.publicKey:
-            saveIt = True
-        self.generate()
-        if saveIt:
-            self.save()
+    def verify(self) -> bool:
+        _entropy = self._entropy
+        _entropyStr = b64encode(_entropy).decode('utf-8')
+        _privateKeyObj = self._generatePrivateKey()
+        _addressObj = self._generateAddress()
+        words = self._generateWords()
+        privateKey = str(_privateKeyObj)
+        publicKey = _privateKeyObj.pub.hex()
+        address = str(_addressObj)
+        scripthash = self._generateScripthash()
+        return (
+            _entropy == self._entropy and
+            _entropyStr == self._entropyStr and
+            words == self.words and
+            privateKey == self.privateKey and
+            publicKey == self.publicKey and
+            address == self.address and
+            scripthash == self.scripthash)
 
     def generate(self):
         self._entropy = self._entropy or self._generateEntropy()
@@ -392,59 +127,172 @@ class Wallet():
     def _generateScriptPubKeyFromAddress(self, address: str):
         ''' returns CScript object from address '''
 
-    def getUnspentSignatures(self, force: bool = False) -> bool:
-        '''
-        we don't need to get the scriptPubKey every time we open the wallet,
-        and it requires lots of calls for individual transactions.
-        we just need them available when we're creating transactions.
-        '''
-        if (not force and
-            len([
-                        u for u in self.unspentCurrency + self.unspentAssets
-                        if 'scriptPubKey' not in u]) == 0
-            ):
-            # already have them all
-            return True
 
-        try:
-            # subscription is not necessary for this
-            # make sure we're connected
-            # if not hasattr(self, 'electrumx') or not self.electrumx.connected():
-            #    self.connect()
-            # self.get()
+class Wallet(WalletBase):
 
-            # get transactions, save their scriptPubKey hex to the unspents
-            for uc in self.unspentCurrency:
-                if len([tx for tx in self.transactions if tx['txid'] == uc['tx_hash']]) == 0:
-                    self.transactions.append(
-                        self.electrumx.getTransaction(uc['tx_hash']))
-                tx = [tx for tx in self.transactions if tx['txid'] == uc['tx_hash']]
-                if len(tx) > 0:
-                    vout = [vout for vout in tx[0].get(
-                        'vout', []) if vout.get('n') == uc['tx_pos']]
-                    if len(vout) > 0:
-                        scriptPubKey = vout[0].get(
-                            'scriptPubKey', {}).get('hex', None)
-                        if scriptPubKey is not None:
-                            uc['scriptPubKey'] = scriptPubKey
-            for ua in self.unspentAssets:
-                if len([tx for tx in self.transactions if tx['txid'] == ua['tx_hash']]) == 0:
-                    self.transactions.append(
-                        self.electrumx.getTransaction(ua['tx_hash']))
-                tx = [tx for tx in self.transactions if tx['txid'] == ua['tx_hash']]
-                if len(tx) > 0:
-                    vout = [vout for vout in tx[0].get(
-                        'vout', []) if vout.get('n') == ua['tx_pos']]
-                    if len(vout) > 0:
-                        scriptPubKey = vout[0].get(
-                            'scriptPubKey', {}).get('hex', None)
-                        if scriptPubKey is not None:
-                            ua['scriptPubKey'] = scriptPubKey
-        except Exception as e:
-            logging.warning(
-                'unable to acquire signatures of unspent transactions, maybe unable to send', e, print=True)
+    def __init__(
+        self,
+        walletPath: str,
+        reserve: float = .25,
+        isTestnet: bool = False,
+        password: str = None,
+    ):
+        super().__init__()
+        self.satoriFee = 0.00000010
+        self.isTestnet = isTestnet
+        self.password = password
+        self.walletPath = walletPath
+        # maintain minimum amount of currency at all times to cover fees - server only
+        self.reserveAmount = reserve
+        self.reserve = TxUtils.asSats(reserve)
+        self.stats = {}
+        self.alias = None
+        self.banner = None
+        self.currency = None
+        self.balance = None
+        self.currencyAmount = 0
+        self.balanceAmount = 0
+        self.divisibility = 0
+        self.transactionHistory: list[dict] = []
+        self.transactions: TransactionStruct = []
+        self.assetTransactions = []
+        self.electrumx: ElectrumxAPI = None
+        self.currencyOnChain = None
+        self.balanceOnChain = None
+        self.unspentCurrency = None
+        self.unspentAssets = None
+        self.load()
+
+    def __call__(self):
+        self.connect()
+        self.get()
+        return self
+
+    def __repr__(self):
+        return (
+            f'{self.chain}Wallet('
+            f'\n\tpublicKey: {self.publicKey},'
+            f'\n\tprivateKey: {self.privateKey},'
+            f'\n\twords: {self.words},'
+            f'\n\taddress: {self.address},'
+            f'\n\tscripthash: {self.scripthash},'
+            f'\n\tbalance: {self.balance},'
+            f'\n\tstats: {self.stats},'
+            f'\n\tbanner: {self.banner})')
+
+    @property
+    def symbol(self) -> str:
+        return 'wallet'
+
+    @property
+    def chain(self) -> str:
+        return ''
+
+    @property
+    def satoriOriginalTxHash(self) -> str:
+        return ''
+
+    @property
+    def publicKeyBytes(self) -> bytes:
+        return bytes.fromhex(self.publicKey)
+
+    @property
+    def isEncrypted(self) -> bool:
+        return ' ' not in self.words
+
+    @property
+    def isDecrypted(self) -> bool:
+        return not self.isEncrypted
+
+    ### Loading ################################################################
+
+    def fileExists(self):
+        return os.path.exists(self.walletPath):
+
+    def load(self) -> bool:
+        if not self.fileExists():
+            self.generate()
+            self.save()
+            return self.load()
+        self.yaml = config.get(self.walletPath)
+        if self.yaml == False:
             return False
+        self.yaml = self.decryptWallet(self.yaml)
+        super().load(self.yaml)
+        if self.isDecrypted:
+            if not super().verify():
+                raise Exception('wallet or vault file corrupt')
         return True
+
+    def close(self) -> None:
+        self.password = None
+        self.yaml = None
+        super().close()
+
+    def open(self, password: str = None) -> None:
+        self.password = password
+        self.load()
+
+    def decryptWallet(self, encrypted: dict) -> dict:
+        if isinstance(self.password, str):
+            from satorilib import secret
+            try:
+                return secret.decryptMapValues(
+                    encrypted=encrypted,
+                    password=self.password,
+                    keys=['entropy', 'privateKey', 'words',
+                          # we used to encrypt these, but we don't anymore...
+                          'address' if len(encrypted.get(self.symbol, {}).get(
+                              'address', '')) > 34 else '',  # == 108 else '',
+                          'scripthash' if len(encrypted.get(
+                              'scripthash', '')) != 64 else '',  # == 152 else '',
+                          'publicKey' if len(encrypted.get(
+                              'publicKey', '')) != 66 else '',  # == 152 else '',
+                          ])
+            except Exception as _:
+                return encrypted
+        return encrypted
+
+    def encryptWallet(self, content: dict) -> dict:
+        if isinstance(self.password, str):
+            from satorilib import secret
+            try:
+                return secret.encryptMapValues(
+                    content=content,
+                    password=self.password,
+                    keys=['entropy', 'privateKey', 'words'])
+            except Exception as _:
+                return content
+        return content
+
+    def save(self):
+        safetify(self.walletPath)
+        config.put(
+            data={
+                **(
+                    self.encryptWallet(content=self.yaml)
+                    if hasattr(self, 'yaml') and isinstance(self.yaml, dict)
+                    else {}),
+                **self.encryptWallet(
+                    content={
+                        'entropy': self._entropyStr,
+                        'words': self.words,
+                        'privateKey': self.privateKey,
+                    }),
+                **{
+                    'publicKey': self.publicKey,
+                    'scripthash': self.scripthash,
+                    self.symbol: {
+                        'address': self.address,
+                    }
+                }
+            },
+            path=self.walletPath)
+
+    ### Electrumx ##############################################################
+
+    def connect(self):
+        ''' connect to Electrumx '''
 
     def setupSubscriptions(self):
         self.electrumx.makeSubscriptions()
@@ -570,6 +418,113 @@ class Wallet():
         # self.currencyVouts = self.electrumx.evrVouts
         # self.assetVouts = self.electrumx.assetVouts
 
+    ### Functions ##############################################################
+
+    def setAlias(self, alias: Union[str, None] = None) -> None:
+        self.alias = alias
+
+    def hash160ToAddress(self, pubKeyHash: Union[str, bytes]) -> str:
+        return TxUtils.hash160ToAddress(pubKeyHash, self.networkByte)
+
+    def showStats(self):
+        ''' returns a string of stats properly formatted '''
+        def invertDivisibility(divisibility: int):
+            return (16 + 1) % (divisibility + 8 + 1)
+
+        divisions = self.stats.get('divisions', 8)
+        circulatingCoins = TxUtils.asAmount(int(self.stats.get(
+            'sats_in_circulation', 100000000000000)))
+        # circulatingSats = self.stats.get(
+        #    'sats_in_circulation', 100000000000000) / int('1' + ('0'*invertDivisibility(int(divisions))))
+        # headTail = str(circulatingSats).split('.')
+        # if headTail[1] == '0' or headTail[1] == '00000000':
+        #    circulatingSats = f"{int(headTail[0]):,}"
+        # else:
+        #    circulatingSats = f"{int(headTail[0]):,}" + '.' + \
+        #        f"{headTail[1][0:4]}" + '.' + f"{headTail[1][4:]}"
+        return f'''
+    Circulating Supply: {circulatingCoins}
+    Decimal Points: {divisions}
+    Reissuable: {self.stats.get('reissuable', False)}
+    Issuing Transactions: {self.stats.get('source', {}).get('tx_hash', self.satoriOriginalTxHash)}
+    '''
+
+    def authPayload(self, asDict: bool = False, challenge: str = None) -> Union[str, dict]:
+        payload = connection.authPayload(self, challenge)
+        if asDict:
+            return payload
+        return json.dumps(payload)
+
+    def registerPayload(self, asDict: bool = False, challenge: str = None) -> Union[str, dict]:
+        payload = {
+            **connection.authPayload(self, challenge),
+            **system.devicePayload(asDict=True)}
+        if asDict:
+            return payload
+        return json.dumps(payload)
+
+    def sign(self, message: str):
+        ''' signs a message with the private key '''
+
+    def verify(self, message: str, sig: bytes, address: Union[str, None] = None) -> bool:
+        ''' verifies a message with the public key '''
+
+    ### Transaction Support ####################################################
+
+    def getUnspentSignatures(self, force: bool = False) -> bool:
+        '''
+        we don't need to get the scriptPubKey every time we open the wallet,
+        and it requires lots of calls for individual transactions.
+        we just need them available when we're creating transactions.
+        '''
+        if (not force and
+                len([
+                    u for u in self.unspentCurrency + self.unspentAssets
+                            if 'scriptPubKey' not in u]) == 0
+                ):
+            # already have them all
+            return True
+
+        try:
+            # subscription is not necessary for this
+            # make sure we're connected
+            # if not hasattr(self, 'electrumx') or not self.electrumx.connected():
+            #    self.connect()
+            # self.get()
+
+            # get transactions, save their scriptPubKey hex to the unspents
+            for uc in self.unspentCurrency:
+                if len([tx for tx in self.transactions if tx['txid'] == uc['tx_hash']]) == 0:
+                    self.transactions.append(
+                        self.electrumx.getTransaction(uc['tx_hash']))
+                tx = [tx for tx in self.transactions if tx['txid'] == uc['tx_hash']]
+                if len(tx) > 0:
+                    vout = [vout for vout in tx[0].get(
+                        'vout', []) if vout.get('n') == uc['tx_pos']]
+                    if len(vout) > 0:
+                        scriptPubKey = vout[0].get(
+                            'scriptPubKey', {}).get('hex', None)
+                        if scriptPubKey is not None:
+                            uc['scriptPubKey'] = scriptPubKey
+            for ua in self.unspentAssets:
+                if len([tx for tx in self.transactions if tx['txid'] == ua['tx_hash']]) == 0:
+                    self.transactions.append(
+                        self.electrumx.getTransaction(ua['tx_hash']))
+                tx = [tx for tx in self.transactions if tx['txid'] == ua['tx_hash']]
+                if len(tx) > 0:
+                    vout = [vout for vout in tx[0].get(
+                        'vout', []) if vout.get('n') == ua['tx_pos']]
+                    if len(vout) > 0:
+                        scriptPubKey = vout[0].get(
+                            'scriptPubKey', {}).get('hex', None)
+                        if scriptPubKey is not None:
+                            ua['scriptPubKey'] = scriptPubKey
+        except Exception as e:
+            logging.warning(
+                'unable to acquire signatures of unspent transactions, maybe unable to send', e, print=True)
+            return False
+        return True
+
     def getUnspentsFromHistory(self) -> tuple[list, list]:
         '''
             get unspents from transaction history
@@ -594,12 +549,6 @@ class Wallet():
 
         for txRef in self.transactionHistory:
             txRef['tx_hash']
-
-    def sign(self, message: str):
-        ''' signs a message with the private key '''
-
-    def verify(self, message: str, sig: bytes, address: Union[str, None] = None) -> bool:
-        ''' verifies a message with the public key '''
 
     def _checkSatoriValue(self, output: 'CMutableTxOut') -> bool:
         '''
@@ -795,7 +744,10 @@ class Wallet():
             return self.electrumx.broadcast(txHex)
         return self.electrumx.broadcast(txHex)
 
+    ### Transactions ###########################################################
+
     # for server
+
     def satoriDistribution(self, amountByAddress: dict[str: float], memo: str) -> str:
         ''' creates a transaction with multiple SATORI asset recipients '''
         if len(amountByAddress) == 0 or len(amountByAddress) > 1000:

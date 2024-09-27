@@ -8,9 +8,9 @@ from evrmore.core.scripteval import EvalScriptError
 from satoriwallet import ElectrumxAPI
 from satoriwallet import evrmore
 from satoriwallet import TxUtils, AssetTransaction
+from satoriwallet.api.blockchain import Electrumx
 from satorilib import logging
 from satorilib.api.wallet.wallet import Wallet, TransactionFailure
-from satoriwallet.api.blockchain import Electrumx
 
 
 class EvrmoreWallet(Wallet):
@@ -23,7 +23,6 @@ class EvrmoreWallet(Wallet):
         password: Union[str, None] = None,
         connection: Electrumx = None,
         type: str = 'wallet',
-        use: Wallet = None,
     ):
         self.connection = connection
         self.type = type
@@ -31,8 +30,7 @@ class EvrmoreWallet(Wallet):
             walletPath,
             reserve=reserve,
             isTestnet=isTestnet,
-            password=password,
-            use=use)
+            password=password)
 
     def connect(self):
         try:

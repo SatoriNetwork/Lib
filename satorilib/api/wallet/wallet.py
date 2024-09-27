@@ -299,7 +299,7 @@ class Wallet(WalletBase):
 
     def get(self, *args, **kwargs):
         ''' gets data from the blockchain, saves to attributes '''
-
+        
         def openSafely(supposedDict: dict, key: str, default: Union[str, int, dict, list] = None):
             try:
                 return supposedDict.get(key, default)
@@ -370,6 +370,7 @@ class Wallet(WalletBase):
                 print(e)
                 return
 
+        logging.info("Getting all the data from the blockchain", color="green")
         self.currencyOnChain = self.electrumx.getCurrency()
         self.balanceOnChain = self.electrumx.getBalance()
         self.stats = self.electrumx.getStats()
@@ -384,9 +385,10 @@ class Wallet(WalletBase):
         self.unspentAssets = self.electrumx.getUnspentAssets()
         # mempool sends all unspent transactions in currency and assets so we have to filter them here:
         self.unspentCurrency = [
-            x for x in self.unspentCurrency if x.get('asset') == None]
+            x for x in self.unspentCurrency if x.get('asset') == None]        
         self.unspentAssets = [
             x for x in self.unspentAssets if x.get('asset') != None]
+        
         # for logging purposes
         for x in self.unspentCurrency:
             openSafely(x, 'value')

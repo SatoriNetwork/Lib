@@ -22,8 +22,10 @@ class EvrmoreWallet(Wallet):
         isTestnet: bool = False,
         password: Union[str, None] = None,
         connection: Electrumx = None,
+        type: str = 'wallet',
     ):
         self.connection = connection
+        self.type = type
         super().__init__(
             walletPath,
             reserve=reserve,
@@ -37,6 +39,7 @@ class EvrmoreWallet(Wallet):
                 address=self.address,
                 scripthash=self.scripthash,
                 connection=self.connection,
+                type=self.type,
                 onScripthashNotification=self.get,
                 onBlockNotification=None,
                 servers=[

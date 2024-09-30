@@ -30,6 +30,10 @@ from satorilib.api.time.time import timeToTimestamp
 from satorilib.api.wallet import Wallet
 from satorilib.concepts.structs import Stream
 from satorilib.server.api import ProposalSchema, VoteSchema
+from requests.exceptions import RequestException
+import json
+import traceback
+import datetime as dt
 
 
 class SatoriServerClient(object):
@@ -58,16 +62,19 @@ class SatoriServerClient(object):
         function: callable,
         endpoint: str,
         url: str = None,
-        json: Union[str, None] = None,
+        payload: Union[str, dict, None] = None,
         challenge: str = None,
         useWallet: Wallet = None,
         extraHeaders: Union[dict, None] = None,
         raiseForStatus: bool = True,
     ) -> requests.Response:
-        if json is not None:
+        if isinstance(payload, dict):
+            payload = json.dumps(payload)
+
+        if payload is not None:
             logging.info(
                 'outgoing:',
-                json[0:40], f'{"..." if len(json) > 40 else ""}',
+                payload[0:40], f'{"..." if len(payload) > 40 else ""}',
                 print=True)
         r = function(
             (url or self.url) + endpoint,
@@ -77,7 +84,7 @@ class SatoriServerClient(object):
                     challenge=challenge or self._getChallenge()),
                 **(extraHeaders or {}),
             },
-            json=json)
+            json=payload)
         if raiseForStatus:
             try:
                 r.raise_for_status()
@@ -133,21 +140,21 @@ class SatoriServerClient(object):
         return self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/register/wallet',
-            json=self.wallet.registerPayload())
+            payload=self.wallet.registerPayload())
 
     def registerStream(self, stream: dict, payload: str = None):
         ''' publish stream {'source': 'test', 'name': 'stream1', 'target': 'target'}'''
         return self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/register/stream',
-            json=payload or json.dumps(stream))
+            payload=payload or json.dumps(stream))
 
     def registerSubscription(self, subscription: dict, payload: str = None):
         ''' subscribe to stream '''
         return self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/register/subscription',
-            json=payload or json.dumps(subscription))
+            payload=payload or json.dumps(subscription))
 
     def registerPin(self, pin: dict, payload: str = None):
         '''
@@ -163,7 +170,7 @@ class SatoriServerClient(object):
         return self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/register/pin',
-            json=payload or json.dumps(pin))
+            payload=payload or json.dumps(pin))
 
     def requestPrimary(self):
         ''' subscribe to primary data stream and and publish prediction '''
@@ -176,14 +183,14 @@ class SatoriServerClient(object):
         return self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/get/streams',
-            json=payload or json.dumps(stream))
+            payload=payload or json.dumps(stream))
 
     def myStreams(self):
         ''' subscribe to primary data stream and and publish prediction '''
         return self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/my/streams',
-            json='{}')
+            payload='{}')
 
     def removeStream(self, stream: dict = None, payload: str = None):
         ''' removes a stream from the server '''
@@ -192,14 +199,14 @@ class SatoriServerClient(object):
         return self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/remove/stream',
-            json=payload or json.dumps(stream or {}))
+            payload=payload or json.dumps(stream or {}))
 
     def checkin(self, referrer: str = None) -> dict:
         challenge = self._getChallenge()
         response = self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/checkin',
-            json=self.wallet.registerPayload(challenge=challenge),
+            payload=self.wallet.registerPayload(challenge=challenge),
             challenge=challenge,
             extraHeaders={'referrer': referrer} if referrer else {},
             raiseForStatus=False)
@@ -216,7 +223,7 @@ class SatoriServerClient(object):
         response = self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/checkin/check',
-            json=self.wallet.registerPayload(challenge=challenge),
+            payload=self.wallet.registerPayload(challenge=challenge),
             challenge=challenge,
             extraHeaders={'changesSince': timeToTimestamp(self.lastCheckin)},
             raiseForStatus=False)
@@ -294,14 +301,14 @@ class SatoriServerClient(object):
             function=requests.post,
             endpoint='/vote_on/manifest',
             useWallet=wallet,
-            json=json.dumps(votes or {})).text
+            payload=json.dumps(votes or {})).text
 
     def submitSanctionVote(self, wallet: Wallet, votes: dict[str, int]):
         return self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/vote_on/sanction',
             useWallet=wallet,
-            json=json.dumps(votes or {})).text
+            payload=json.dumps(votes or {})).text
 
     def removeSanctionVote(self, wallet: Wallet):
         return self._makeAuthenticatedCall(
@@ -316,7 +323,7 @@ class SatoriServerClient(object):
         response = self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/register/subscription/pindepin',
-            json=json.dumps(stream))
+            payload=json.dumps(stream))
         if response.status_code < 400:
             return response.json().get('success'), response.json().get('result')
         return False, ''
@@ -354,7 +361,7 @@ class SatoriServerClient(object):
             return None
         return None
 
-    def  setRewardAddress(
+    def setRewardAddress(
         self,
         signature: Union[str, bytes],
         pubkey: str,
@@ -395,7 +402,7 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/mine/to/address',
-                json=js)
+                payload=js)
             return response.status_code < 400, response.text
         except Exception as e:
             logging.warning(
@@ -415,7 +422,8 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/stake/for/address',
-                json=json.dumps({
+                raiseForStatus=False,
+                payload=json.dumps({
                     'vaultSignature': vaultSignature,
                     'vaultPubkey': vaultPubkey,
                     'address': address}))
@@ -424,6 +432,58 @@ class SatoriServerClient(object):
             logging.warning(
                 'unable to determine status of mine to address feature due to connection timeout; try again Later.', e, color='yellow')
             return False, ''
+
+    def lendToAddress(
+        self,
+        vaultSignature: Union[str, bytes],
+        vaultPubkey: str,
+        address: str
+    ) -> tuple[bool, str]:
+        ''' add lend address '''
+        try:
+            if isinstance(vaultSignature, bytes):
+                vaultSignature = vaultSignature.decode()
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/stake/lend/to/address',
+                raiseForStatus=False,
+                payload=json.dumps({
+                    'vaultSignature': vaultSignature,
+                    'vaultPubkey': vaultPubkey,
+                    'address': address}))
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to determine status of mine to address feature due to connection timeout; try again Later.', e, color='yellow')
+            return False, ''
+
+    def lendRemove(self) -> tuple[bool, dict]:
+        ''' removes a stream from the server '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/stake/lend/remove')
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to stakeProxyRemove due to connection timeout; try again Later.', e, color='yellow')
+            return False, {}
+
+    def lendAddress(self) -> Union[str, None]:
+        ''' get lending address '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/stake/lend/address')
+            if response.status_code > 399:
+                return 'Unknown'
+            if response.text in ['null', 'None', 'NULL']:
+                return ''
+            return response.text
+        except Exception as e:
+            logging.warning(
+                'unable to get reward address; try again Later.', e, color='yellow')
+            return ''
 
     def reportVault(
         self,
@@ -441,7 +501,7 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/vault/report',
-                json=json.dumps({
+                payload=json.dumps({
                     'walletSignature': walletSignature,
                     'vaultSignature': vaultSignature,
                     'vaultPubkey': vaultPubkey,
@@ -468,7 +528,7 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/mine_to_vault/enable',
-                json=json.dumps({
+                payload=json.dumps({
                     'walletSignature': walletSignature,
                     'vaultSignature': vaultSignature,
                     'vaultPubkey': vaultPubkey,
@@ -495,7 +555,7 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/mine_to_vault/disable',
-                json=json.dumps({
+                payload=json.dumps({
                     'walletSignature': walletSignature,
                     'vaultSignature': vaultSignature,
                     'vaultPubkey': vaultPubkey,
@@ -550,7 +610,7 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/beta/claim',
-                json=json.dumps({'ethAddress': ethAddress}))
+                payload=json.dumps({'ethAddress': ethAddress}))
             return response.status_code < 400,  response.json()
         except Exception as e:
             logging.warning(
@@ -575,7 +635,7 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/stake/proxy/charity',
-                json=json.dumps({'child': address, 'childId': childId}))
+                payload=json.dumps({'child': address, 'childId': childId}))
             return response.status_code < 400, response.text
         except Exception as e:
             logging.warning(
@@ -588,7 +648,7 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/stake/proxy/charity/not',
-                json=json.dumps({'child': address, 'childId': childId}))
+                payload=json.dumps({'child': address, 'childId': childId}))
             return response.status_code < 400, response.text
         except Exception as e:
             logging.warning(
@@ -625,7 +685,7 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/stake/proxy/remove',
-                json=json.dumps({'child': address, 'childId': childId}))
+                payload=json.dumps({'child': address, 'childId': childId}))
             return response.status_code < 400, response.text
         except Exception as e:
             logging.warning(
@@ -686,12 +746,38 @@ class SatoriServerClient(object):
             return None
         return True
 
-    def getProposalVotes(self):
-        ''' add to get all votes on this proposal'''
-
-    def submitProposal(self,) -> tuple[bool, dict]:
+    def submitProposal(self, proposal_data: dict) -> tuple[bool, dict]:
         '''submits proposal'''
-        # finish
+        try:
+            # Ensure options is a JSON string
+            if 'options' in proposal_data and isinstance(proposal_data['options'], list):
+                proposal_data['options'] = json.dumps(proposal_data['options'])
+
+            # Convert the entire proposal_data to a JSON string
+            proposal_json_string = json.dumps(proposal_data)
+
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/proposal/submit',
+                payload=proposal_json_string
+            )
+            if response.status_code < 400:
+                return True, response.text
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                logging.error(f"Error in submitProposal: {error_message}")
+                return False, {"error": error_message}
+
+        except RequestException as re:
+            error_message = f"Request error in submitProposal: {str(re)}"
+            logging.error(error_message)
+            logging.error(traceback.format_exc())
+            return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Unexpected error in submitProposal: {str(e)}"
+            logging.error(error_message)
+            logging.error(traceback.format_exc())
+            return False, {"error": error_message}
 
     def getProposals(self):
         """
@@ -701,44 +787,66 @@ class SatoriServerClient(object):
             response = self._makeUnauthenticatedCall(
                 function=requests.get,
                 endpoint='/proposals/get'
-                # json= could request a subset - active, historic, etc.
             )
             if response.status_code == 200:
-                # Fetch JSON data from the response
                 response_data = response.json()
-
-                # Load proposals using the schema
-                proposals = ProposalSchema(many=True).load(response_data)
+                # Use load to deserialize JSON data into Python objects
+                # proposals = ProposalSchema().load(response_data, many=True)
+                proposals = response_data  # Directly use the JSON response
                 return proposals
             else:
-                print(
-                    f"Failed to get proposals. Status code: {response.status_code}")
+                logging.error(
+                    f"Failed to get proposals. Status code: {response.status_code}", color='red')
                 return []
         except requests.RequestException as e:
-            print(f"Error occurred while fetching proposals: {str(e)}")
+            logging.error(
+                f"Error occurred while fetching proposals: {str(e)}", color='red')
             return []
+        # except marshmallow.exceptions.ValidationError as e:
+        #     print(f"Error validating proposal data: {str(e)}")
+        #     return []
 
-    def submitProposalVote(self, proposal_id: str, vote: str) -> tuple[bool, dict]:
-        '''Submits a vote for a proposal'''
+    def getProposalVotes(self, proposal_id: str) -> dict:
+        """
+        Function to get all votes for a specific proposal by calling the API endpoint.
+        """
         try:
-            print(f"Submitting vote: proposal_id={proposal_id}, vote={vote}")
-            # VoteSchema
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint=f'/proposal/votes/get/{proposal_id}'
+            )
+
+            if response.status_code == 200:
+                return response.json()
+            else:
+                logging.error(
+                    f"Failed to get proposal votes. Status code: {response.status_code}", color='red')
+                return {}
+        except requests.RequestException as e:
+            logging.error(
+                f"Error occurred while fetching proposal votes: {str(e)}", color='red')
+            return {}
+
+    def submitProposalVote(self, proposal_id: int, vote: str) -> tuple[bool, dict]:
+        """
+        Submits a vote for a proposal
+        """
+        try:
             vote_data = {
-                "proposal_id": str(proposal_id),
-                "vote": vote
+                "proposal_id": int(proposal_id),  # Send proposal_id as integer
+                "vote": str(vote),
             }
             response = self._makeAuthenticatedCall(
                 function=requests.post,
-                endpoint='/proposals_votes',
-                # turn this into an api object for the server
-                json=json.dumps(vote_data)
+                endpoint='/proposal/vote/submit',
+                payload=vote_data  # Pass the vote_data dictionary directly
             )
-            print(f"Response status code: {response.status_code}")
-            print(f"Response content: {response.text}")
-            return response.status_code < 400, response.json() if response.status_code < 400 else {}
+            if response.status_code == 200:
+                return True, response.text
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+
         except Exception as e:
-            logging.warning(
-                'Unable to submitProposalVote due to an error; try again later.',
-                exc_info=e
-            )
-            return False, {}
+            error_message = f"Error in submitProposalVote: {str(e)}"
+            return False, {"error": error_message}

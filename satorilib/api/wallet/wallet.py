@@ -171,6 +171,7 @@ class Wallet(WalletBase):
         self.transactionHistory: list[dict] = []
         # TransactionStruct(*v)... {txid: (raw, vinVoutsTxs)}
         self._transactions: dict[str, tuple[dict, list[dict]]] = {}
+        self.cache = {}
         self.transactions: TransactionStruct = []
         self.assetTransactions = []
         self.electrumx: ElectrumxAPI = None
@@ -243,13 +244,13 @@ class Wallet(WalletBase):
     def loadCache(self) -> bool:
         if not self.cacheFileExists():
             return False
-        self.yaml = config.get(self.cachePath)
-        if self.yaml == False:
+        self.cache = config.get(self.cachePath)
+        if self.cache == False:
             return False
         self._transactions = (
-            self.yaml
+            self.cache
             .get(self.symbol, {})
-            .get(self.address, ({}, [])))
+            .get(self.address, {'': ({}, [])}))
         return True
 
     def close(self) -> None:
@@ -322,7 +323,9 @@ class Wallet(WalletBase):
         config.put(
             data={
                 **{
+                    **self.cache,
                     self.symbol: {
+                        **self.cache.get(self.symbol, {}),
                         self.address: self._transactions,
                     }}},
             path=self.cachePath)

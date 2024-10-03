@@ -138,6 +138,7 @@ class Wallet(WalletBase):
     def __init__(
         self,
         walletPath: str,
+        cachePath: str,
         reserve: float = .25,
         isTestnet: bool = False,
         password: str = None,
@@ -147,6 +148,7 @@ class Wallet(WalletBase):
         self.isTestnet = isTestnet
         self.password = password
         self.walletPath = walletPath
+        self.cachePath = cachePath
         # maintain minimum amount of currency at all times to cover fees - server only
         self.reserveAmount = reserve
         self.reserve = TxUtils.asSats(reserve)
@@ -159,6 +161,7 @@ class Wallet(WalletBase):
         self.balanceAmount = 0
         self.divisibility = 0
         self.transactionHistory: list[dict] = []
+        self._transactions: list[str] = []
         self.transactions: TransactionStruct = []
         self.assetTransactions = []
         self.electrumx: ElectrumxAPI = None
@@ -211,11 +214,14 @@ class Wallet(WalletBase):
 
     ### Loading ################################################################
 
-    def fileExists(self):
+    def walletFileExists(self):
         return os.path.exists(self.walletPath)
 
+    def cacheFileExists(self):
+        return os.path.exists(self.cachePath)
+
     def load(self) -> bool:
-        if not self.fileExists():
+        if not self.walletFileExists():
             self.generate()
             self.save()
             return self.load()
@@ -227,6 +233,20 @@ class Wallet(WalletBase):
         if self.isDecrypted and not super().verify():
             raise Exception('wallet or vault file corrupt')
         return True
+
+    def loadCache(self) -> bool:
+        if not self.cacheFileExists():
+            self.saveCache()
+            return self.load()
+        self.yaml = config.get(self.walletPath)
+        if self.yaml == False:
+            return False
+        self.yaml = self.decryptWallet(self.yaml)
+        super().load(self.yaml)
+        if self.isDecrypted and not super().verify():
+            raise Exception('wallet or vault file corrupt')
+        return True
+
 
     def close(self) -> None:
         self.password = None
@@ -293,6 +313,19 @@ class Wallet(WalletBase):
             },
             path=self.walletPath)
 
+    def saveCache(self):
+        safetify(self.cachePath)
+        config.put(
+            data={
+                **{
+                    self.symbol: {
+                        'address': self.address,
+                        'transactions': self._transactions,
+                    }
+                }
+            },
+            path=self.cachePath)
+
     ### Electrumx ##############################################################
 
     def connect(self):
@@ -313,7 +346,7 @@ class Wallet(WalletBase):
 
         def getBalanceTheHardWay() -> int:
             '''
-            using unspents get all transactions
+            using unspents get all _transactionsself._transactions = []
             cycle through the vouts to find the asset you want and that was sent to your address:
             'vout': [{
                 'n': 0,
@@ -334,7 +367,7 @@ class Wallet(WalletBase):
             return self.electrumx.getAssetHolders(self.address).get(self.address, 0)
 
         def getTransactions(transactionHistory: dict, limit: int = 0) -> list:
-            self.transactions = self.transactions or []
+            self._transactions = self._transactions or []self._transactions = []
             if limit < 0:
                 txHist = transactionHistory[limit:]
             elif limit > 0:
@@ -345,8 +378,8 @@ class Wallet(WalletBase):
                 raw = self.electrumx.getTransaction(tx.get('tx_hash', ''))
                 txs = [self.electrumx.getTransaction(vin.get('txid', ''))
                        for vin in raw.get('vin', [])]
-                self.transactions.append(
-                    TransactionStruct(raw=raw, vinVoutsTxs=txs))
+                self._transactions.append(self._transactions=[]
+                                          TransactionStruct(raw=raw, vinVoutsTxs=txs))
 
         # unused - alternative to getTransactions - just gets the ones we need.
         def getVouts(self, unspentCurrency, unspentAssets):
@@ -386,7 +419,7 @@ class Wallet(WalletBase):
         # self.getTransactionsThread.join()
         self.unspentCurrency = self.electrumx.getUnspentCurrency()
         self.unspentAssets = self.electrumx.getUnspentAssets()
-        # mempool sends all unspent transactions in currency and assets so we have to filter them here:
+        # mempool sends all unspent _transactions in currency and assets so we have to filter them here:self._transactions = []
         self.unspentCurrency = [
             x for x in self.unspentCurrency if x.get('asset') == None]
         self.unspentAssets = [
@@ -483,14 +516,14 @@ class Wallet(WalletBase):
     def getUnspentSignatures(self, force: bool = False) -> bool:
         '''
         we don't need to get the scriptPubKey every time we open the wallet,
-        and it requires lots of calls for individual transactions.
-        we just need them available when we're creating transactions.
+        and it requires lots of calls for individual _transactions.self._transactions = []
+        we just need them available when we're creating _transactions.self._transactions = []
         '''
         if (not force and
-                    len([
-                        u for u in self.unspentCurrency + self.unspentAssets
-                        if 'scriptPubKey' not in u]) == 0
-                ):
+                len([
+                    u for u in self.unspentCurrency + self.unspentAssets
+                    if 'scriptPubKey' not in u]) == 0
+            ):
             # already have them all
             return True
 
@@ -501,12 +534,13 @@ class Wallet(WalletBase):
             #    self.connect()
             # self.get()
 
-            # get transactions, save their scriptPubKey hex to the unspents
+            # get _transactions, save their scriptPubKey hex to the unspentsself._transactions = []
             for uc in self.unspentCurrency:
-                if len([tx for tx in self.transactions if tx['txid'] == uc['tx_hash']]) == 0:
-                    self.transactions.append(
-                        self.electrumx.getTransaction(uc['tx_hash']))
-                tx = [tx for tx in self.transactions if tx['txid'] == uc['tx_hash']]
+                if len([tx for tx in self._transactions if tx['txid'] == uc['tx_hash']]) == 0:
+                    self._transactions = []
+                    self._transactions.append(self._transactions=[]
+                                              self.electrumx.getTransaction(uc['tx_hash']))
+                tx = [tx for tx in self._transactions if tx['txid'] == uc['tx_hash']]self._transactions = []
                 if len(tx) > 0:
                     vout = [vout for vout in tx[0].get(
                         'vout', []) if vout.get('n') == uc['tx_pos']]
@@ -516,10 +550,11 @@ class Wallet(WalletBase):
                         if scriptPubKey is not None:
                             uc['scriptPubKey'] = scriptPubKey
             for ua in self.unspentAssets:
-                if len([tx for tx in self.transactions if tx['txid'] == ua['tx_hash']]) == 0:
-                    self.transactions.append(
-                        self.electrumx.getTransaction(ua['tx_hash']))
-                tx = [tx for tx in self.transactions if tx['txid'] == ua['tx_hash']]
+                if len([tx for tx in self._transactions if tx['txid'] == ua['tx_hash']]) == 0:
+                    self._transactions = []
+                    self._transactions.append(self._transactions=[]
+                                              self.electrumx.getTransaction(ua['tx_hash']))
+                tx = [tx for tx in self._transactions if tx['txid'] == ua['tx_hash']]self._transactions = []
                 if len(tx) > 0:
                     vout = [vout for vout in tx[0].get(
                         'vout', []) if vout.get('n') == ua['tx_pos']]
@@ -530,7 +565,7 @@ class Wallet(WalletBase):
                             ua['scriptPubKey'] = scriptPubKey
         except Exception as e:
             logging.warning(
-                'unable to acquire signatures of unspent transactions, maybe unable to send', e, print=True)
+                'unable to acquire signatures of unspent _transactions, maybe unable to send', e, print=True)self._transactions = []
             return False
         return True
 
@@ -539,8 +574,8 @@ class Wallet(WalletBase):
             get unspents from transaction history
             I have to figure out what the VOUTs are myself -
             and I have to split them into lists of currency and Satori outputs
-            get history, loop through all transactions, gather all vouts
-            loop through all transactions again, remove the vouts that are referenced by vins
+            get history, loop through all _transactions, gather all voutsself._transactions = []
+            loop through all _transactions again, remove the vouts that are referenced by vinsself._transactions = []
             loop through the remaining vouts which are the unspent vouts
             and throw the ones away that are assets but not satori,
             and save the others as currency or satori outputs
@@ -980,7 +1015,7 @@ class Wallet(WalletBase):
     #        gatheredSatoriSats) = self._gatherSatoriUnspents(satoriTotalSats)
     #    txins, txinScripts = self._compileInputs(
     #        gatheredSatoriUnspents=gatheredSatoriUnspents)
-    #    # partial transactions need to use Sighash Single so we need to create
+    #    # partial _transactions need to use Sighash Single so we need to createself._transactions = []
     #    # ouputs 1-1 to inputs:
     #    satoriOuts = []
     #    outsAmount = 0

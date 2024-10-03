@@ -421,11 +421,11 @@ class Wallet(WalletBase):
         # self.currencyVouts = self.electrumx.evrVouts
         # self.assetVouts = self.electrumx.assetVouts
 
-        # getTransactions(self.transactionHistory)
+        getTransactions(self.transactionHistory)
         # threaded interferring with other calls...
-        self.getTransactionsThread = threading.Thread(
-           target=getTransactions, args=(self.transactionHistory,), daemon=True)
-        self.getTransactionsThread.start()
+        # self.getTransactionsThread = threading.Thread(
+        #    target=getTransactions, args=(self.transactionHistory,), daemon=True)
+        # self.getTransactionsThread.start()
 
     ### Functions ##############################################################
 

@@ -110,17 +110,17 @@ class StreamId:
         a list of values and the target an index for that list.
 
         note 0: the above note is helpful, but np.inf cannot be concatenated
-        with strings so it would be preferable to use a random string here, 
+        with strings so it would be preferable to use a random string here,
         rather than an empty string becuase it would be less likely to clash.
         we'll use the Mersenne Twister algorithm with seed 'dR3jS9lMqXcTfYvA':
         q7jDmL8kV4HvCnX
 
         note 1: that's a great idea, but here's the situation: the server has
-        this same problem and solves it with an empty string. So since this 
+        this same problem and solves it with an empty string. So since this
         problem manifest at the domain level, not merely in this equality check,
         we'll use that solution for now.
 
-        note 2: alright, so that doesn't work in this endpoint: 
+        note 2: alright, so that doesn't work in this endpoint:
         /remove_stream/<source>/<stream>/<target> because target is an empty
         string. so. target always has to be a non-null non-empty string. I think
         the default should be a - then. To be honest... the best solution is to
@@ -134,7 +134,7 @@ class StreamId:
         to be an unlimited hierarchy requiring at least source. for now we'll
         use the '-' solution which requires a server change anyway.
 
-        note 3: instead of that I decided to change the endpoint to 
+        note 3: instead of that I decided to change the endpoint to
         /remove_stream/<topic> and parse out the topic instead. it's just less
         work for the same quality work around.
         '''

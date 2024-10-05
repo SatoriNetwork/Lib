@@ -36,8 +36,6 @@ import traceback
 import datetime as dt
 
 
-
-
 class SatoriServerClient(object):
     def __init__(
         self,
@@ -57,7 +55,6 @@ class SatoriServerClient(object):
 
     def _getChallenge(self):
         # return requests.get(self.url + '/time').text
-        print('hello')
         return str(time.time())
 
     def _makeAuthenticatedCall(
@@ -65,7 +62,7 @@ class SatoriServerClient(object):
         function: callable,
         endpoint: str,
         url: str = None,
-        payload: Union[str,dict, None] = None,
+        payload: Union[str, dict, None] = None,
         challenge: str = None,
         useWallet: Wallet = None,
         extraHeaders: Union[dict, None] = None,
@@ -73,10 +70,8 @@ class SatoriServerClient(object):
     ) -> requests.Response:
         if isinstance(payload, dict):
             payload = json.dumps(payload)
-            
 
         if payload is not None:
-            print(type(payload))
             logging.info(
                 'outgoing:',
                 payload[0:40], f'{"..." if len(payload) > 40 else ""}',
@@ -92,7 +87,6 @@ class SatoriServerClient(object):
             json=payload)
         if raiseForStatus:
             try:
-                print(r.text)
                 r.raise_for_status()
             except requests.exceptions.HTTPError as e:
                 logging.error('authenticated server err:',
@@ -367,7 +361,7 @@ class SatoriServerClient(object):
             return None
         return None
 
-    def  setRewardAddress(
+    def setRewardAddress(
         self,
         signature: Union[str, bytes],
         pubkey: str,
@@ -428,6 +422,7 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/stake/for/address',
+                raiseForStatus=False,
                 payload=json.dumps({
                     'vaultSignature': vaultSignature,
                     'vaultPubkey': vaultPubkey,
@@ -437,6 +432,58 @@ class SatoriServerClient(object):
             logging.warning(
                 'unable to determine status of mine to address feature due to connection timeout; try again Later.', e, color='yellow')
             return False, ''
+
+    def lendToAddress(
+        self,
+        vaultSignature: Union[str, bytes],
+        vaultPubkey: str,
+        address: str
+    ) -> tuple[bool, str]:
+        ''' add lend address '''
+        try:
+            if isinstance(vaultSignature, bytes):
+                vaultSignature = vaultSignature.decode()
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/stake/lend/to/address',
+                raiseForStatus=False,
+                payload=json.dumps({
+                    'vaultSignature': vaultSignature,
+                    'vaultPubkey': vaultPubkey,
+                    'address': address}))
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to determine status of mine to address feature due to connection timeout; try again Later.', e, color='yellow')
+            return False, ''
+
+    def lendRemove(self) -> tuple[bool, dict]:
+        ''' removes a stream from the server '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/stake/lend/remove')
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to stakeProxyRemove due to connection timeout; try again Later.', e, color='yellow')
+            return False, {}
+
+    def lendAddress(self) -> Union[str, None]:
+        ''' get lending address '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/stake/lend/address')
+            if response.status_code > 399:
+                return 'Unknown'
+            if response.text in ['null', 'None', 'NULL']:
+                return ''
+            return response.text
+        except Exception as e:
+            logging.warning(
+                'unable to get reward address; try again Later.', e, color='yellow')
+            return ''
 
     def reportVault(
         self,
@@ -570,6 +617,18 @@ class SatoriServerClient(object):
                 'unable to claim beta due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
 
+    def poolAddresses(self) -> tuple[bool, dict]:
+        ''' removes a stream from the server '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/stake/lend/addresses')
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to stakeProxyRequest due to connection timeout; try again Later.', e, color='yellow')
+            return False, {}
+
     def stakeProxyChildren(self) -> tuple[bool, dict]:
         ''' removes a stream from the server '''
         try:
@@ -668,7 +727,7 @@ class SatoriServerClient(object):
                 response = self._makeAuthenticatedCall(
                     function=requests.post,
                     endpoint='/record/prediction/authed' if isPrediction else '/record/observation/authed',
-                    json=json.dumps({
+                    payload=json.dumps({
                         'topic': topic,
                         'data': str(data),
                         'time': str(observationTime),
@@ -701,86 +760,63 @@ class SatoriServerClient(object):
 
     def submitProposal(self, proposal_data: dict) -> tuple[bool, dict]:
         '''submits proposal'''
-        def custom_log(*args, **kwargs):
-            # Remove 'color' and 'print' kwargs if present
-            kwargs.pop('color', None)
-            kwargs.pop('print', None)
-            print(*args, **kwargs)
-
-        # Temporarily replace logging.info and logging.error
-        original_info = logging.info
-        original_error = logging.error
-        logging.info = custom_log
-        logging.error = custom_log
-
         try:
-            print(f"Submitting proposal data: {json.dumps(proposal_data, indent=2)}")
-            
             # Ensure options is a JSON string
             if 'options' in proposal_data and isinstance(proposal_data['options'], list):
                 proposal_data['options'] = json.dumps(proposal_data['options'])
-            
+
             # Convert the entire proposal_data to a JSON string
             proposal_json_string = json.dumps(proposal_data)
-            
+
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/proposal/submit',
                 payload=proposal_json_string
             )
-            
-            print(f"Response status code: {response.status_code}")
-            print(f"Response content: {response.text[:1000]}")  # Print first 1000 characters of response
-            
             if response.status_code < 400:
-                return True, response.text 
+                return True, response.text
             else:
                 error_message = f"Server returned status code {response.status_code}: {response.text}"
-                print(f"Error in submitProposal: {error_message}")
+                logging.error(f"Error in submitProposal: {error_message}")
                 return False, {"error": error_message}
-        
+
         except RequestException as re:
             error_message = f"Request error in submitProposal: {str(re)}"
-            print(error_message)
-            print(traceback.format_exc())
+            logging.error(error_message)
+            logging.error(traceback.format_exc())
             return False, {"error": error_message}
         except Exception as e:
             error_message = f"Unexpected error in submitProposal: {str(e)}"
-            print(error_message)
-            print(traceback.format_exc())
+            logging.error(error_message)
+            logging.error(traceback.format_exc())
             return False, {"error": error_message}
-        finally:
-            # Restore original logging functions
-            logging.info = original_info
-            logging.error = original_error
 
-     
     def getProposals(self):
-            """
-            Function to get all proposals by calling the API endpoint.
-            """
-            try:
-                response = self._makeUnauthenticatedCall(
-                    function=requests.get,
-                    endpoint='/proposals/get'
-                )
-                if response.status_code == 200:
-                    response_data = response.json()
-                    # Use load to deserialize JSON data into Python objects
-                    # proposals = ProposalSchema().load(response_data, many=True)
-                    proposals = response_data  # Directly use the JSON response
-                    return proposals
-                else:
-                    print(f"Failed to get proposals. Status code: {response.status_code}")
-                    return []
-            except requests.RequestException as e:
-                print(f"Error occurred while fetching proposals: {str(e)}")
+        """
+        Function to get all proposals by calling the API endpoint.
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/proposals/get'
+            )
+            if response.status_code == 200:
+                response_data = response.json()
+                # Use load to deserialize JSON data into Python objects
+                # proposals = ProposalSchema().load(response_data, many=True)
+                proposals = response_data  # Directly use the JSON response
+                return proposals
+            else:
+                logging.error(
+                    f"Failed to get proposals. Status code: {response.status_code}", color='red')
                 return []
-            # except marshmallow.exceptions.ValidationError as e:
-            #     print(f"Error validating proposal data: {str(e)}")
-            #     return []
-
-
+        except requests.RequestException as e:
+            logging.error(
+                f"Error occurred while fetching proposals: {str(e)}", color='red')
+            return []
+        # except marshmallow.exceptions.ValidationError as e:
+        #     print(f"Error validating proposal data: {str(e)}")
+        #     return []
 
     def getProposalVotes(self, proposal_id: str) -> dict:
         """
@@ -793,15 +829,15 @@ class SatoriServerClient(object):
             )
 
             if response.status_code == 200:
-                print(response.text)
                 return response.json()
             else:
-                print(f"Failed to get proposal votes. Status code: {response.status_code}")
+                logging.error(
+                    f"Failed to get proposal votes. Status code: {response.status_code}", color='red')
                 return {}
         except requests.RequestException as e:
-            print(f"Error occurred while fetching proposal votes: {str(e)}")
+            logging.error(
+                f"Error occurred while fetching proposal votes: {str(e)}", color='red')
             return {}
-
 
     def submitProposalVote(self, proposal_id: int, vote: str) -> tuple[bool, dict]:
         """
@@ -812,16 +848,11 @@ class SatoriServerClient(object):
                 "proposal_id": int(proposal_id),  # Send proposal_id as integer
                 "vote": str(vote),
             }
-            print('calling server')
-            print(vote_data)
-
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/proposal/vote/submit',
                 payload=vote_data  # Pass the vote_data dictionary directly
             )
-            print(response.text)
-
             if response.status_code == 200:
                 return True, response.text
             else:

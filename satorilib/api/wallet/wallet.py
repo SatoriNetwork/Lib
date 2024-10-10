@@ -41,6 +41,10 @@ class WalletBase():
     def __init__(self, entropy: Union[bytes, None] = None):
         self._entropy: bytes = entropy
 
+    @property
+    def symbol(self) -> str:
+        return 'wallet'
+
     def close(self) -> None:
         self._entropy = None
         self._entropyStr = ''
@@ -48,7 +52,8 @@ class WalletBase():
         self.privateKey = ''
         self.words = ''
 
-    def load(self, yaml: dict):
+    def loadFromYaml(self, yaml: dict = None):
+        yaml = yaml or {}
         self._entropy = yaml.get('entropy')
         if isinstance(self._entropy, bytes):
             self._entropyStr = b64encode(self._entropy).decode('utf-8')
@@ -138,15 +143,20 @@ class Wallet(WalletBase):
     def __init__(
         self,
         walletPath: str,
+        cachePath: str = None,
         reserve: float = .25,
         isTestnet: bool = False,
         password: str = None,
     ):
+        if walletPath == cachePath:
+            raise Exception('wallet and cache paths cannot be the same')
         super().__init__()
         self.satoriFee = 0.00000010
         self.isTestnet = isTestnet
         self.password = password
         self.walletPath = walletPath
+        self.cachePath = cachePath or walletPath.replace(
+            '.yaml', '.cache.yaml')
         # maintain minimum amount of currency at all times to cover fees - server only
         self.reserveAmount = reserve
         self.reserve = TxUtils.asSats(reserve)
@@ -159,6 +169,9 @@ class Wallet(WalletBase):
         self.balanceAmount = 0
         self.divisibility = 0
         self.transactionHistory: list[dict] = []
+        # TransactionStruct(*v)... {txid: (raw, vinVoutsTxs)}
+        self._transactions: dict[str, tuple[dict, list[dict]]] = {}
+        self.cache = {}
         self.transactions: TransactionStruct = []
         self.assetTransactions = []
         self.electrumx: ElectrumxAPI = None
@@ -167,6 +180,7 @@ class Wallet(WalletBase):
         self.unspentCurrency = None
         self.unspentAssets = None
         self.load()
+        self.loadCache()
 
     def __call__(self):
         self.connect()
@@ -184,10 +198,6 @@ class Wallet(WalletBase):
             f'\n\tbalance: {self.balance},'
             f'\n\tstats: {self.stats},'
             f'\n\tbanner: {self.banner})')
-
-    @property
-    def symbol(self) -> str:
-        return 'wallet'
 
     @property
     def chain(self) -> str:
@@ -211,11 +221,14 @@ class Wallet(WalletBase):
 
     ### Loading ################################################################
 
-    def fileExists(self):
+    def walletFileExists(self):
         return os.path.exists(self.walletPath)
 
+    def cacheFileExists(self):
+        return os.path.exists(self.cachePath)
+
     def load(self) -> bool:
-        if not self.fileExists():
+        if not self.walletFileExists():
             self.generate()
             self.save()
             return self.load()
@@ -223,9 +236,21 @@ class Wallet(WalletBase):
         if self.yaml == False:
             return False
         self.yaml = self.decryptWallet(self.yaml)
-        super().load(self.yaml)
+        self.loadFromYaml(self.yaml)
         if self.isDecrypted and not super().verify():
             raise Exception('wallet or vault file corrupt')
+        return True
+
+    def loadCache(self) -> bool:
+        if not self.cacheFileExists():
+            return False
+        self.cache = config.get(self.cachePath)
+        if self.cache == False:
+            return False
+        self._transactions = (
+            self.cache
+            .get(self.symbol, {})
+            .get(self.address, {'': ({}, [])}))
         return True
 
     def close(self) -> None:
@@ -293,6 +318,18 @@ class Wallet(WalletBase):
             },
             path=self.walletPath)
 
+    def saveCache(self):
+        safetify(self.cachePath)
+        config.put(
+            data={
+                **{
+                    **self.cache,
+                    self.symbol: {
+                        **self.cache.get(self.symbol, {}),
+                        self.address: self._transactions,
+                    }}},
+            path=self.cachePath)
+
     ### Electrumx ##############################################################
 
     def connect(self):
@@ -333,25 +370,26 @@ class Wallet(WalletBase):
             '''
             return self.electrumx.getAssetHolders(self.address).get(self.address, 0)
 
-        def getTransactions(transactionHistory: dict, limit: int = 0) -> list:
-            self.transactions = self.transactions or []
-            if limit < 0:
-                txHist = transactionHistory[limit:]
-            elif limit > 0:
-                txHist = transactionHistory[:limit]
-            else:
-                txHist = transactionHistory
-            for tx in txHist:
-                raw = self.electrumx.getTransaction(tx.get('tx_hash', ''))
-                if raw is not None:
-                    txs = []
-                    for vin in raw.get('vin', []):
-                        txs.append(
-                            self.electrumx.getTransaction(vin.get('txid', '')))
+        def getTransactions(transactionHistory: dict) -> list:
+            self.transactions = []
+            for tx in transactionHistory:
+                txid = tx.get('tx_hash', '')
+                if txid not in self._transactions.keys():
+                    raw = self.electrumx.getTransaction(txid)
+                    if raw is not None:
+                        txs = []
+                        for vin in raw.get('vin', []):
+                            txs.append(
+                                self.electrumx.getTransaction(vin.get('txid', '')))
+                        transaction = TransactionStruct(raw=raw, vinVoutsTxs=[t for t in txs if t is not None])
+                        self.transactions.append(transaction)
+                        self._transactions[txid] = transaction.export()
+                else:
+                    raw, txs = self._transactions.get(txid, ({}, []))
                     self.transactions.append(
-                        TransactionStruct(
-                            raw=raw,
-                            vinVoutsTxs=[t for t in txs if t is not None]))
+                        TransactionStruct(raw=raw, vinVoutsTxs=txs))
+            print(len(self.transactions))
+            print(len(self.transactions))
 
         # unused - alternative to getTransactions - just gets the ones we need.
         def getVouts(self, unspentCurrency, unspentAssets):
@@ -431,6 +469,7 @@ class Wallet(WalletBase):
         self.getTransactionsThread = threading.Thread(
             target=getTransactions, args=(self.transactionHistory,), daemon=True)
         self.getTransactionsThread.start()
+        self.saveCache()
 
     ### Functions ##############################################################
 
@@ -491,11 +530,12 @@ class Wallet(WalletBase):
         and it requires lots of calls for individual transactions.
         we just need them available when we're creating transactions.
         '''
-        if (not force and
+        if (
+            not force and
             len([
-                        u for u in self.unspentCurrency + self.unspentAssets
-                        if 'scriptPubKey' not in u]) == 0
-            ):
+                u for u in self.unspentCurrency + self.unspentAssets
+                if 'scriptPubKey' not in u]) == 0
+        ):
             # already have them all
             return True
 

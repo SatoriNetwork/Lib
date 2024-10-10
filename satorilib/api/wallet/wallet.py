@@ -343,10 +343,15 @@ class Wallet(WalletBase):
                 txHist = transactionHistory
             for tx in txHist:
                 raw = self.electrumx.getTransaction(tx.get('tx_hash', ''))
-                txs = [self.electrumx.getTransaction(vin.get('txid', ''))
-                       for vin in raw.get('vin', [])]
-                self.transactions.append(
-                    TransactionStruct(raw=raw, vinVoutsTxs=txs))
+                if raw is not None:
+                    txs = []
+                    for vin in raw.get('vin', []):
+                        txs.append(
+                            self.electrumx.getTransaction(vin.get('txid', '')))
+                    self.transactions.append(
+                        TransactionStruct(
+                            raw=raw,
+                            vinVoutsTxs=[t for t in txs if t is not None]))
 
         # unused - alternative to getTransactions - just gets the ones we need.
         def getVouts(self, unspentCurrency, unspentAssets):
@@ -424,7 +429,7 @@ class Wallet(WalletBase):
         # getTransactions(self.transactionHistory)
         # threaded interferring with other calls...
         self.getTransactionsThread = threading.Thread(
-           target=getTransactions, args=(self.transactionHistory,), daemon=True)
+            target=getTransactions, args=(self.transactionHistory,), daemon=True)
         self.getTransactionsThread.start()
 
     ### Functions ##############################################################
@@ -487,10 +492,10 @@ class Wallet(WalletBase):
         we just need them available when we're creating transactions.
         '''
         if (not force and
-                    len([
+            len([
                         u for u in self.unspentCurrency + self.unspentAssets
                         if 'scriptPubKey' not in u]) == 0
-                ):
+            ):
             # already have them all
             return True
 

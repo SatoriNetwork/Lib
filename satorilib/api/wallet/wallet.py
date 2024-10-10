@@ -376,16 +376,19 @@ class Wallet(WalletBase):
                 txid = tx.get('tx_hash', '')
                 if txid not in self._transactions.keys():
                     raw = self.electrumx.getTransaction(txid)
-                    txs = [self.electrumx.getTransaction(vin.get('txid', ''))
-                           for vin in raw.get('vin', [])]
-                    transaction = TransactionStruct(raw=raw, vinVoutsTxs=txs)
-                    self.transactions.append(transaction)
-                    self._transactions[txid] = transaction.export()
+                    if raw is not None:
+                        txs = []
+                        for vin in raw.get('vin', []):
+                            txs.append(
+                                self.electrumx.getTransaction(vin.get('txid', '')))
+                        transaction = TransactionStruct(raw=raw, vinVoutsTxs=[t for t in txs if t is not None])
+                        self.transactions.append(transaction)
+                        self._transactions[txid] = transaction.export()
                 else:
                     raw, txs = self._transactions.get(txid, ({}, []))
                     self.transactions.append(
                         TransactionStruct(raw=raw, vinVoutsTxs=txs))
-            print(self.transactions)
+            print(len(self.transactions))
             print(len(self.transactions))
 
         # unused - alternative to getTransactions - just gets the ones we need.
@@ -461,11 +464,11 @@ class Wallet(WalletBase):
         # self.currencyVouts = self.electrumx.evrVouts
         # self.assetVouts = self.electrumx.assetVouts
 
-        getTransactions(self.transactionHistory)
+        # getTransactions(self.transactionHistory)
         # threaded interferring with other calls...
-        # self.getTransactionsThread = threading.Thread(
-        #    target=getTransactions, args=(self.transactionHistory,), daemon=True)
-        # self.getTransactionsThread.start()
+        self.getTransactionsThread = threading.Thread(
+            target=getTransactions, args=(self.transactionHistory,), daemon=True)
+        self.getTransactionsThread.start()
         self.saveCache()
 
     ### Functions ##############################################################
@@ -527,11 +530,12 @@ class Wallet(WalletBase):
         and it requires lots of calls for individual transactions.
         we just need them available when we're creating transactions.
         '''
-        if (not force and
-                len([
-                    u for u in self.unspentCurrency + self.unspentAssets
-                            if 'scriptPubKey' not in u]) == 0
-                ):
+        if (
+            not force and
+            len([
+                u for u in self.unspentCurrency + self.unspentAssets
+                if 'scriptPubKey' not in u]) == 0
+        ):
             # already have them all
             return True
 

@@ -465,13 +465,49 @@ class Wallet(WalletBase):
         # self.assetVouts = self.electrumx.assetVouts
 
         # getTransactions(self.transactionHistory)
+        
         # threaded interferring with other calls...
+        # self.getTransactionsThread = threading.Thread(
+        #     target=getTransactions, args=(self.transactionHistory,), daemon=True)
+        # self.getTransactionsThread.start()
+        # self.saveCache()
+
+    ### Functions ##############################################################
+    def callTransactionHistory(self):
+        def getTransactions(transactionHistory: dict) -> list:
+            self.transactions = []
+            if not isinstance(transactionHistory, list):
+                return
+            print("keys", self._transactions.keys())
+            for tx in transactionHistory:
+                txid = tx.get('tx_hash', '')
+                if txid not in self._transactions.keys():
+                    print("txid", txid)
+                    raw = self.electrumx.getTransaction(txid)
+                    print("!!!!!!!!!!!!!!!!!!!!!!!!!!raw got!!!!!!!!!!!!!!!!!!!!!!!")
+                    if raw is not None:
+                        txs = []
+                        for vin in raw.get('vin', []):
+                            txs.append(
+                                self.electrumx.getTransaction(vin.get('txid', '')))
+                        transaction = TransactionStruct(raw=raw, vinVoutsTxs=[t for t in txs if t is not None])
+                        self.transactions.append(transaction)
+                        self._transactions[txid] = transaction.export()
+                        print("!!!!!!_transactions are now updated and having the txId as key!!!!!!!!!", txid in self._transactions.keys())
+                else:
+                    print("txid for cache", txid)
+                    raw, txs = self._transactions.get(txid, ({}, []))
+                    self.transactions.append(
+                        TransactionStruct(raw=raw, vinVoutsTxs=txs))
+            print(len(self.transactions))
+            print(len(self.transactions))
+            print("keys", self._transactions.keys())
+            self.saveCache()
+
         self.getTransactionsThread = threading.Thread(
             target=getTransactions, args=(self.transactionHistory,), daemon=True)
         self.getTransactionsThread.start()
-        self.saveCache()
-
-    ### Functions ##############################################################
+        # self.saveCache()
 
     def setAlias(self, alias: Union[str, None] = None) -> None:
         self.alias = alias

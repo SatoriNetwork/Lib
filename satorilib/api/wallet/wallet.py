@@ -494,12 +494,12 @@ class Wallet(WalletBase):
                         self.transactions.append(transaction)
                         self._transactions[txid] = transaction.export()
                         print("!!!!!!_transactions are now updated and having the txId as key!!!!!!!!!", txid in self._transactions.keys())
+                        print("Extracted txs", len(self._transactions[txid][0]['vin']))
                 else:
                     print("txid for cache", txid)
                     raw, txs = self._transactions.get(txid, ({}, []))
                     self.transactions.append(
                         TransactionStruct(raw=raw, vinVoutsTxs=txs))
-            print(len(self.transactions))
             print(len(self.transactions))
             print("keys", self._transactions.keys())
             self.saveCache()

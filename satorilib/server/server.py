@@ -378,7 +378,7 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/mine/to/address',
-                json=js)
+                payload=js)
             return response.status_code < 400, response.text
         except Exception as e:
             logging.warning(
@@ -617,6 +617,18 @@ class SatoriServerClient(object):
                 'unable to claim beta due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
 
+    def poolAddresses(self) -> tuple[bool, dict]:
+        ''' removes a stream from the server '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/stake/lend/addresses')
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to stakeProxyRequest due to connection timeout; try again Later.', e, color='yellow')
+            return False, {}
+
     def stakeProxyChildren(self) -> tuple[bool, dict]:
         ''' removes a stream from the server '''
         try:
@@ -715,7 +727,7 @@ class SatoriServerClient(object):
                 response = self._makeAuthenticatedCall(
                     function=requests.post,
                     endpoint='/record/prediction/authed' if isPrediction else '/record/observation/authed',
-                    json=json.dumps({
+                    payload=json.dumps({
                         'topic': topic,
                         'data': str(data),
                         'time': str(observationTime),
@@ -821,6 +833,9 @@ class SatoriServerClient(object):
             logging.error(
                 f"Error occurred while fetching approved proposals: {str(e)}", color='red')
             return []
+        # except marshmallow.exceptions.ValidationError as e:
+        #     print(f"Error validating proposal data: {str(e)}")
+        #     return []
 
     def getProposalVotes(self, proposal_id: str) -> dict:
         """
@@ -866,6 +881,7 @@ class SatoriServerClient(object):
         except Exception as e:
             error_message = f"Error in submitProposalVote: {str(e)}"
             return False, {"error": error_message}
+
         
     def approveProposal(self, proposal_id: int) -> tuple[bool, dict]:
         """
@@ -958,3 +974,4 @@ class SatoriServerClient(object):
         except Exception as e:
             error_message = f"Error in getUnapprovedProposals: {str(e)}"
             return {'status': 'error', 'message': error_message}
+

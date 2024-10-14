@@ -798,13 +798,10 @@ class SatoriServerClient(object):
         try:
             response = self._makeUnauthenticatedCall(
                 function=requests.get,
-                endpoint='/proposals/get'
+                endpoint='/proposals/get/all'
             )
             if response.status_code == 200:
-                response_data = response.json()
-                # Use load to deserialize JSON data into Python objects
-                # proposals = ProposalSchema().load(response_data, many=True)
-                proposals = response_data  # Directly use the JSON response
+                proposals = response.json()
                 return proposals
             else:
                 logging.error(
@@ -813,6 +810,28 @@ class SatoriServerClient(object):
         except requests.RequestException as e:
             logging.error(
                 f"Error occurred while fetching proposals: {str(e)}", color='red')
+            return []
+
+
+    def getApprovedProposals(self):
+        """
+        Function to get all approved proposals by calling the API endpoint.
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/proposals/get/approved'
+            )
+            if response.status_code == 200:
+                proposals = response.json()
+                return proposals
+            else:
+                logging.error(
+                    f"Failed to get approved proposals. Status code: {response.status_code}", color='red')
+                return []
+        except requests.RequestException as e:
+            logging.error(
+                f"Error occurred while fetching approved proposals: {str(e)}", color='red')
             return []
         # except marshmallow.exceptions.ValidationError as e:
         #     print(f"Error validating proposal data: {str(e)}")
@@ -862,3 +881,97 @@ class SatoriServerClient(object):
         except Exception as e:
             error_message = f"Error in submitProposalVote: {str(e)}"
             return False, {"error": error_message}
+
+        
+    def approveProposal(self, proposal_id: int) -> tuple[bool, dict]:
+        """
+        Approves a proposal
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint=f'/proposals/approve/{proposal_id}'
+            )
+            if response.status_code == 200:
+                return True, response.json()
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+
+        except Exception as e:
+            error_message = f"Error in approveProposal: {str(e)}"
+            return False, {"error": error_message}
+        
+    def disapproveProposal(self, proposal_id: int) -> tuple[bool, dict]:
+        """
+        Disapproves and deletes a proposal
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint=f'/proposals/disapprove/{proposal_id}'
+            )
+            if response.status_code == 200:
+                return True, response.json()
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in disapproveProposal: {str(e)}"
+            return False, {"error": error_message}
+        
+    def getActiveProposals(self) -> dict:
+        """
+        Fetches active proposals
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/proposals/active'
+            )
+            if response.status_code == 200:
+                return {'status': 'success', 'proposals': response.json()}
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return {'status': 'error', 'message': error_message}
+        except Exception as e:
+            error_message = f"Error in getActiveProposals: {str(e)}"
+            return {'status': 'error', 'message': error_message}
+        
+    def getExpiredProposals(self) -> dict:
+        """
+        Fetches expired proposals
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/proposals/expired'
+            )
+            if response.status_code == 200:
+                return {'status': 'success', 'proposals': response.json()}
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return {'status': 'error', 'message': error_message}
+        except Exception as e:
+            error_message = f"Error in getExpiredProposals: {str(e)}"
+            return {'status': 'error', 'message': error_message}
+        
+
+    def getUnapprovedProposals(self) -> dict:
+        """
+        Fetches unapproved proposals
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/proposals/unapproved'
+            )
+            if response.status_code == 200:
+                return {'status': 'success', 'proposals': response.json()}
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return {'status': 'error', 'message': error_message}
+        except Exception as e:
+            error_message = f"Error in getUnapprovedProposals: {str(e)}"
+            return {'status': 'error', 'message': error_message}
+

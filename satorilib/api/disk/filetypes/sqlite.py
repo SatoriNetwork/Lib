@@ -3,10 +3,11 @@ import os
 import pandas as pd
 from satorilib.api.interfaces.data import FileManager
 from satorilib import logging
+# use sqlalchemy
 
 
-class CSVManager(FileManager):
-    ''' manages reading and writing to CSV files usind pandas '''
+class SqliteManager(FileManager):
+    ''' manages reading and writing to sqlite database using pandas '''
 
     def _conformBasic(self, df: pd.DataFrame) -> pd.DataFrame:
         return self._conformIndexName(self.conformFlatColumns(df))

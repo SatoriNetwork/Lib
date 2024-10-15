@@ -67,26 +67,26 @@ class SatoriPubSubConn(object):
             except:
                 pass
         self.ws = self.ws or websocket.WebSocket()
-        while not self.ws.connected:
-            try:
-                self.ws.connect(f'{self.url}?uid={self.uid}')
-                if isinstance(self.onConnect, Callable):
-                    self.onConnect()
-                self.send(self.command + ':' + self.payload)
-                logging.info('connected to:', self.url, 'for', 'publishing' if self.router ==
-                             None else 'subscriptions', 'as', self.uid, color='green')
-                return self.ws
-            except Exception as e:
-                # except OSError as e:
-                # OSError: [Errno 99] Cannot assign requested address
-                # pubsub server went down
-                if 'Forbidden' in str(e):
-                    exit()
-                logging.error(
-                    e, f'\ndropped {"publishing" if self.router is None else "subscribing"} {self.url}, retrying in 60 seconds...')
-                if isinstance(self.onDisconnect, Callable):
-                    self.onDisconnect()
-                time.sleep(60)
+        self.ws.settimeout(60*60)
+        try:
+            self.ws.connect(f'{self.url}?uid={self.uid}')
+            if isinstance(self.onConnect, Callable):
+                self.onConnect()
+            self.send(self.command + ':' + self.payload)
+            logging.info('connected to:', self.url, 'for', 'publishing' if self.router ==
+                            None else 'subscriptions', 'as', self.uid, color='green')
+            return self.ws
+        except Exception as e:
+            # except OSError as e:
+            # OSError: [Errno 99] Cannot assign requested address
+            # pubsub server went down
+            if 'Forbidden' in str(e):
+                exit()
+            logging.error(
+                e, f'\ndropped {"publishing" if self.router is None else "subscribing"} {self.url}, retrying in 60 seconds...', print=True)
+            if isinstance(self.onDisconnect, Callable):
+                self.onDisconnect()
+            time.sleep(60)
 
     def listen(self):
         while True:

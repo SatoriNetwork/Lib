@@ -378,7 +378,7 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/mine/to/address',
-                json=js)
+                payload=js)
             return response.status_code < 400, response.text
         except Exception as e:
             logging.warning(
@@ -718,7 +718,6 @@ class SatoriServerClient(object):
         #    return
         # if isPrediction and self.topicTime.get(topic, 0) > time.time() - 60*60:
         #    return
-
         if self.topicTime.get(topic, 0) > time.time() - (Stream.minimumCadence*.95):
             return
         self.setTopicTime(topic)

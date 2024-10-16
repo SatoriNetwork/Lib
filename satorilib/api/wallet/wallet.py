@@ -322,40 +322,39 @@ class Wallet(WalletBase):
         safetify(self.cachePath)
         config.put(
             data={
-                **{
-                    **self.cache,
-                    self.symbol: {
-                        **self.cache.get(self.symbol, {}),
-                        self.address: self._transactions,
-                    }}},
+                **self.cache,
+                self.symbol: {
+                    **self.cache.get(self.symbol, {}),
+                    self.address: self._transactions,
+                }},
             path=self.cachePath)
-        
+
     def saveCache(self, new_transactions: dict):
         try:
             safetify(self.cachePath)
-                        
+
             # if no new transactions return
             if len(new_transactions.items()) == 0:
                 return False
-            
+
             # Load existing cache data
             existing_cache = config.get(self.cachePath)
             if existing_cache == False:
                 return False
-            
-            existing_cache.setdefault(self.symbol, {}).setdefault(self.address, {})
-            
+
+            existing_cache.setdefault(
+                self.symbol, {}).setdefault(self.address, {})
+
             # Append new transactions to the existing cache for the address
             for txid, transaction in new_transactions.items():
                 if txid not in existing_cache[self.symbol][self.address]:
                     existing_cache[self.symbol][self.address][txid] = transaction
-        
+
             # Save the updated cache
             config.put(
                 data=existing_cache,
-                path=self.cachePath
-            )
-            
+                path=self.cachePath)
+
             print("Stored SuccessFully")
         except Exception as e:
             print("saveCache error", e)
@@ -411,7 +410,8 @@ class Wallet(WalletBase):
                         for vin in raw.get('vin', []):
                             txs.append(
                                 self.electrumx.getTransaction(vin.get('txid', '')))
-                        transaction = TransactionStruct(raw=raw, vinVoutsTxs=[t for t in txs if t is not None])
+                        transaction = TransactionStruct(
+                            raw=raw, vinVoutsTxs=[t for t in txs if t is not None])
                         self.transactions.append(transaction)
                         self._transactions[txid] = transaction.export()
                 else:
@@ -495,7 +495,7 @@ class Wallet(WalletBase):
         # self.assetVouts = self.electrumx.assetVouts
 
         # getTransactions(self.transactionHistory)
-        
+
         # threaded interferring with other calls...
         # self.getTransactionsThread = threading.Thread(
         #     target=getTransactions, args=(self.transactionHistory,), daemon=True)
@@ -517,21 +517,35 @@ class Wallet(WalletBase):
                     raw = self.electrumx.getTransaction(txid)
                     print("!!!!!!!!!!!!!!!!!!!!!!!!!!raw got!!!!!!!!!!!!!!!!!!!!!!!")
                     if raw is not None:
-                        txs = []
-                        for vin in raw.get('vin', []):
-                            txs.append(
-                                self.electrumx.getTransaction(vin.get('txid', '')))
-                        transaction = TransactionStruct(raw=raw, vinVoutsTxs=[t for t in txs if t is not None])
+                        # commented out section allows us to get all our
+                        # supporting transactions which gives us the abililty
+                        # to know how much we received out of every transaction.
+                        # we thought this might not be worth grabbing but
+                        # decided it probably is, so we haven't removed this
+                        # code entirely. we'll probably use this feature if we
+                        # can make the data more quickly retrieved.
+
+                        # txs = []
+                        # for vin in raw.get('vin', []):
+                        #     txs.append(
+                        #         self.electrumx.getTransaction(vin.get('txid', '')))
+                        # transaction = TransactionStruct(raw=raw, vinVoutsTxs=[t for t in txs if t is not None])
+                        transaction = TransactionStruct(
+                            raw=raw, vinVoutsTxids=[vin.get('txid', '') for vin in raw.get('vin', [])])
                         self.transactions.append(transaction)
                         self._transactions[txid] = transaction.export()
-                        new_transactions[txid] = transaction.export()  # Add to new transactions
-                        print("!!!!!!_transactions are now updated and having the txId as key!!!!!!!!!", txid in self._transactions.keys())
-                        print("Extracted txs", len(self._transactions[txid][0]['vin']))
+                        new_transactions[txid] = transaction.export()
+                        print("!!!!!!_transactions are now updated and having the txId as key!!!!!!!!!",
+                              txid in self._transactions.keys())
+                        print("Extracted txs", len(
+                            self._transactions[txid][0]['vin']))
                 else:
                     print("txid for cache", txid)
-                    raw, txs = self._transactions.get(txid, ({}, []))
+                    # raw, txids = self._transactions.get(txid, ({}, []))
+                    raw, txids = self._transactions.get(txid, ({}, []))
                     self.transactions.append(
-                        TransactionStruct(raw=raw, vinVoutsTxs=txs))
+                        # TransactionStruct(raw=raw, vinVoutsTxs=txs))
+                        TransactionStruct(raw=raw, vinVoutsTxids=txids))
             print(len(self.transactions))
             print("keys", self._transactions.keys())
             self.saveCache(new_transactions)

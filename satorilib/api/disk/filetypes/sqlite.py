@@ -1,22 +1,27 @@
-from typing import Union
-import os
+from typing import Union, List
 import pandas as pd
+from sqlalchemy import create_engine, Table, MetaData, select, insert, delete
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import SQLAlchemyError
 from satorilib.api.interfaces.data import FileManager
 from satorilib import logging
-# use sqlalchemy
-
 
 class SqliteManager(FileManager):
     ''' manages reading and writing to sqlite database using pandas '''
 
-    def _conformBasic(self, df: pd.DataFrame) -> pd.DataFrame:
-        return self._conformIndexName(self.conformFlatColumns(df))
+    def __init__(self, connection_string: str):
+        self.engine = create_engine(connection_string)
+        self.Session = sessionmaker(bind=self.engine)
+        self.metadata = MetaData()
 
-    def _conformIndexName(self, df: pd.DataFrame) -> pd.DataFrame:
-        df.index.name = None
+    def _conform_basic(self, df: pd.DataFrame) -> pd.DataFrame:
+        return self._conform_index_name(self.conform_flat_columns(df))
+
+    def _conform_index_name(self, df: pd.DataFrame) -> pd.DataFrame:
+        df.index.name = 'id'
         return df
 
-    def conformFlatColumns(self, df: pd.DataFrame) -> pd.DataFrame:
+    def conform_flat_columns(self, df: pd.DataFrame) -> pd.DataFrame:
         if len(df.columns) == 1:
             df.columns = ['value']
         if len(df.columns) == 2:
@@ -32,67 +37,57 @@ class SqliteManager(FileManager):
     def _dedupe(self, df: pd.DataFrame) -> pd.DataFrame:
         return df[~df.index.duplicated(keep='last')]
 
-    def _merge(self, dfs: list[pd.DataFrame]) -> pd.DataFrame:
+    def _merge(self, dfs: List[pd.DataFrame]) -> pd.DataFrame:
         return self._clean(pd.concat(dfs, axis=0))
 
-    def remove(self, filePath: str) -> Union[bool, None]:
+    def remove(self, table_name: str) -> Union[bool, None]:
         try:
-            os.remove(filePath)
+            table = Table(table_name, self.metadata, autoload_with=self.engine)
+            table.drop(self.engine)
             return True
-        except FileNotFoundError as _:
-            return None
-        except Exception as _:
+        except SQLAlchemyError as e:
+            logging.error(f"Error removing table {table_name}", e, print=True)
             return False
 
-    def read(self, filePath: str, **kwargs) -> pd.DataFrame:
+    def read(self, table_name: str, **kwargs) -> pd.DataFrame:
         try:
-            return self._clean(self._conformBasic(pd.read_csv(filePath, index_col=0, header=None)))
-        except Exception as _:
-            # try:
-            #    with open(filePath, mode='r') as f:
-            #        x = f.read()
-            #    if x != None and x != '' and x != ' ' and x != '\n':
-            #        logging.info(
-            #            f'unable to read file: {filePath}', e, f'filecontents: {x}', print=True)
-            # except Exception as _:
-            #    logging.info(
-            #            f'unable to read file: {filePath}', e, print=True)
+            table = Table(table_name, self.metadata, autoload_with=self.engine)
+            with self.Session() as session:
+                result = session.execute(select(table))
+                df = pd.DataFrame(result.fetchall(), columns=result.keys())
+                return self._clean(self._conform_basic(df.set_index('id')))
+        except SQLAlchemyError as e:
+            logging.error(f"Error reading from table {table_name}", e, print=True)
             return None
 
-    def write(self, filePath: str, data: pd.DataFrame) -> bool:
+    def write(self, table_name: str, data: pd.DataFrame) -> bool:
         try:
-            data.to_csv(filePath, header=False)
+            data = self._conform_basic(data)
+            data.to_sql(table_name, self.engine, if_exists='replace', index=True)
             return True
-        except Exception as _:
+        except SQLAlchemyError as e:
+            logging.error(f"Error writing to table {table_name}", e, print=True)
             return False
 
-    def append(self, filePath: str, data: pd.DataFrame) -> bool:
+    def append(self, table_name: str, data: pd.DataFrame) -> bool:
         try:
-            data.to_csv(filePath, mode='a', header=False)
+            data = self._conform_basic(data)
+            data.to_sql(table_name, self.engine, if_exists='append', index=True)
             return True
-        except Exception as _:
+        except SQLAlchemyError as e:
+            logging.error(f"Error appending to table {table_name}", e, print=True)
             return False
 
-    def readLines(
-        self,
-        filePath: str,
-        start: int,
-        end: int = None,
-    ) -> Union[pd.DataFrame, None]:
+    def read_lines(self, table_name: str, start: int, end: int = None) -> Union[pd.DataFrame, None]:
         ''' 0-indexed '''
-        end = (end if end is not None and end > start else None) or start+1
-        capture = end - start - 1
+        end = (end if end is not None and end > start else None) or start + 1
         try:
-            df = self._conformBasic(pd.read_table(
-                filePath,
-                sep=",",
-                index_col=0,
-                header=None,
-                skiprows=start,
-                # skipfooter=end, # slicing is faster; since using c engine
-                # engine='python', # required for skipfooter
-            ))
-            return df.iloc[[capture]] if capture == 0 else df.iloc[0:capture+1]
-        except Exception as e:
-            logging.error('unable to get data', e, print=True)
+            table = Table(table_name, self.metadata, autoload_with=self.engine)
+            with self.Session() as session:
+                query = select(table).order_by(table.c.id).offset(start).limit(end - start)
+                result = session.execute(query)
+                df = pd.DataFrame(result.fetchall(), columns=result.keys())
+                return self._conform_basic(df.set_index('id'))
+        except SQLAlchemyError as e:
+            logging.error(f"Error reading lines from table {table_name}", e, print=True)
             return None

@@ -275,9 +275,6 @@ class SatoriServerClient(object):
             endpoint='/get_wallet_alias').text
 
     def getManifestVote(self, wallet: Wallet = None):
-        # TODO: when we implement a split in the server /votes_for/manifest
-        #       might be on the website domain, along with others (that don't
-        #       require authentication) so we will have to handle that.
         return self._makeUnauthenticatedCall(
             function=requests.get,
             endpoint=(

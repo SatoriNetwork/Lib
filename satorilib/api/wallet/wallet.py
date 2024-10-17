@@ -156,7 +156,7 @@ class Wallet(WalletBase):
         self.password = password
         self.walletPath = walletPath
         self.cachePath = cachePath or walletPath.replace(
-            '.yaml', '.cache.yaml')
+            '.yaml', '.cache.csv')
         # maintain minimum amount of currency at all times to cover fees - server only
         self.reserveAmount = reserve
         self.reserve = TxUtils.asSats(reserve)
@@ -244,7 +244,11 @@ class Wallet(WalletBase):
     def loadCache(self) -> bool:
         if not self.cacheFileExists():
             return False
-        self.cache = config.get(self.cachePath)
+        if self.cachePath.endswith('.csv'):
+            import pandas as pd
+            self.cache = pd.read_csv(self.cachePath)
+        if self.cachePath.endswith('.yaml'):
+            self.cache = config.get(self.cachePath)
         if self.cache == False:
             return False
         self._transactions = (
@@ -350,10 +354,18 @@ class Wallet(WalletBase):
                 if txid not in existing_cache[self.symbol][self.address]:
                     existing_cache[self.symbol][self.address][txid] = transaction
 
-            # Save the updated cache
-            config.put(
-                data=existing_cache,
-                path=self.cachePath)
+            if self.cachePath.endswith('.csv'):
+                import pandas as pd
+                # create a pandas dataframe
+                #FIX:
+                df = pd.DataFrame(existing_cache)
+                # save to disk
+                df.to_csv(self.cachePath, index=False)
+            elif self.cachePath.endswith('.yaml'):
+                # Save the updated cache
+                config.put(
+                    data=existing_cache,
+                    path=self.cachePath)
 
             print("Stored SuccessFully")
         except Exception as e:

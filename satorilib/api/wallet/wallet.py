@@ -241,22 +241,6 @@ class Wallet(WalletBase):
             raise Exception('wallet or vault file corrupt')
         return True
 
-    def loadCache(self) -> bool:
-        if not self.cacheFileExists():
-            return False
-        if self.cachePath.endswith('.csv'):
-            import pandas as pd
-            self.cache = pd.read_csv(self.cachePath)
-        if self.cachePath.endswith('.yaml'):
-            self.cache = config.get(self.cachePath)
-        if self.cache == False:
-            return False
-        self._transactions = (
-            self.cache
-            .get(self.symbol, {})
-            .get(self.address, {'': ({}, [])}))
-        return True
-
     def close(self) -> None:
         self.password = None
         self.yaml = None
@@ -332,37 +316,80 @@ class Wallet(WalletBase):
                     self.address: self._transactions,
                 }},
             path=self.cachePath)
+        
+    def loadCache(self) -> bool:
+        if not self.cacheFileExists():
+            return False
+        if self.cachePath.endswith('.csv'):
+            import pandas as pd
+            import ast
+            self.cache = pd.read_csv(self.cachePath).to_dict(orient='records')
+            if self.cache and isinstance(self.cache, list) and len(self.cache) > 0:
+                self.cache = ast.literal_eval(self.cache[0][self.symbol])
+            if self.cache == False:
+                return False
+            self._transactions = (
+                self.cache
+                .get(self.address, {'': ({}, [])}))
+        if self.cachePath.endswith('.yaml'):
+            self.cache = config.get(self.cachePath)
+            if self.cache == False:
+                return False
+            self._transactions = (
+                self.cache
+                .get(self.symbol, {})
+                .get(self.address, {'': ({}, [])}))
+        return True
 
     def saveCache(self, new_transactions: dict):
         try:
             safetify(self.cachePath)
-
+            print("New Transactions", len(new_transactions.items()))
+            
             # if no new transactions return
             if len(new_transactions.items()) == 0:
                 return False
-
-            # Load existing cache data
-            existing_cache = config.get(self.cachePath)
-            if existing_cache == False:
-                return False
-
-            existing_cache.setdefault(
-                self.symbol, {}).setdefault(self.address, {})
-
-            # Append new transactions to the existing cache for the address
-            for txid, transaction in new_transactions.items():
-                if txid not in existing_cache[self.symbol][self.address]:
-                    existing_cache[self.symbol][self.address][txid] = transaction
-
+            
             if self.cachePath.endswith('.csv'):
                 import pandas as pd
-                # create a pandas dataframe
-                #FIX:
-                df = pd.DataFrame(existing_cache)
-                # save to disk
+                import ast
+                
+                if self.cacheFileExists():
+                    # if we are not using self.cache anywhere so instead of reading it again we can directly used self.cache which has been assigned in loadCache
+                    existing_cache_str = pd.read_csv(self.cachePath).to_dict(orient='records')
+                    if existing_cache_str and isinstance(existing_cache_str, list) and len(existing_cache_str) > 0:
+                        existing_cache_temp = ast.literal_eval(existing_cache_str[0][self.symbol])
+                    if existing_cache_temp == False:
+                        return False
+                    existing_cache = {}
+                    existing_cache.setdefault(
+                        self.symbol, {}).setdefault(self.address, existing_cache_temp[self.address])
+                else: 
+                    existing_cache = {}
+                    existing_cache.setdefault(
+                        self.symbol, {}).setdefault(self.address, {})
+
+                # Append new transactions to the existing cache for the address after checking if we do have anything already in existing cache
+                for txid, transaction in new_transactions.items():
+                    if txid not in existing_cache[self.symbol][self.address]:
+                        existing_cache[self.symbol][self.address][txid] = transaction
+
+                df = pd.DataFrame([{self.symbol: existing_cache[self.symbol]}])
                 df.to_csv(self.cachePath, index=False)
             elif self.cachePath.endswith('.yaml'):
-                # Save the updated cache
+                # Load existing cache data
+                existing_cache = config.get(self.cachePath)
+                if existing_cache == False:
+                    return False
+
+                existing_cache.setdefault(
+                    self.symbol, {}).setdefault(self.address, {})
+
+                # Append new transactions to the existing cache for the address
+                for txid, transaction in new_transactions.items():
+                    if txid not in existing_cache[self.symbol][self.address]:
+                        existing_cache[self.symbol][self.address][txid] = transaction
+                        
                 config.put(
                     data=existing_cache,
                     path=self.cachePath)
@@ -536,14 +563,18 @@ class Wallet(WalletBase):
                         # decided it probably is, so we haven't removed this
                         # code entirely. we'll probably use this feature if we
                         # can make the data more quickly retrieved.
-
-                        # txs = []
-                        # for vin in raw.get('vin', []):
-                        #     txs.append(
-                        #         self.electrumx.getTransaction(vin.get('txid', '')))
-                        # transaction = TransactionStruct(raw=raw, vinVoutsTxs=[t for t in txs if t is not None])
-                        transaction = TransactionStruct(
-                            raw=raw, vinVoutsTxids=[vin.get('txid', '') for vin in raw.get('vin', [])])
+                        txs = []
+                        txIds = []
+                        for vin in raw.get('vin', []):
+                            txId = vin.get('txid', '')
+                            if txId == '':
+                                continue
+                            txIds.append(txId)
+                            txs.append(
+                                self.electrumx.getTransaction(txId))
+                        transaction = TransactionStruct(raw=raw, vinVoutsTxids=txIds, vinVoutsTxs=[t for t in txs if t is not None])
+                        # transaction = TransactionStruct(
+                        #     raw=raw, vinVoutsTxids=[vin.get('txid', '') for vin in raw.get('vin', [])])
                         self.transactions.append(transaction)
                         self._transactions[txid] = transaction.export()
                         new_transactions[txid] = transaction.export()
@@ -554,10 +585,10 @@ class Wallet(WalletBase):
                 else:
                     print("txid for cache", txid)
                     # raw, txids = self._transactions.get(txid, ({}, []))
-                    raw, txids = self._transactions.get(txid, ({}, []))
+                    raw, txids, txs = self._transactions.get(txid, ({}, []))
                     self.transactions.append(
                         # TransactionStruct(raw=raw, vinVoutsTxs=txs))
-                        TransactionStruct(raw=raw, vinVoutsTxids=txids))
+                        TransactionStruct(raw=raw, vinVoutsTxids=txids, vinVoutsTxs=txs))
             print(len(self.transactions))
             print("keys", self._transactions.keys())
             self.saveCache(new_transactions)
@@ -565,7 +596,6 @@ class Wallet(WalletBase):
         self.getTransactionsThread = threading.Thread(
             target=getTransactions, args=(self.transactionHistory,), daemon=True)
         self.getTransactionsThread.start()
-        # self.saveCache()
 
     def setAlias(self, alias: Union[str, None] = None) -> None:
         self.alias = alias

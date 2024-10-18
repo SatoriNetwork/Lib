@@ -1343,10 +1343,15 @@ class Wallet(WalletBase):
         reportedFeeSats = feeSatsReserved - currencyChange
         # logging.debug('reportedFeeSats', reportedFeeSats, color='magenta')
         # logging.debug('reportedFeeSats', reportedFeeSats, color='magenta')
-        print("tx")
+        print("tx--")
         print(tx)
         print(tx.vout[-2])
         print(self._checkSatoriValue(tx.vout[-2]))
+        print(self._checkSatoriValue(
+            self._deserialize(tx.serialize()).vout[-2]))
+        print(str(tx.serialize()))
+        print(str(self._deserialize(tx.serialize())))
+        print(str(self._deserialize(tx.serialize()).vout[-2]))
         return tx.serialize(), reportedFeeSats
 
     def satoriOnlyCompleterSimple(
@@ -1393,6 +1398,15 @@ class Wallet(WalletBase):
         completerAddress = completerAddress or self.address
         changeAddress = changeAddress or self.address
         tx = self._deserialize(serialTx)
+        print(f"serialTx--{str(serialTx)}")
+        with open('/tmp/serialTx.log', mode='w') as f:
+            f.write(f"serialTx--{str(serialTx)}")
+        print(f"Tx--{str(tx)}")
+        with open('/tmp/Tx.log', mode='w') as f:
+            f.write(f"Tx--{str(tx)}")
+        print(f"Txvout--{str(tx.vout[-2])}")
+        with open('/tmp/Txvout.log', mode='w') as f:
+            f.write(f"Txvout--{str(tx.vout[-2])}")
         if not _verifyFee():
             raise TransactionFailure(
                 f'fee mismatch, {reportedFeeSats}, {feeSatsReserved}')

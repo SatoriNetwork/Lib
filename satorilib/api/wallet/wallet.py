@@ -1,5 +1,6 @@
 from typing import Union
 import os
+import pandas as pd
 import threading
 import json
 from base64 import b64encode, b64decode
@@ -156,7 +157,7 @@ class Wallet(WalletBase):
         self.password = password
         self.walletPath = walletPath
         self.cachePath = cachePath or walletPath.replace(
-            '.yaml', '.cache.yaml')
+            '.yaml', '.cache.csv')
         # maintain minimum amount of currency at all times to cover fees - server only
         self.reserveAmount = reserve
         self.reserve = TxUtils.asSats(reserve)
@@ -172,7 +173,7 @@ class Wallet(WalletBase):
         # TransactionStruct(*v)... {txid: (raw, vinVoutsTxs)}
         self._transactions: dict[str, tuple[dict, list[dict]]] = {}
         self.cache = {}
-        self.transactions: TransactionStruct = []
+        self.transactions: list[TransactionStruct] = []
         self.assetTransactions = []
         self.electrumx: ElectrumxAPI = None
         self.currencyOnChain = None
@@ -241,18 +242,6 @@ class Wallet(WalletBase):
             raise Exception('wallet or vault file corrupt')
         return True
 
-    def loadCache(self) -> bool:
-        if not self.cacheFileExists():
-            return False
-        self.cache = config.get(self.cachePath)
-        if self.cache == False:
-            return False
-        self._transactions = (
-            self.cache
-            .get(self.symbol, {})
-            .get(self.address, {'': ({}, [])}))
-        return True
-
     def close(self) -> None:
         self.password = None
         self.yaml = None
@@ -318,17 +307,93 @@ class Wallet(WalletBase):
             },
             path=self.walletPath)
 
-    def saveCache(self):
+    def saveCacheOld(self):
         safetify(self.cachePath)
         config.put(
             data={
-                **{
-                    **self.cache,
-                    self.symbol: {
-                        **self.cache.get(self.symbol, {}),
-                        self.address: self._transactions,
-                    }}},
+                **self.cache,
+                self.symbol: {
+                    **self.cache.get(self.symbol, {}),
+                    self.address: self._transactions,
+                }},
             path=self.cachePath)
+
+    def loadCache(self) -> bool:
+        if not self.cacheFileExists():
+            return False
+
+        if self.cachePath.endswith('.csv'):
+            self.cache = pd.read_csv(self.cachePath)
+            self._transactions = self.cache[self.cache['address'] == self.address].set_index(
+                'txid')['transaction'].apply(json.loads).to_dict()
+            return True if self._transactions else False
+
+        elif self.cachePath.endswith('.yaml'):
+            self.cache = config.get(self.cachePath)
+            if not self.cache:
+                return False
+            self._transactions = (
+                self.cache
+                .get(self.symbol, {})
+                .get(self.address, {'': ({}, [])}))
+            return True
+
+        return False
+
+    def saveCache(self, new_transactions: dict):
+        try:
+            safetify(self.cachePath)
+            print("New Transactions", len(new_transactions.items()))
+
+            # if no new transactions return
+            if len(new_transactions.items()) == 0:
+                return False
+
+            if self.cachePath.endswith('.csv'):
+                if self.cacheFileExists():
+                    # Load the existing cache
+                    existing_cache = pd.read_csv(self.cachePath)
+                else:
+                    # Initialize an empty DataFrame if the cache doesn't exist
+                    existing_cache = pd.DataFrame(
+                        columns=['symbol', 'address', 'txid', 'transaction'])
+
+                # Convert new_transactions to a DataFrame
+                new_transactions_list = [
+                    {'symbol': self.symbol, 'address': self.address,
+                        'txid': txid, 'transaction': json.dumps(transaction)}
+                    for txid, transaction in new_transactions.items()
+                ]
+                new_transactions_df = pd.DataFrame(new_transactions_list)
+
+                # Concatenate the new transactions with the existing cache and drop duplicates
+                updated_cache = pd.concat([existing_cache, new_transactions_df]).drop_duplicates(
+                    subset=['txid'], keep='last')
+
+                # Save the updated cache to the CSV file
+                updated_cache.to_csv(self.cachePath, index=False)
+
+            elif self.cachePath.endswith('.yaml'):
+                # Load existing cache data
+                existing_cache = config.get(self.cachePath)
+                if not existing_cache:
+                    return False
+
+                existing_cache.setdefault(
+                    self.symbol, {}).setdefault(self.address, {})
+
+                # Append new transactions to the existing cache for the address
+                for txid, transaction in new_transactions.items():
+                    if txid not in existing_cache[self.symbol][self.address]:
+                        existing_cache[self.symbol][self.address][txid] = transaction
+
+                config.put(
+                    data=existing_cache,
+                    path=self.cachePath)
+
+            print("Stored Successfully")
+        except Exception as e:
+            print("saveCache error", e)
 
     ### Electrumx ##############################################################
 
@@ -381,7 +446,8 @@ class Wallet(WalletBase):
                         for vin in raw.get('vin', []):
                             txs.append(
                                 self.electrumx.getTransaction(vin.get('txid', '')))
-                        transaction = TransactionStruct(raw=raw, vinVoutsTxs=[t for t in txs if t is not None])
+                        transaction = TransactionStruct(
+                            raw=raw, vinVoutsTxs=[t for t in txs if t is not None])
                         self.transactions.append(transaction)
                         self._transactions[txid] = transaction.export()
                 else:
@@ -465,13 +531,75 @@ class Wallet(WalletBase):
         # self.assetVouts = self.electrumx.assetVouts
 
         # getTransactions(self.transactionHistory)
+
         # threaded interferring with other calls...
+        # self.getTransactionsThread = threading.Thread(
+        #     target=getTransactions, args=(self.transactionHistory,), daemon=True)
+        # self.getTransactionsThread.start()
+        # self.saveCache()
+
+    ### Functions ##############################################################
+    def appendTransaction(self, txid):
+        if txid not in self._transactions.keys():
+            print("txid", txid)
+            raw = self.electrumx.getTransaction(txid)
+            print("!!!!!!!!!!!!!!!!!!!!!!!!!!raw got!!!!!!!!!!!!!!!!!!!!!!!")
+            if raw is not None:
+                # commented out section allows us to get all our
+                # supporting transactions which gives us the abililty
+                # to know how much we received out of every transaction.
+                # we thought this might not be worth grabbing but
+                # decided it probably is, so we haven't removed this
+                # code entirely. we'll probably use this feature if we
+                # can make the data more quickly retrieved.
+                txs = []
+                txIds = []
+                for vin in raw.get('vin', []):
+                    txId = vin.get('txid', '')
+                    if txId == '':
+                        continue
+                    txIds.append(txId)
+                    txs.append(
+                        self.electrumx.getTransaction(txId))
+                transaction = TransactionStruct(raw=raw, vinVoutsTxids=txIds, vinVoutsTxs=[
+                                                t for t in txs if t is not None])
+                # transaction = TransactionStruct(
+                #     raw=raw, vinVoutsTxids=[vin.get('txid', '') for vin in raw.get('vin', [])])
+                self.transactions.append(transaction)
+                self._transactions[txid] = transaction.export()
+                print("!!!!!!_transactions are now updated and having the txId as key!!!!!!!!!",
+                      txid in self._transactions.keys())
+                print("Extracted txs", len(
+                    self._transactions[txid][0]['vin']))
+                return transaction.export()
+        else:
+            print("txid for cache", txid)
+            # raw, txids = self._transactions.get(txid, ({}, []))
+            raw, txids, txs = self._transactions.get(txid, ({}, []))
+            self.transactions.append(
+                # TransactionStruct(raw=raw, vinVoutsTxs=txs))
+                TransactionStruct(raw=raw, vinVoutsTxids=txids, vinVoutsTxs=txs))
+
+    def callTransactionHistory(self):
+        def getTransactions(transactionHistory: dict) -> list:
+            self.transactions = []
+            if not isinstance(transactionHistory, list):
+                return
+            print("keys", self._transactions.keys())
+            new_transactions = {}  # Collect new transactions here
+            for tx in transactionHistory:
+                txid = tx.get('tx_hash', '')
+                new_tranaction = self.appendTransaction(txid)
+                if new_tranaction is not None:
+                    new_transactions[txid] = new_tranaction
+            print(len(self.transactions))
+            print("keys", self._transactions.keys())
+            # why not save self._transactions to cache? because these are incremental.
+            self.saveCache(new_transactions)
+
         self.getTransactionsThread = threading.Thread(
             target=getTransactions, args=(self.transactionHistory,), daemon=True)
         self.getTransactionsThread.start()
-        self.saveCache()
-
-    ### Functions ##############################################################
 
     def setAlias(self, alias: Union[str, None] = None) -> None:
         self.alias = alias
@@ -530,6 +658,8 @@ class Wallet(WalletBase):
         and it requires lots of calls for individual transactions.
         we just need them available when we're creating transactions.
         '''
+        print(self.transactions)
+        print(type(self.transactions))
         if (
             not force and
             len([
@@ -547,28 +677,61 @@ class Wallet(WalletBase):
             # self.get()
 
             # get transactions, save their scriptPubKey hex to the unspents
+            print('self.unspentCurrency')
+            print(self.unspentCurrency)
+            print(type(self.unspentCurrency))
             for uc in self.unspentCurrency:
                 if len([tx for tx in self.transactions if tx['txid'] == uc['tx_hash']]) == 0:
-                    self.transactions.append(
-                        self.electrumx.getTransaction(uc['tx_hash']))
+                    new_transactions = {}  # Collect new transactions here
+                    new_tranaction = self.appendTransaction(uc['tx_hash'])
+                    if new_tranaction is not None:
+                        new_transactions[uc['tx_hash']] = new_tranaction
+                    self.saveCache(new_transactions)
                 tx = [tx for tx in self.transactions if tx['txid'] == uc['tx_hash']]
+                print('tx')
+                print(tx)
+                print(type(tx))
                 if len(tx) > 0:
-                    vout = [vout for vout in tx[0].get(
+                    print('tx[0]')
+                    print(tx[0])
+                    print(type(tx[0]))
+                    vout = [vout for vout in tx[0].raw.get(
                         'vout', []) if vout.get('n') == uc['tx_pos']]
                     if len(vout) > 0:
+                        print('vout[0]')
+                        print(vout[0])
+                        print(type(vout[0]))
                         scriptPubKey = vout[0].get(
                             'scriptPubKey', {}).get('hex', None)
                         if scriptPubKey is not None:
                             uc['scriptPubKey'] = scriptPubKey
+            print('self.unspentAssets')
+            print(self.unspentAssets)
+            print(type(self.unspentAssets))
             for ua in self.unspentAssets:
-                if len([tx for tx in self.transactions if tx['txid'] == ua['tx_hash']]) == 0:
-                    self.transactions.append(
-                        self.electrumx.getTransaction(ua['tx_hash']))
-                tx = [tx for tx in self.transactions if tx['txid'] == ua['tx_hash']]
+                print('ua', ua)
+                if len([tx for tx in self.transactions if tx.txid == ua['tx_hash']]) == 0:
+                    print('append')
+                    new_transactions = {}  # Collect new transactions here
+                    new_tranaction = self.appendTransaction(ua['tx_hash'])
+                    if new_tranaction is not None:
+                        new_transactions[ua['tx_hash']] = new_tranaction
+                    self.saveCache(new_transactions)
+                print('after if')
+                tx = [tx for tx in self.transactions if tx.txid == ua['tx_hash']]
+                print('tx')
+                print(tx)
+                print(type(tx))
                 if len(tx) > 0:
-                    vout = [vout for vout in tx[0].get(
+                    print('tx[0]')
+                    print(tx[0])
+                    print(type(tx[0]))
+                    vout = [vout for vout in tx[0].raw.get(
                         'vout', []) if vout.get('n') == ua['tx_pos']]
                     if len(vout) > 0:
+                        print('vout[0]')
+                        print(vout[0])
+                        print(type(vout[0]))
                         scriptPubKey = vout[0].get(
                             'scriptPubKey', {}).get('hex', None)
                         if scriptPubKey is not None:
@@ -1180,6 +1343,15 @@ class Wallet(WalletBase):
         reportedFeeSats = feeSatsReserved - currencyChange
         # logging.debug('reportedFeeSats', reportedFeeSats, color='magenta')
         # logging.debug('reportedFeeSats', reportedFeeSats, color='magenta')
+        print("tx--")
+        print(tx)
+        print(tx.vout[-2])
+        print(self._checkSatoriValue(tx.vout[-2]))
+        print(self._checkSatoriValue(
+            self._deserialize(tx.serialize()).vout[-2]))
+        print(str(tx.serialize()))
+        print(str(self._deserialize(tx.serialize())))
+        print(str(self._deserialize(tx.serialize()).vout[-2]))
         return tx.serialize(), reportedFeeSats
 
     def satoriOnlyCompleterSimple(
@@ -1226,11 +1398,20 @@ class Wallet(WalletBase):
         completerAddress = completerAddress or self.address
         changeAddress = changeAddress or self.address
         tx = self._deserialize(serialTx)
+        print(f"serialTx--{str(serialTx)}")
+        with open('/tmp/serialTx.log', mode='w') as f:
+            f.write(f"serialTx--{str(serialTx)}")
+        print(f"Tx--{str(tx)}")
+        with open('/tmp/Tx.log', mode='w') as f:
+            f.write(f"Tx--{str(tx)}")
+        print(f"Txvout--{str(tx.vout[-2])}")
+        with open('/tmp/Txvout.log', mode='w') as f:
+            f.write(f"Txvout--{str(tx.vout[-2])}")
         if not _verifyFee():
             raise TransactionFailure(
                 f'fee mismatch, {reportedFeeSats}, {feeSatsReserved}')
         if not _verifyClaim():
-            raise TransactionFailure(f'claim mismatch, {tx.vout[-2].value}')
+            raise TransactionFailure(f'claim mismatch, {tx.vout[-2]}')
         if not _verifyClaimAddress():
             raise TransactionFailure('claim mismatch, _verifyClaimAddress')
         if not _verifyChangeAddress():

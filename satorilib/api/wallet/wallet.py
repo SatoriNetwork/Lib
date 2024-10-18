@@ -1196,20 +1196,11 @@ class Wallet():
         completerAddress = completerAddress or self.address
         changeAddress = changeAddress or self.address
         tx = self._deserialize(serialTx)
-        print(f"serialTx--{str(serialTx)}")
-        with open('/tmp/serialTx.log', mode='a') as f:
-            f.write(f"serialTx--{str(serialTx)}")
-        print(f"Tx--{str(tx)}")
-        with open('/tmp/Tx.log', mode='a') as f:
-            f.write(f"Tx--{str(tx)}")
-        print(f"Txvout--{str(tx.vout[-2])}")
-        with open('/tmp/Txvout.log', mode='a') as f:
-            f.write(f"Txvout--{str(tx.vout[-2])}")
         if not _verifyFee():
             raise TransactionFailure(
                 f'fee mismatch, {reportedFeeSats}, {feeSatsReserved}')
         if not _verifyClaim():
-            raise TransactionFailure(f'claim mismatch, {tx.vout[-2].value}')
+            raise TransactionFailure(f'claim mismatch, {tx.vout[-2]}')
         if not _verifyClaimAddress():
             raise TransactionFailure('claim mismatch, _verifyClaimAddress')
         if not _verifyChangeAddress():

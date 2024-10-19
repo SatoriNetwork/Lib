@@ -152,7 +152,7 @@ class Wallet(WalletBase):
         if walletPath == cachePath:
             raise Exception('wallet and cache paths cannot be the same')
         super().__init__()
-        self.satoriFee = 0.00000010
+        self.satoriFee = 0.00000001
         self.isTestnet = isTestnet
         self.password = password
         self.walletPath = walletPath
@@ -396,6 +396,12 @@ class Wallet(WalletBase):
             print("saveCache error", e)
 
     ### Electrumx ##############################################################
+
+    def connected(self) -> bool:
+        return self.electrumx.connected()
+
+    def disconnect(self) -> bool:
+        return self.electrumx.disconnect()
 
     def connect(self):
         ''' connect to Electrumx '''
@@ -681,13 +687,13 @@ class Wallet(WalletBase):
             print(self.unspentCurrency)
             print(type(self.unspentCurrency))
             for uc in self.unspentCurrency:
-                if len([tx for tx in self.transactions if tx['txid'] == uc['tx_hash']]) == 0:
+                if len([tx for tx in self.transactions if tx.txid == uc['tx_hash']]) == 0:
                     new_transactions = {}  # Collect new transactions here
                     new_tranaction = self.appendTransaction(uc['tx_hash'])
                     if new_tranaction is not None:
                         new_transactions[uc['tx_hash']] = new_tranaction
                     self.saveCache(new_transactions)
-                tx = [tx for tx in self.transactions if tx['txid'] == uc['tx_hash']]
+                tx = [tx for tx in self.transactions if tx.txid == uc['tx_hash']]
                 print('tx')
                 print(tx)
                 print(type(tx))

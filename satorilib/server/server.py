@@ -850,3 +850,20 @@ class SatoriServerClient(object):
         except Exception as e:
             error_message = f"Error in submitProposalVote: {str(e)}"
             return False, {"error": error_message}
+
+    def poolAccepting(self, status: bool) -> tuple[bool, dict]:
+        """
+        Function to set the pool status to accepting or not accepting
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/stake/lend/enable' if status else '/stake/lend/disable')
+            if response.status_code == 200:
+                return True, response.text
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in submitProposalVote: {str(e)}"
+            return False, {"error": error_message}

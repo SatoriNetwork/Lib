@@ -42,6 +42,14 @@ class WalletBase():
 
     def __init__(self, entropy: Union[bytes, None] = None):
         self._entropy: bytes = entropy
+        self._entropy = None
+        self._entropyStr = ''
+        self._privateKeyObj = None
+        self.privateKey = ''
+        self.words = ''
+        self.publicKey = None
+        self.address = None
+        self.scripthash = None
 
     @property
     def symbol(self) -> str:

@@ -1200,7 +1200,7 @@ class Wallet():
             raise TransactionFailure(
                 f'fee mismatch, {reportedFeeSats}, {feeSatsReserved}')
         if not _verifyClaim():
-            raise TransactionFailure(f'claim mismatch, {tx.vout[-2].value}')
+            raise TransactionFailure(f'claim mismatch, {tx.vout[-2]}')
         if not _verifyClaimAddress():
             raise TransactionFailure('claim mismatch, _verifyClaimAddress')
         if not _verifyChangeAddress():

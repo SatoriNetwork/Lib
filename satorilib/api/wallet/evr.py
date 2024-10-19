@@ -1,4 +1,5 @@
 from typing import Union
+import random
 from evrmore import SelectParams
 from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret
 from evrmore.core.scripteval import VerifyScript, SCRIPT_VERIFY_P2SH
@@ -24,13 +25,33 @@ class EvrmoreWallet(Wallet):
         connection: Electrumx = None,
         type: str = 'wallet',
     ):
-        self.connection = connection
+        self.connection = connection or EvrmoreWallet.createElectrumxConnection()
         self.type = type
         super().__init__(
             walletPath,
             reserve=reserve,
             isTestnet=isTestnet,
             password=password)
+
+    @staticmethod
+    def createElectrumxConnection():
+        servers: list[str] = [
+            '146.190.149.237:50002',
+            '146.190.38.120:50002',
+            'electrum1-mainnet.evrmorecoin.org:50002',
+            'electrum2-mainnet.evrmorecoin.org:50002']
+        serversSubscription: list[str] = [
+            '146.190.149.237:50001',
+            '146.190.38.120:50001',
+            'electrum1-mainnet.evrmorecoin.org:50001',
+            'electrum2-mainnet.evrmorecoin.org:50001']
+        hostPort = random.choice(servers)
+        hostPortSubscription = random.choice(serversSubscription)
+        return Electrumx(
+            host=hostPort.split(':')[0],
+            port=int(hostPort.split(':')[1]),
+            hostSubscription=hostPortSubscription.split(':')[0],
+            portSubscription=int(hostPortSubscription.split(':')[1]))
 
     def connect(self):
         try:

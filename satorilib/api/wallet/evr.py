@@ -5,9 +5,10 @@ from evrmore.core.scripteval import VerifyScript, SCRIPT_VERIFY_P2SH
 from evrmore.core.script import CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, OP_EVR_ASSET, OP_DROP, OP_RETURN, SIGHASH_ANYONECANPAY
 from evrmore.core import b2x, lx, COIN, COutPoint, CMutableTxOut, CMutableTxIn, CMutableTransaction, Hash160
 from evrmore.core.scripteval import EvalScriptError
-from satoriwallet import ElectrumXAPI
+from satoriwallet import ElectrumxAPI
 from satoriwallet import evrmore
 from satoriwallet import TxUtils, AssetTransaction
+from satoriwallet.api.blockchain import Electrumx
 from satorilib import logging
 from satorilib.api.wallet.wallet import Wallet, TransactionFailure
 
@@ -17,62 +18,60 @@ class EvrmoreWallet(Wallet):
     def __init__(
         self,
         walletPath: str,
-        temporary: bool = False,
         reserve: float = .25,
         isTestnet: bool = False,
         password: Union[str, None] = None,
-        use: Wallet = None,
+        connection: Electrumx = None,
+        type: str = 'wallet',
     ):
+        self.connection = connection
+        self.type = type
         super().__init__(
             walletPath,
-            temporary=temporary,
             reserve=reserve,
             isTestnet=isTestnet,
-            password=password,
-            use=use)
+            password=password)
 
     def connect(self):
-        i = 0
-        while i < 3:
-            i += 1
-            try:
-                self.electrumx = ElectrumXAPI(
-                    chain=self.chain,
-                    address=self.address,
-                    scripthash=self.scripthash,
-                    servers=[
-                        # 'moontree.com:50022',  # mainnet ssl evr
-                        '146.190.149.237:50002',
-                        '146.190.38.120:50002',  # backup - maybe just use for server
-                        'electrum1-mainnet.evrmorecoin.org:50002',
-                        'electrum2-mainnet.evrmorecoin.org:50002',  # keeps erroring out
+        try:
+            self.electrumx = ElectrumxAPI(
+                chain=self.chain,
+                address=self.address,
+                scripthash=self.scripthash,
+                connection=self.connection,
+                type=self.type,
+                onScripthashNotification=self.get,
+                onBlockNotification=None,
+                servers=[
+                    # 'moontree.com:50022',  # mainnet ssl evr
+                    '146.190.149.237:50002',
+                    '146.190.38.120:50002',  # backup - maybe just use for server
+                    'electrum1-mainnet.evrmorecoin.org:50002',
+                    'electrum2-mainnet.evrmorecoin.org:50002',  # keeps erroring out
 
-                        # '146.190.149.237:50022',  # mainnet ssl evr # not working yet
+                    # '146.190.149.237:50022',  # mainnet ssl evr # not working yet
 
-                        # updated to more recent version, now getting errors:
-                        # """{'code': -32601, 'message': 'unknown method "blockchain.scripthash.listassets"'} <class 'dict'>"""
-                        # 'electrum1-mainnet.evrmorecoin.org:50002',  # ssl
-                        # 'electrum2-mainnet.evrmorecoin.org:50002',  # ssl
+                    # updated to more recent version, now getting errors:
+                    # """{'code': -32601, 'message': 'unknown method "blockchain.scripthash.listassets"'} <class 'dict'>"""
+                    # 'electrum1-mainnet.evrmorecoin.org:50002',  # ssl
+                    # 'electrum2-mainnet.evrmorecoin.org:50002',  # ssl
 
-                        # no good:
-                        # 'electrum1-mainnet.evrmorecoin.org:50001',  # tcp
-                        # 'electrum2-mainnet.evrmorecoin.org:50001',  # tcp
-                        # 'moontree.com:50021',  # mainnet tcp evr
-                        # 'moontree.com:50031', # testnet tcp evr
-                        # 'moontree.com:50032', # testnet ssl evr
-                        # 'electrum1-mainnet.evrmorecoin.org:50004', # wss
-                        # 'electrum2-mainnet.evrmorecoin.org:50004', # wss
-                        # 'electrum1-testnet.evrmorecoin.org:50001', # tcp
-                        # 'electrum1-testnet.evrmorecoin.org:50002', # ssl
-                        # 'electrum1-testnet.evrmorecoin.org:50004', # wss
-                    ])
-                break
-            except Exception as e:
-                logging.warning(
-                    'unable to connect to Evrmore servers, continuing with limited wallet ability', e)
-                # import time
-                # time.sleep(30)
-                break
+                    # no good:
+                    # 'electrum1-mainnet.evrmorecoin.org:50001',  # tcp
+                    # 'electrum2-mainnet.evrmorecoin.org:50001',  # tcp
+                    # 'moontree.com:50021',  # mainnet tcp evr
+                    # 'moontree.com:50031', # testnet tcp evr
+                    # 'moontree.com:50032', # testnet ssl evr
+                    # 'electrum1-mainnet.evrmorecoin.org:50004', # wss
+                    # 'electrum2-mainnet.evrmorecoin.org:50004', # wss
+                    # 'electrum1-testnet.evrmorecoin.org:50001', # tcp
+                    # 'electrum1-testnet.evrmorecoin.org:50002', # ssl
+                    # 'electrum1-testnet.evrmorecoin.org:50004', # wss
+                ])
+            # self.setupSubscriptions()
+        except Exception as e:
+            logging.warning(
+                'ElectrumxAPI issue', e)
 
     @property
     def symbol(self) -> str:
@@ -108,8 +107,8 @@ class EvrmoreWallet(Wallet):
         SelectParams('mainnet')
         return CEvrmoreSecret.from_secret_bytes(self._entropy)
 
-    def _generateAddress(self):
-        return P2PKHEvrmoreAddress.from_pubkey(self._privateKeyObj.pub)
+    def _generateAddress(self, pub=None):
+        return P2PKHEvrmoreAddress.from_pubkey(pub or self._privateKeyObj.pub)
 
     @staticmethod
     def generateAddress(pubkey: Union[bytes, str]) -> str:

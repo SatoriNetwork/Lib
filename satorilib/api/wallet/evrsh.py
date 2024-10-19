@@ -5,7 +5,7 @@ from evrmore.core.scripteval import VerifyScript, SCRIPT_VERIFY_P2SH
 from evrmore.core.script import CScript, OP_HASH160, OP_EQUAL, SignatureHash, SIGHASH_ALL
 from evrmore.core import b2x, lx, COutPoint, CMutableTxOut, CMutableTxIn, CMutableTransaction, Hash160
 from evrmore.core.scripteval import EvalScriptError
-from satoriwallet import ElectrumXAPI
+from satoriwallet import ElectrumxAPI
 from satoriwallet import evrmore
 from satoriwallet import TxUtils, AssetTransaction
 from satorilib import logging
@@ -30,7 +30,7 @@ class EvrmoreP2SHWallet(Wallet):
             password=password)
 
     def connect(self):
-        self.electrumx = ElectrumXAPI(
+        self.electrumx = ElectrumxAPI(
             chain=self.chain,
             address=self.address,
             scripthash=self.scripthash,

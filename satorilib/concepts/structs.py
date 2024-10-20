@@ -531,13 +531,15 @@ class Observation:
         return Observation.fromGuess(raw)
 
     @staticmethod
-    def fromTopic(raw):
+    def fromTopic(raw, realtime: bool = True):
         '''
         this is the structur that hte Satori PubSub delivers data in: {
             'topic': '{"source": "satori", "author": "02a85fb71485c6d7c62a3784c5549bd3849d0afa3ee44ce3f9ea5541e4c56402d8", "stream": "WeatherBerlin", "target": "temperature"}',
             'time': '2024-04-13 17:53:00.661619',
             'data': 4.2,
             'hash': 'abc'}
+        if realtime is false then we trust the observationTime because we're
+        running this function on past data. however, we probably never do that.
         '''
         if isinstance(raw, str):
             j = json.loads(raw)
@@ -545,8 +547,22 @@ class Observation:
             j = raw
         topic = j.get('topic', None)
         streamId = StreamId.fromTopic(topic)
-        observationTime = j.get('time',
-                                dt.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))
+        now = dt.datetime.now(dt.timezone.utc)
+        nowStr = now.strftime('%Y-%m-%d %H:%M:%S.%f')
+        if not realtime:
+            observationTime = j.get('time', )
+            try:
+                observationDt = dt.datetime.strptime(
+                    observationTime,
+                    format='%Y-%m-%d %H:%M:%S.%f')
+                if (observationDt > now or observationDt < now - 60):
+                    observationDt = now
+                    observationTime = nowStr
+            except Exception as _:
+                observationDt = now
+                observationTime = nowStr
+        else:
+            observationTime = j.get('time', now)
         observationHash = j.get('observationHash', j.get('hash', None))
         value = j.get('data', None)
         target = None

@@ -294,6 +294,8 @@ class Wallet(WalletBase):
 
     def save(self):
         safetify(self.walletPath)
+        if self.walletFileExists():
+            return False
         config.put(
             data={
                 **(
@@ -315,6 +317,7 @@ class Wallet(WalletBase):
                 }
             },
             path=self.walletPath)
+        return True
 
     def saveCacheOld(self):
         safetify(self.cachePath)

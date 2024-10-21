@@ -331,26 +331,29 @@ class Wallet(WalletBase):
             path=self.cachePath)
 
     def loadCache(self) -> bool:
-        if not self.cacheFileExists():
-            return False
-
-        if self.cachePath.endswith('.csv'):
-            self.cache = pd.read_csv(self.cachePath)
-            self._transactions = self.cache[self.cache['address'] == self.address].set_index(
-                'txid')['transaction'].apply(json.loads).to_dict()
-            return True if self._transactions else False
-
-        elif self.cachePath.endswith('.yaml'):
-            self.cache = config.get(self.cachePath)
-            if not self.cache:
+        try:
+            if not self.cacheFileExists():
                 return False
-            self._transactions = (
-                self.cache
-                .get(self.symbol, {})
-                .get(self.address, {'': ({}, [])}))
-            return True
 
-        return False
+            if self.cachePath.endswith('.csv'):
+                self.cache = pd.read_csv(self.cachePath)
+                self._transactions = self.cache[self.cache['address'] == self.address].set_index(
+                    'txid')['transaction'].apply(json.loads).to_dict()
+                return True if self._transactions else False
+
+            elif self.cachePath.endswith('.yaml'):
+                self.cache = config.get(self.cachePath)
+                if not self.cache:
+                    return False
+                self._transactions = (
+                    self.cache
+                    .get(self.symbol, {})
+                    .get(self.address, {'': ({}, [])}))
+                return True
+
+            return False
+        except Exception as e:
+            logging.error(f'issue loading transaction cache, {e}')
 
     def saveCache(self, new_transactions: dict):
         try:
@@ -581,9 +584,9 @@ class Wallet(WalletBase):
             # why not save self._transactions to cache? because these are incremental.
             self.saveCache(new_transactions)
 
-        self.getTransactionsThread = threading.Thread(
-            target=getTransactions, args=(self.transactionHistory,), daemon=True)
-        self.getTransactionsThread.start()
+        # self.getTransactionsThread = threading.Thread(
+        #    target=getTransactions, args=(self.transactionHistory,), daemon=True)
+        # self.getTransactionsThread.start()
 
     def setAlias(self, alias: Union[str, None] = None) -> None:
         self.alias = alias

@@ -85,7 +85,10 @@ class WalletBase():
         words = self._generateWords()
         privateKey = str(_privateKeyObj)
         publicKey = _privateKeyObj.pub.hex()
-        address = str(_addressObj)  # file might not have the address listed...
+        address = str(_addressObj)
+        # file might not have the address listed...
+        if self.address is None:
+            self.address = address
         scripthash = self._generateScripthash(forAddress=address)
         return (
             _entropy == self._entropy and
@@ -93,7 +96,7 @@ class WalletBase():
             words == self.words and
             privateKey == self.privateKey and
             publicKey == self.publicKey and
-            (address == self.address or self.address is None) and
+            address == self.address and
             scripthash == self.scripthash)
 
     def generateObjects(self):

@@ -148,7 +148,6 @@ class SatoriServerClient(object):
             function=requests.post,
             endpoint='/register/wallet',
             payload=self.wallet.registerPayload())
-            payload=self.wallet.registerPayload())
 
     def registerStream(self, stream: dict, payload: str = None):
         ''' publish stream {'source': 'test', 'name': 'stream1', 'target': 'target'}'''
@@ -156,14 +155,12 @@ class SatoriServerClient(object):
             function=requests.post,
             endpoint='/register/stream',
             payload=payload or json.dumps(stream))
-            payload=payload or json.dumps(stream))
 
     def registerSubscription(self, subscription: dict, payload: str = None):
         ''' subscribe to stream '''
         return self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/register/subscription',
-            payload=payload or json.dumps(subscription))
             payload=payload or json.dumps(subscription))
 
     def registerPin(self, pin: dict, payload: str = None):
@@ -180,7 +177,6 @@ class SatoriServerClient(object):
         return self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/register/pin',
-            payload=payload or json.dumps(pin))
             payload=payload or json.dumps(pin))
 
     def requestPrimary(self):
@@ -202,7 +198,6 @@ class SatoriServerClient(object):
             function=requests.post,
             endpoint='/my/streams',
             payload='{}')
-            payload='{}')
 
     def removeStream(self, stream: dict = None, payload: str = None):
         ''' removes a stream from the server '''
@@ -212,14 +207,12 @@ class SatoriServerClient(object):
             function=requests.post,
             endpoint='/remove/stream',
             payload=payload or json.dumps(stream or {}))
-            payload=payload or json.dumps(stream or {}))
 
     def checkin(self, referrer: str = None) -> dict:
         challenge = self._getChallenge()
         response = self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/checkin',
-            payload=self.wallet.registerPayload(challenge=challenge),
             payload=self.wallet.registerPayload(challenge=challenge),
             challenge=challenge,
             extraHeaders={'referrer': referrer} if referrer else {},
@@ -237,7 +230,6 @@ class SatoriServerClient(object):
         response = self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/checkin/check',
-            payload=self.wallet.registerPayload(challenge=challenge),
             payload=self.wallet.registerPayload(challenge=challenge),
             challenge=challenge,
             extraHeaders={'changesSince': timeToTimestamp(self.lastCheckin)},
@@ -314,14 +306,12 @@ class SatoriServerClient(object):
             endpoint='/vote_on/manifest',
             useWallet=wallet,
             payload=json.dumps(votes or {})).text
-            payload=json.dumps(votes or {})).text
 
     def submitSanctionVote(self, wallet: Wallet, votes: dict[str, int]):
         return self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/vote_on/sanction',
             useWallet=wallet,
-            payload=json.dumps(votes or {})).text
             payload=json.dumps(votes or {})).text
 
     def removeSanctionVote(self, wallet: Wallet):
@@ -337,7 +327,6 @@ class SatoriServerClient(object):
         response = self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/register/subscription/pindepin',
-            payload=json.dumps(stream))
             payload=json.dumps(stream))
         if response.status_code < 400:
             return response.json().get('success'), response.json().get('result')
@@ -442,7 +431,6 @@ class SatoriServerClient(object):
                 function=requests.post,
                 endpoint='/mine/to/address',
                 payload=js)
-                payload=js)
             return response.status_code < 400, response.text
         except Exception as e:
             logging.warning(
@@ -462,8 +450,6 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/stake/for/address',
-                payload=json.dumps({
-                raiseForStatus=False,
                 payload=json.dumps({
                     'vaultSignature': vaultSignature,
                     'vaultPubkey': vaultPubkey,
@@ -543,7 +529,6 @@ class SatoriServerClient(object):
                 function=requests.post,
                 endpoint='/vault/report',
                 payload=json.dumps({
-                payload=json.dumps({
                     'walletSignature': walletSignature,
                     'vaultSignature': vaultSignature,
                     'vaultPubkey': vaultPubkey,
@@ -571,7 +556,6 @@ class SatoriServerClient(object):
                 function=requests.post,
                 endpoint='/mine_to_vault/enable',
                 payload=json.dumps({
-                payload=json.dumps({
                     'walletSignature': walletSignature,
                     'vaultSignature': vaultSignature,
                     'vaultPubkey': vaultPubkey,
@@ -598,7 +582,6 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/mine_to_vault/disable',
-                payload=json.dumps({
                 payload=json.dumps({
                     'walletSignature': walletSignature,
                     'vaultSignature': vaultSignature,
@@ -655,7 +638,6 @@ class SatoriServerClient(object):
                 function=requests.post,
                 endpoint='/beta/claim',
                 payload=json.dumps({'ethAddress': ethAddress}))
-                payload=json.dumps({'ethAddress': ethAddress}))
             return response.status_code < 400,  response.json()
         except Exception as e:
             logging.warning(
@@ -692,7 +674,6 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/stake/proxy/charity',
-                payload=json.dumps({'child': address, 'childId': childId}))
                 payload=json.dumps({'child': address, 'childId': childId}))
             return response.status_code < 400, response.text
         except Exception as e:
@@ -743,7 +724,6 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/stake/proxy/remove',
-                payload=json.dumps({'child': address, 'childId': childId}))
                 payload=json.dumps({'child': address, 'childId': childId}))
             return response.status_code < 400, response.text
         except Exception as e:
@@ -837,6 +817,55 @@ class SatoriServerClient(object):
             logging.error(error_message)
             logging.error(traceback.format_exc())
             return False, {"error": error_message}
+        
+    def getProposalById(self, proposal_id: str) -> dict:
+        """
+        Function to get a specific proposal by ID by calling the API endpoint.
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint=f'/proposal/{proposal_id}'
+            )
+            if response.status_code == 200:
+                return response.json()['proposal']
+            else:
+                logging.error(
+                    f"Failed to get proposal. Status code: {response.status_code}", 
+                    extra={'color': 'red'}
+                )
+                return None
+        except requests.RequestException as e:
+            logging.error(
+                f"Error occurred while fetching proposal: {str(e)}", 
+                extra={'color': 'red'}
+            )
+            return None
+        
+
+    def getProposalVotes(self, proposal_id: str) -> dict:
+        """
+        Function to get all votes for a proposal by calling the API endpoint.
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint=f'/proposal/votes/get/{proposal_id}'
+            )
+            if response.status_code == 200:
+                return response.json()
+            else:
+                logging.error(
+                    f"Failed to get proposal votes. Status code: {response.status_code}", 
+                    extra={'color': 'red'}
+                )
+                return None
+        except requests.RequestException as e:
+            logging.error(
+                f"Error occurred while fetching proposal votes: {str(e)}", 
+                extra={'color': 'red'}
+            )
+            return None
 
     def getProposals(self):
         """
@@ -902,30 +931,7 @@ class SatoriServerClient(object):
                 f"Error occurred while fetching proposal votes: {str(e)}", color='red')
             return {}
 
-    def submitProposalVote(self, proposal_id: int, vote: str) -> tuple[bool, dict]:
-        """
-        Submits a vote for a proposal
-        """
-        try:
-            vote_data = {
-                "proposal_id": int(proposal_id),  # Send proposal_id as integer
-                "vote": str(vote),
-            }
-            response = self._makeAuthenticatedCall(
-                function=requests.post,
-                endpoint='/proposal/vote/submit',
-                payload=vote_data  # Pass the vote_data dictionary directly
-            )
-            if response.status_code == 200:
-                return True, response.text
-            else:
-                error_message = f"Server returned status code {response.status_code}: {response.text}"
-                return False, {"error": error_message}
-
-        except Exception as e:
-            error_message = f"Error in submitProposalVote: {str(e)}"
-            return False, {"error": error_message}
-
+    
     def submitProposal(self, proposal_data: dict) -> tuple[bool, dict]:
         '''submits proposal'''
         try:
@@ -1008,45 +1014,41 @@ class SatoriServerClient(object):
             return {}
 
     def submitProposalVote(self, proposal_id: int, vote: str) -> tuple[bool, dict]:
-        """
-        Submits a vote for a proposal
-        """
         try:
             vote_data = {
-                "proposal_id": int(proposal_id),  # Send proposal_id as integer
+                "proposal_id": int(proposal_id),
                 "vote": str(vote),
             }
-            response = self._makeAuthenticatedCall(
+            response = self._makeUnauthenticatedCall(
                 function=requests.post,
-                endpoint='/proposal/vote/submit',
-                payload=vote_data  # Pass the vote_data dictionary directly
+                endpoint='/proposals/vote',
+                payload=vote_data
             )
             if response.status_code == 200:
-                return True, response.text
-            else:
-                error_message = f"Server returned status code {response.status_code}: {response.text}"
-                return False, {"error": error_message}
-
-        except Exception as e:
-            error_message = f"Error in submitProposalVote: {str(e)}"
-            return False, {"error": error_message}
-
-    def poolAccepting(self, status: bool) -> tuple[bool, dict]:
-        """
-        Function to set the pool status to accepting or not accepting
-        """
-        try:
-            response = self._makeAuthenticatedCall(
-                function=requests.get,
-                endpoint='/stake/lend/enable' if status else '/stake/lend/disable')
-            if response.status_code == 200:
-                return True, response.text
+                return True, response.json()
             else:
                 error_message = f"Server returned status code {response.status_code}: {response.text}"
                 return False, {"error": error_message}
         except Exception as e:
             error_message = f"Error in submitProposalVote: {str(e)}"
             return False, {"error": error_message}
+
+        def poolAccepting(self, status: bool) -> tuple[bool, dict]:
+            """
+            Function to set the pool status to accepting or not accepting
+            """
+            try:
+                response = self._makeAuthenticatedCall(
+                    function=requests.get,
+                    endpoint='/stake/lend/enable' if status else '/stake/lend/disable')
+                if response.status_code == 200:
+                    return True, response.text
+                else:
+                    error_message = f"Server returned status code {response.status_code}: {response.text}"
+                    return False, {"error": error_message}
+            except Exception as e:
+                error_message = f"Error in submitProposalVote: {str(e)}"
+                return False, {"error": error_message}
 
         
     def approveProposal(self, proposal_id: int) -> tuple[bool, dict]:
@@ -1123,20 +1125,27 @@ class SatoriServerClient(object):
             return {'status': 'error', 'message': error_message}
         
 
-    def getUnapprovedProposals(self) -> dict:
+    def getUnapprovedProposals(self, wallet_address: str) -> dict:
         """
-        Fetches unapproved proposals
+        Function to get all unapproved proposals by calling the API endpoint.
         """
         try:
-            response = self._makeUnauthenticatedCall(
+           
+            response = self._makeAuthenticatedCall(
                 function=requests.get,
-                endpoint='/proposals/unapproved'
+                endpoint=f'/proposals/unapproved?wallet_address={wallet_address}'
             )
             if response.status_code == 200:
-                return {'status': 'success', 'proposals': response.json()}
+                return response.json()
             else:
-                error_message = f"Server returned status code {response.status_code}: {response.text}"
-                return {'status': 'error', 'message': error_message}
-        except Exception as e:
-            error_message = f"Error in getUnapprovedProposals: {str(e)}"
-            return {'status': 'error', 'message': error_message}
+                logging.error(
+                    f"Failed to get unapproved proposals. Status code: {response.status_code}", 
+                    extra={'color': 'red'}
+                )
+                return {'status': 'error', 'message': f"Failed to get unapproved proposals. Status code: {response.status_code}"}
+        except requests.RequestException as e:
+            logging.error(
+                f"Error occurred while fetching unapproved proposals: {str(e)}", 
+                extra={'color': 'red'}
+            )
+            return {'status': 'error', 'message': f"Error occurred while fetching unapproved proposals: {str(e)}"}

@@ -63,7 +63,6 @@ class WalletBase():
         self.words = ''
 
     def loadFromYaml(self, yaml: dict = None):
-        print('loadFromYaml', yaml)
         yaml = yaml or {}
         self._entropy = yaml.get('entropy')
         if isinstance(self._entropy, bytes):
@@ -77,7 +76,6 @@ class WalletBase():
         self.address = yaml.get(self.symbol, {}).get('address')
         self.scripthash = yaml.get('scripthash')
         self.generateObjects()
-        print('self._privateKeyObj', self._privateKeyObj)
 
     def verify(self) -> bool:
         _entropy = self._entropy
@@ -561,6 +559,7 @@ class Wallet(WalletBase):
         logging.info('pulled transactions from blockchain', color='blue')
 
     ### Functions ##############################################################
+
     def appendTransaction(self, txid):
         if txid not in self._transactions.keys():
             raw = self.electrumx.getTransaction(txid)

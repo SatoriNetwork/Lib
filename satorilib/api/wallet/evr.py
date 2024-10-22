@@ -1,4 +1,5 @@
 from typing import Union
+import threading
 import random
 from evrmore import SelectParams
 from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret
@@ -61,7 +62,7 @@ class EvrmoreWallet(Wallet):
                 scripthash=self.scripthash,
                 connection=self.connection,
                 type=self.type,
-                onScripthashNotification=self.get,
+                onScripthashNotification=self.get,  # self.callTransactionHistory()
                 onBlockNotification=None,
                 servers=[
                     # 'moontree.com:50022',  # mainnet ssl evr
@@ -93,6 +94,12 @@ class EvrmoreWallet(Wallet):
         except Exception as e:
             logging.warning(
                 'ElectrumxAPI issue', e)
+
+    def subscribe(self):
+        # Start a thread to listen for updates
+        self.processThread = threading.Thread(
+            target=self.electrumx.processNotifications)
+        self.processThread.start()
 
     @property
     def symbol(self) -> str:

@@ -63,6 +63,7 @@ class WalletBase():
         self.words = ''
 
     def loadFromYaml(self, yaml: dict = None):
+        print('loadFromYaml', yaml)
         yaml = yaml or {}
         self._entropy = yaml.get('entropy')
         if isinstance(self._entropy, bytes):
@@ -76,6 +77,7 @@ class WalletBase():
         self.address = yaml.get(self.symbol, {}).get('address')
         self.scripthash = yaml.get('scripthash')
         self.generateObjects()
+        print('self._privateKeyObj', self._privateKeyObj)
 
     def verify(self) -> bool:
         _entropy = self._entropy
@@ -412,8 +414,14 @@ class Wallet(WalletBase):
     def connect(self):
         ''' connect to Electrumx '''
 
+    def clearSubscriptions(self):
+        self.electrumx.cancelSubscriptions()
+
     def setupSubscriptions(self):
         self.electrumx.makeSubscriptions()
+
+    def stopSubscription(self):
+        self.electrumx.cancelSubscriptions()
 
     def get(self, *args, **kwargs):
         ''' gets data from the blockchain, saves to attributes '''
@@ -494,7 +502,9 @@ class Wallet(WalletBase):
 
         logging.debug('pulling transactions from blockchain...')
         self.currencyOnChain = self.electrumx.getCurrency()
+        logging.debug('self.currencyOnChain', self.currencyOnChain)
         self.balanceOnChain = self.electrumx.getBalance()
+        logging.debug('self.currencyOnChain', self.currencyOnChain)
         self.stats = self.electrumx.getStats()
         # self.divisibility = self.stats.get('divisions', 8)
         self.divisibility = openSafely(self.stats, 'divisions', 8)
@@ -510,7 +520,7 @@ class Wallet(WalletBase):
             x for x in self.unspentCurrency if x.get('asset') == None]
         self.unspentAssets = [
             x for x in self.unspentAssets if x.get('asset') != None]
-
+        logging.debug('self.unspentAssets', self.unspentAssets)
         # for logging purposes
         for x in self.unspentCurrency:
             openSafely(x, 'value')
@@ -534,6 +544,7 @@ class Wallet(WalletBase):
         self.balance = sum([
             x.get('value') for x in self.unspentAssets
             if x.get('name', x.get('asset')) == 'SATORI' and x.get('value') > 0])
+        logging.debug('self.balance', self.balance)
         self.currencyAmount = TxUtils.asAmount(self.currency or 0, 8)
         self.balanceAmount = TxUtils.asAmount(
             self.balance or 0, self.divisibility)

@@ -294,8 +294,11 @@ class SatoriServerClient(object):
         
     def getSearchStreams(self):
         return self._makeUnauthenticatedCall(
-            function=requests.get,
-            endpoint=f'/streams/search').json()
+            function=requests.post,
+            endpoint=f'/streams/search',
+            payload=json.dumps({
+                'address': self.wallet.address
+            })).json()
         
     def submitMaifestVote(self, wallet: Wallet, votes: dict[str, int]):
         # todo authenticate the vault instead

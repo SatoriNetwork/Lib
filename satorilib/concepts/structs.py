@@ -1,6 +1,7 @@
 from typing import Union
 import json
 import pandas as pd
+import numpy as np
 import datetime as dt
 from functools import partial
 # from satorilib.api.hash import generatePathId
@@ -564,7 +565,20 @@ class Observation:
         else:
             observationTime = j.get('time', now)
         observationHash = j.get('observationHash', j.get('hash', None))
-        value = j.get('data', None)
+        # value = j.get('data', None)
+
+        data = j.get('data', [np.nan])
+        if isinstance(data, str):
+            try:
+                values = [float(data)]
+            except:
+                # values = [float(v.strip()) for v in data.split(',')]
+                values = list(map(ord, data))
+        elif not isinstance(data, list):
+            values = [data]
+        # value = np.asarray(value, dtype=np.float64)
+        observationTimes = [observationTime] * len(values)
+
         target = None
         df = pd.DataFrame(
             {
@@ -573,8 +587,8 @@ class Observation:
                     streamId.author,
                     streamId.stream,
                     streamId.target
-                ): [value]},
-            index=[observationTime])
+                ): values},
+            index=observationTimes)
         # I don't understand whey we still have a StreamObservationId
         # or the multicolumn identifier... maybe it's for the engine?
         # I think we should just save it to disk like this:
@@ -588,7 +602,7 @@ class Observation:
             streamId=streamId,
             observationTime=observationTime,
             observationHash=observationHash,
-            value=value,
+            value=str(values[-1]),
             target=target,
             df=df)
 

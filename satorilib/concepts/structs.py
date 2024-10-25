@@ -3,19 +3,20 @@ import json
 import pandas as pd
 import datetime as dt
 from functools import partial
+
 # from satorilib.api.hash import generatePathId
 # from enum import Enum
 
 
 class StreamId:
-    ''' unique identifier for a stream '''
+    """unique identifier for a stream"""
 
     def __init__(
         self,
         source: str,
         author: str,
         stream: str,
-        target: str = '',
+        target: str = "",
     ):
         self.__source = source
         self.__author = author
@@ -47,26 +48,29 @@ class StreamId:
 
     @staticmethod
     def itemNames():
-        return ['source', 'author', 'stream', 'target']
+        return ["source", "author", "stream", "target"]
 
-    def topic(self, asJson: bool = True, authorAsPubkey=False) -> Union[str, dict[str, str]]:
-        '''
+    def topic(
+        self, asJson: bool = True, authorAsPubkey=False
+    ) -> Union[str, dict[str, str]]:
+        """
         the topic (id) for this stream.
         this is how the pubsub system identifies the stream.
-        '''
+        """
         if asJson:
             return self.topicJson(authorAsPubkey=authorAsPubkey)
         return {
-            'source': self.__source,
-            'pubkey' if authorAsPubkey else 'author': self.__author,
-            'stream': self.__stream,
-            'target': self.__target}
+            "source": self.__source,
+            "pubkey" if authorAsPubkey else "author": self.__author,
+            "stream": self.__stream,
+            "target": self.__target,
+        }
 
     def topicJson(self, authorAsPubkey=False) -> str:
-        '''
+        """
         the topic (id) for this stream.
         this is how the pubsub system identifies the stream.
-        '''
+        """
         return json.dumps(self.topic(asJson=False, authorAsPubkey=authorAsPubkey))
 
     @property
@@ -76,17 +80,21 @@ class StreamId:
     @property
     def idString(self):  # todo: make this .id and the .key a tuple
         return (
-            (self.__source or '') +
-            (self.__author or '') +
-            (self.__stream or '') +
-            (self.__target or ''))
+            (self.__source or "")
+            + (self.__author or "")
+            + (self.__stream or "")
+            + (self.__target or "")
+        )
 
     def __repr__(self):
-        return str({
-            'source': self.__source,
-            'author': self.__author,
-            'stream': self.__stream,
-            'target': self.__target})
+        return str(
+            {
+                "source": self.__source,
+                "author": self.__author,
+                "stream": self.__stream,
+                "target": self.__target,
+            }
+        )
 
     def __str__(self):
         return str(self.__repr__())
@@ -94,14 +102,15 @@ class StreamId:
     def __eq__(self, other):
         if isinstance(other, StreamId):
             return (
-                self.source == other.source and
-                self.author == other.author and
-                self.stream == other.stream and
-                self.target == other.target)
+                self.source == other.source
+                and self.author == other.author
+                and self.stream == other.stream
+                and self.target == other.target
+            )
         return False
 
     def __hash__(self):
-        '''
+        """
         note: target can be None meaning, the stream is not a dictionary of
         values. yet we still have to hash the object, thus the use of np.inf
         which only has the side effect of barring np.inf as a valid target when
@@ -137,16 +146,15 @@ class StreamId:
         note 3: instead of that I decided to change the endpoint to
         /remove_stream/<topic> and parse out the topic instead. it's just less
         work for the same quality work around.
-        '''
+        """
         return hash(
-            self.__source +
-            self.__author +
-            self.__stream +
-            (self.__target or ''))
+            self.__source + self.__author + self.__stream + (self.__target or "")
+        )
 
     @property
     def generateHash(self) -> str:
         from satorilib.api.hash import generatePathId, hashIt
+
         return generatePathId(streamId=self)
 
     @property
@@ -164,23 +172,25 @@ class StreamId:
             source=source or self.source,
             author=author or self.author,
             stream=stream or self.stream,
-            target=target or self.target)
+            target=target or self.target,
+        )
 
     @staticmethod
     def fromMap(map: dict = None):
         return StreamId(
-            source=(map or {}).get('source'),
-            author=(map or {}).get('author', (map or {}).get('pubkey')),
-            stream=(map or {}).get('stream', (map or {}).get('name')),
-            target=(map or {}).get('target'))
+            source=(map or {}).get("source"),
+            author=(map or {}).get("author", (map or {}).get("pubkey")),
+            stream=(map or {}).get("stream", (map or {}).get("name")),
+            target=(map or {}).get("target"),
+        )
 
     @staticmethod
     def fromTopic(topic: str = None):
-        return StreamId.fromMap(json.loads(topic or '{}'))
+        return StreamId.fromMap(json.loads(topic or "{}"))
 
 
 # now that we've made the StreamId hashable this is basically unnecessary.
-class StreamIdMap():
+class StreamIdMap:
     def __init__(self, streamId: StreamId = None, value=None):
         if streamId is None:
             self.d = dict()
@@ -208,17 +218,23 @@ class StreamIdMap():
 
     @staticmethod
     def _condition(key: StreamId, streamId: StreamId, default: bool = True):
-        return all([
-            x == k or (x is None and default)
-            for x, k in zip(
-                [streamId.source, streamId.author,
-                    streamId.stream, streamId.target],
-                [key.source, key.author, key.stream, key.target])])
+        return all(
+            [
+                x == k or (x is None and default)
+                for x, k in zip(
+                    [
+                        streamId.source,
+                        streamId.author,
+                        streamId.stream,
+                        streamId.target,
+                    ],
+                    [key.source, key.author, key.stream, key.target],
+                )
+            ]
+        )
 
     def remove(self, streamId: StreamId, greedy: bool = True):
-        condition = partial(
-            StreamIdMap._condition,
-            streamId=streamId, default=greedy)
+        condition = partial(StreamIdMap._condition, streamId=streamId, default=greedy)
         removed = []
         for k in self.d.keys():
             if condition(k):
@@ -230,27 +246,19 @@ class StreamIdMap():
     def get(self, streamId: StreamId = None, default=None, greedy: bool = False):
         if streamId is None:
             return self.d
-        condition = partial(
-            StreamIdMap._condition,
-            streamId=streamId, default=greedy)
-        matches = [
-            self.d.get(k) for k in self.d.keys() if condition(k)]
+        condition = partial(StreamIdMap._condition, streamId=streamId, default=greedy)
+        matches = [self.d.get(k) for k in self.d.keys() if condition(k)]
         return matches[0] if len(matches) > 0 else default
 
     def getAll(self, streamId: StreamId = None, greedy: bool = True):
         if streamId is None:
             return self.d
-        condition = partial(
-            StreamIdMap._condition,
-            streamId=streamId, default=greedy)
+        condition = partial(StreamIdMap._condition, streamId=streamId, default=greedy)
         return {k: v for k, v in self.d.items() if condition(k)}
 
     def isFilled(self, streamId: StreamId, greedy: bool = True):
-        condition = partial(
-            StreamIdMap._condition,
-            streamId=streamId, default=greedy)
-        matches = [
-            self.d.get(k) is not None for k in self.d.keys() if condition(k)]
+        condition = partial(StreamIdMap._condition, streamId=streamId, default=greedy)
+        matches = [self.d.get(k) is not None for k in self.d.keys() if condition(k)]
         return len(matches) > 0 and all(matches)
 
     def getAllAsList(self, streamId: StreamId = None, greedy: bool = True):
@@ -260,7 +268,7 @@ class StreamIdMap():
 
 class Stream:
 
-    minimumCadence = 60*10
+    minimumCadence = 60 * 10
 
     def __init__(
         self,
@@ -281,7 +289,7 @@ class Stream:
         pinned: int = None,
         reason: StreamId = None,
         reason_is_primary: bool = None,
-        **kwargs
+        **kwargs,
     ):
         self.streamId = streamId
         self.cadence = cadence
@@ -316,45 +324,52 @@ class Stream:
     def fromMap(rep: dict = None):
         def extractKnownKwarg(key: str, rep: dict = None):
             rep = rep or {}
-            kwargs = rep.get('kwargs', {})
+            kwargs = rep.get("kwargs", {})
             if key in kwargs.keys() and key not in rep.keys():
                 rep[key] = kwargs.get(key)
-                rep['kwargs'] = {k: v for k, v in kwargs.items() if k != key}
+                rep["kwargs"] = {k: v for k, v in kwargs.items() if k != key}
             return rep
 
         def extractPredicting(key: str, rep: dict = None):
             predictionKeys = [
-                f'{key}_source',
-                f'{key}_author',
-                f'{key}_stream',
-                f'{key}_target',]
+                f"{key}_source",
+                f"{key}_author",
+                f"{key}_stream",
+                f"{key}_target",
+            ]
             rep = rep or {}
             if all([x in rep.keys() for x in predictionKeys]):
-                rep[key] = StreamId.fromMap({
-                    k.replace(f'{key}_', ''): v
-                    for k, v in rep.items()
-                    if k in predictionKeys})
-                rep = {
-                    k: v for k, v in rep.items() if k not in predictionKeys}
+                rep[key] = StreamId.fromMap(
+                    {
+                        k.replace(f"{key}_", ""): v
+                        for k, v in rep.items()
+                        if k in predictionKeys
+                    }
+                )
+                rep = {k: v for k, v in rep.items() if k not in predictionKeys}
             return rep
 
-        rep = extractKnownKwarg('ts', rep)
-        rep = extractKnownKwarg('reason_is_primary', rep)
-        rep = extractPredicting('predicting', rep)  # publish prediction of x
-        rep = extractPredicting('reason', rep)  # subscribing to predict x
+        rep = extractKnownKwarg("ts", rep)
+        rep = extractKnownKwarg("reason_is_primary", rep)
+        rep = extractPredicting("predicting", rep)  # publish prediction of x
+        rep = extractPredicting("reason", rep)  # subscribing to predict x
         return Stream(
             streamId=StreamId.fromMap(rep),
-            **{k: rep[k] for k in rep.keys() if k not in StreamId.itemNames()})
+            **{k: rep[k] for k in rep.keys() if k not in StreamId.itemNames()},
+        )
 
     def asMap(self, noneToBlank=False, includeTopic=True):
         return {
-            **({
-                k: v if v is not None else ''
-                for k, v in vars(self).items()} if noneToBlank else vars(self)),
-            **({'topic': self.streamId.topic()} if includeTopic else {})}
+            **(
+                {k: v if v is not None else "" for k, v in vars(self).items()}
+                if noneToBlank
+                else vars(self)
+            ),
+            **({"topic": self.streamId.topic()} if includeTopic else {}),
+        }
 
 
-class StreamOverview():
+class StreamOverview:
 
     def __init__(
         self,
@@ -365,9 +380,9 @@ class StreamOverview():
         pinned=False,
         predictions=None,
         # dataset=None,
-        subscribers: int = '-',
-        accuracy: float = '-',
-        prediction: float = '-',
+        subscribers: int = "-",
+        accuracy: float = "-",
+        prediction: float = "-",
     ):
         self.streamId = streamId
         self.subscribers = subscribers
@@ -380,7 +395,7 @@ class StreamOverview():
         self.predictions = predictions or []
         # self.dataset = dataset
 
-    def load(self, streamOverview: 'StreamOverview'):
+    def load(self, streamOverview: "StreamOverview"):
         self.streamId = streamOverview.streamId
         self.subscribers = streamOverview.subscribers
         self.accuracy = streamOverview.accuracy
@@ -394,16 +409,23 @@ class StreamOverview():
 
     def __str__(self):
         # return str(vars(self))
-        return str({
-            **{k: v for k, v in vars(self).items() if k != 'streamId' and k != 'pinned'},
-            **{
-                'pinned': 1 if self.pinned else 0,
-                'hashed': self.hashed,
-                'source': self.streamId.source,
-                'author': self.streamId.author,
-                'stream': self.streamId.stream,
-                'target': self.streamId.target},
-        })
+        return str(
+            {
+                **{
+                    k: v
+                    for k, v in vars(self).items()
+                    if k != "streamId" and k != "pinned"
+                },
+                **{
+                    "pinned": 1 if self.pinned else 0,
+                    "hashed": self.hashed,
+                    "source": self.streamId.source,
+                    "author": self.streamId.author,
+                    "stream": self.streamId.stream,
+                    "target": self.streamId.target,
+                },
+            }
+        )
 
     def __repr__(self):
         return self.__str__()
@@ -433,7 +455,7 @@ class StreamOverview():
         return self.streamId.generateHash
 
 
-class StreamOverviews():
+class StreamOverviews:
 
     def __init__(self, engine):
         self.engine = engine
@@ -453,37 +475,39 @@ class StreamOverviews():
         return [
             StreamOverview(
                 streamId=StreamId(
-                    source='Streamr',
-                    author='DATAUSD',
-                    stream='DATAUSD/binance/ticker',
-                    target='Close'),
+                    source="Streamr",
+                    author="DATAUSD",
+                    stream="DATAUSD/binance/ticker",
+                    target="Close",
+                ),
                 subscribers=3,
                 accuracy=97.062,
-                prediction='3621.00',
-                value='3548.00',
+                prediction="3621.00",
+                value="3548.00",
                 pinned=True,
                 errs=[],
                 # dataset=None,
                 values=[1, 2, 3],
-                predictions=[1, 2, 3])]
+                predictions=[1, 2, 3],
+            )
+        ]
 
     @staticmethod
     def blank():
-        return [StreamOverview(
-                streamId=StreamId(
-                    source='-',
-                    author='-',
-                    stream='-',
-                    target='-'),
-                subscribers='-',
-                accuracy='-',
-                prediction='-',
-                value='-',
+        return [
+            StreamOverview(
+                streamId=StreamId(source="-", author="-", stream="-", target="-"),
+                subscribers="-",
+                accuracy="-",
+                prediction="-",
+                value="-",
                 pinned=False,
                 errs=[],
                 # dataset=None,
                 values=[1, 1, 1],
-                predictions=[1, 1, 1])]
+                predictions=[1, 1, 1],
+            )
+        ]
 
 
 class Observation:
@@ -506,59 +530,61 @@ class Observation:
         return str(vars(self))
 
     def __repr__(self):
-        return f'Observation of {self.streamId}: ' + str({
-            'time': self.time,
-            'data': self.value,
-            'hash': self.observationHash,
-        })
+        return f"Observation of {self.streamId}: " + str(
+            {
+                "time": self.time,
+                "data": self.value,
+                "hash": self.observationHash,
+            }
+        )
 
     @staticmethod
     def parse(raw):
         if (
-            isinstance(raw, dict) and
-            'topic' in raw.keys() and
-            'data' in raw.keys() and
-            'hash' in raw.keys() and
-            'time' in raw.keys()
+            isinstance(raw, dict)
+            and "topic" in raw.keys()
+            and "data" in raw.keys()
+            and "hash" in raw.keys()
+            and "time" in raw.keys()
         ) or (
-            isinstance(raw, str) and
-            '"topic":' in raw and
-            '"data":' in raw and
-            '"hash":' in raw and
-            '"time":' in raw
+            isinstance(raw, str)
+            and '"topic":' in raw
+            and '"data":' in raw
+            and '"hash":' in raw
+            and '"time":' in raw
         ):
             return Observation.fromTopic(raw)
         return Observation.fromGuess(raw)
 
     @staticmethod
     def fromTopic(raw):
-        '''
+        """
         this is the structur that hte Satori PubSub delivers data in: {
             'topic': '{"source": "satori", "author": "02a85fb71485c6d7c62a3784c5549bd3849d0afa3ee44ce3f9ea5541e4c56402d8", "stream": "WeatherBerlin", "target": "temperature"}',
             'time': '2024-04-13 17:53:00.661619',
             'data': 4.2,
             'hash': 'abc'}
-        '''
+        """
         if isinstance(raw, str):
             j = json.loads(raw)
         elif isinstance(raw, dict):
             j = raw
-        topic = j.get('topic', None)
+        topic = j.get("topic", None)
         streamId = StreamId.fromTopic(topic)
-        observationTime = j.get('time',
-                                dt.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))
-        observationHash = j.get('observationHash', j.get('hash', None))
-        value = j.get('data', None)
+        observationTime = j.get(
+            "time", dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
+        )
+        observationHash = j.get("observationHash", j.get("hash", None))
+        value = j.get("data", None)
         target = None
         df = pd.DataFrame(
             {
-                (
-                    streamId.source,
-                    streamId.author,
-                    streamId.stream,
-                    streamId.target
-                ): [value]},
-            index=[observationTime])
+                (streamId.source, streamId.author, streamId.stream, streamId.target): [
+                    value
+                ]
+            },
+            index=[observationTime],
+        )
         # I don't understand whey we still have a StreamObservationId
         # or the multicolumn identifier... maybe it's for the engine?
         # I think we should just save it to disk like this:
@@ -574,22 +600,23 @@ class Observation:
             observationHash=observationHash,
             value=value,
             target=target,
-            df=df)
+            df=df,
+        )
 
     @staticmethod
     def fromGuess(raw):
-        ''' {
-                'source:"streamrSpoof",'
-                'author:"pubkey",'
-                'stream:"simpleEURCleaned",'
-                'observation': 3675,
-                'time': "2022-02-16 02:52:45.794120",
-                'content': {
-                    'High': 0.81856,
-                    'Low': 0.81337,
-                    'Close': 0.81512}}
-            note: if observed-time is missing, define it here.
-        '''
+        """{
+            'source:"streamrSpoof",'
+            'author:"pubkey",'
+            'stream:"simpleEURCleaned",'
+            'observation': 3675,
+            'time': "2022-02-16 02:52:45.794120",
+            'content': {
+                'High': 0.81856,
+                'Low': 0.81337,
+                'Close': 0.81512}}
+        note: if observed-time is missing, define it here.
+        """
         if isinstance(raw, str):
             j = json.loads(raw)
         elif isinstance(raw, dict):
@@ -601,14 +628,16 @@ class Observation:
         else:
             j = raw
         observationTime = j.get(
-            'time', dt.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))
-        observationHash = j.get('observationHash', j.get('hash', None))
-        content = j.get('content', {})
+            "time", dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
+        )
+        observationHash = j.get("observationHash", j.get("hash", None))
+        content = j.get("content", {})
         streamId = StreamId(
-            source=j.get('source', None),
-            author=j.get('author', None),
-            stream=j.get('stream', None),
-            target=j.get('target', None))
+            source=j.get("source", None),
+            author=j.get("author", None),
+            stream=j.get("stream", None),
+            target=j.get("target", None),
+        )
         value = None
         if isinstance(content, dict):
             if len(content.keys()) == 1:
@@ -616,28 +645,26 @@ class Observation:
                 value = content.get(streamId.target)
             df = pd.DataFrame(
                 {
-                    (
-                        streamId.source,
-                        streamId.author,
-                        streamId.stream,
-                        target): values
-                    for target, values in list(
-                        content.items()) + ([])},
-                index=[observationTime])
+                    (streamId.source, streamId.author, streamId.stream, target): values
+                    for target, values in list(content.items()) + ([])
+                },
+                index=[observationTime],
+            )
         # todo: handle list
-            # elif isinstance(content, list): ...
+        # elif isinstance(content, list): ...
         else:
             value = content
             df = pd.DataFrame(
-                {(
-                    streamId.source,
-                    streamId.author,
-                    streamId.stream,
-                    None): [
-                    content] + (
-                        [('StreamObservationId', observationHash)]
-                        if observationHash is not None else [])},
-                index=[observationTime])
+                {
+                    (streamId.source, streamId.author, streamId.stream, None): [content]
+                    + (
+                        [("StreamObservationId", observationHash)]
+                        if observationHash is not None
+                        else []
+                    )
+                },
+                index=[observationTime],
+            )
         return Observation(
             raw=raw,
             content=content,
@@ -645,7 +672,8 @@ class Observation:
             observationHash=observationHash,
             streamId=streamId,
             value=value,
-            df=df)
+            df=df,
+        )
 
     @property
     def key(self):
@@ -654,3 +682,61 @@ class Observation:
     @property
     def timestamp(self):
         return self.observationTime
+
+
+class StreamPair:
+    """Matches the Subscription streams with the Publication Streams"""
+
+    def __init__(self, subscription: Stream, publication: Stream):
+        self.subscription = subscription
+        self.publication = publication
+
+
+class StreamPairs:
+    """Matches the Subscription streams with the Publication Streams"""
+
+    def __init__(self, subscriptions, publications):
+        self.subscriptions = subscriptions
+        self.publications = publications
+        self.filtered_subscriptions = None
+
+    def get_publication_streams(self):
+        return {pub.streamId.stream.replace("_p", ""): pub for pub in self.publications}
+
+    def filter_subscriptions(self):
+        pub_streams = self.get_publication_streams()
+
+        self.filtered_subscriptions = [
+            sub
+            for sub in self.subscriptions
+            if sub.streamId.stream in pub_streams
+            or sub.streamId.stream.replace("_p", "") in pub_streams
+        ]
+        return self.filtered_subscriptions
+
+    def get_matched_pairs(self) -> tuple[list[Stream], list[Stream]]:
+        pub_streams = self.get_publication_streams()
+        sub_list = []
+        pub_list = []
+
+        for sub in self.subscriptions:
+            stream_name = sub.streamId.stream
+            base_name = stream_name.replace("_p", "")
+
+            if stream_name in pub_streams or base_name in pub_streams:
+                matching_pub = next(
+                    (
+                        pub
+                        for pub in self.publications
+                        if pub.streamId.stream.replace("_p", "") == base_name
+                    ),
+                    None,
+                )
+                if matching_pub:
+                    sub_list.append(sub)
+                    pub_list.append(matching_pub)
+
+        return sub_list, pub_list
+
+    def get_matched_objects(self) -> list[StreamPair]:
+        return [StreamPair(s, p) for s, p in zip(self.subscriptions, self.publications)]

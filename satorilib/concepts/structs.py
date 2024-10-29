@@ -148,7 +148,8 @@ class StreamId:
         work for the same quality work around.
         """
         return hash(
-            self.__source + self.__author + self.__stream + (self.__target or "")
+            self.__source + self.__author +
+            self.__stream + (self.__target or "")
         )
 
     @property
@@ -234,7 +235,8 @@ class StreamIdMap:
         )
 
     def remove(self, streamId: StreamId, greedy: bool = True):
-        condition = partial(StreamIdMap._condition, streamId=streamId, default=greedy)
+        condition = partial(StreamIdMap._condition,
+                            streamId=streamId, default=greedy)
         removed = []
         for k in self.d.keys():
             if condition(k):
@@ -246,19 +248,23 @@ class StreamIdMap:
     def get(self, streamId: StreamId = None, default=None, greedy: bool = False):
         if streamId is None:
             return self.d
-        condition = partial(StreamIdMap._condition, streamId=streamId, default=greedy)
+        condition = partial(StreamIdMap._condition,
+                            streamId=streamId, default=greedy)
         matches = [self.d.get(k) for k in self.d.keys() if condition(k)]
         return matches[0] if len(matches) > 0 else default
 
     def getAll(self, streamId: StreamId = None, greedy: bool = True):
         if streamId is None:
             return self.d
-        condition = partial(StreamIdMap._condition, streamId=streamId, default=greedy)
+        condition = partial(StreamIdMap._condition,
+                            streamId=streamId, default=greedy)
         return {k: v for k, v in self.d.items() if condition(k)}
 
     def isFilled(self, streamId: StreamId, greedy: bool = True):
-        condition = partial(StreamIdMap._condition, streamId=streamId, default=greedy)
-        matches = [self.d.get(k) is not None for k in self.d.keys() if condition(k)]
+        condition = partial(StreamIdMap._condition,
+                            streamId=streamId, default=greedy)
+        matches = [self.d.get(
+            k) is not None for k in self.d.keys() if condition(k)]
         return len(matches) > 0 and all(matches)
 
     def getAllAsList(self, streamId: StreamId = None, greedy: bool = True):
@@ -496,7 +502,8 @@ class StreamOverviews:
     def blank():
         return [
             StreamOverview(
-                streamId=StreamId(source="-", author="-", stream="-", target="-"),
+                streamId=StreamId(source="-", author="-",
+                                  stream="-", target="-"),
                 subscribers="-",
                 accuracy="-",
                 prediction="-",
@@ -557,25 +564,40 @@ class Observation:
         return Observation.fromGuess(raw)
 
     @staticmethod
-    def fromTopic(raw):
-        """
+    def fromTopic(raw, realtime: bool = True):
+        '''
         this is the structur that hte Satori PubSub delivers data in: {
             'topic': '{"source": "satori", "author": "02a85fb71485c6d7c62a3784c5549bd3849d0afa3ee44ce3f9ea5541e4c56402d8", "stream": "WeatherBerlin", "target": "temperature"}',
             'time': '2024-04-13 17:53:00.661619',
             'data': 4.2,
             'hash': 'abc'}
-        """
+        if realtime is false then we trust the observationTime because we're
+        running this function on past data. however, we probably never do that.
+        '''
         if isinstance(raw, str):
             j = json.loads(raw)
         elif isinstance(raw, dict):
             j = raw
         topic = j.get("topic", None)
         streamId = StreamId.fromTopic(topic)
-        observationTime = j.get(
-            "time", dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
-        )
-        observationHash = j.get("observationHash", j.get("hash", None))
-        value = j.get("data", None)
+        now = dt.datetime.now(dt.timezone.utc)
+        nowStr = now.strftime('%Y-%m-%d %H:%M:%S.%f')
+        if not realtime:
+            observationTime = j.get('time', )
+            try:
+                observationDt = dt.datetime.strptime(
+                    observationTime,
+                    format='%Y-%m-%d %H:%M:%S.%f')
+                if (observationDt > now or observationDt < now - 60):
+                    observationDt = now
+                    observationTime = nowStr
+            except Exception as _:
+                observationDt = now
+                observationTime = nowStr
+        else:
+            observationTime = j.get('time', now)
+        observationHash = j.get('observationHash', j.get('hash', None))
+        value = j.get('data', None)
         target = None
         df = pd.DataFrame(
             {

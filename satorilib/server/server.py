@@ -275,9 +275,6 @@ class SatoriServerClient(object):
             endpoint='/get_wallet_alias').text
 
     def getManifestVote(self, wallet: Wallet = None):
-        # TODO: when we implement a split in the server /votes_for/manifest
-        #       might be on the website domain, along with others (that don't
-        #       require authentication) so we will have to handle that.
         return self._makeUnauthenticatedCall(
             function=requests.get,
             endpoint=(
@@ -718,7 +715,6 @@ class SatoriServerClient(object):
         #    return
         # if isPrediction and self.topicTime.get(topic, 0) > time.time() - 60*60:
         #    return
-
         if self.topicTime.get(topic, 0) > time.time() - (Stream.minimumCadence*.95):
             return
         self.setTopicTime(topic)
@@ -859,6 +855,23 @@ class SatoriServerClient(object):
                 error_message = f"Server returned status code {response.status_code}: {response.text}"
                 return False, {"error": error_message}
 
+        except Exception as e:
+            error_message = f"Error in submitProposalVote: {str(e)}"
+            return False, {"error": error_message}
+
+    def poolAccepting(self, status: bool) -> tuple[bool, dict]:
+        """
+        Function to set the pool status to accepting or not accepting
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/stake/lend/enable' if status else '/stake/lend/disable')
+            if response.status_code == 200:
+                return True, response.text
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
         except Exception as e:
             error_message = f"Error in submitProposalVote: {str(e)}"
             return False, {"error": error_message}

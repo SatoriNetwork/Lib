@@ -431,7 +431,7 @@ class Wallet(WalletBase):
                 return supposedDict.get(key, default)
             except Exception as e:
                 logging.error('openSafely err:', supposedDict, e)
-                return None
+                return default
 
         def getBalanceTheHardWay() -> int:
             '''
@@ -503,6 +503,7 @@ class Wallet(WalletBase):
         logging.debug('pulling transactions from blockchain...')
         self.stats = self.electrumx.getStats()
         # self.divisibility = self.stats.get('divisions', 8)
+        print('getting divisibility')
         self.divisibility = openSafely(self.stats, 'divisions', 8)
         self.divisibility = self.divisibility if self.divisibility is not None else 8
         # self.assetTransactions = self.electrumx.assetTransactions
@@ -525,6 +526,7 @@ class Wallet(WalletBase):
             logging.debug('self.unspentAssets', self.unspentAssets)
         # for logging purposes
         for x in self.unspentCurrency:
+            print('x in unspent currency', x, len(self.unspentCurrency))
             openSafely(x, 'value')
         self.currency = sum([
             x.get('value')for x in self.unspentCurrency

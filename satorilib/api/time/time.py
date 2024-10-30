@@ -7,7 +7,7 @@ def datetimeToTimestamp(time: dt.datetime) -> str:
 
 
 def timestampToDatetime(time: str) -> dt.datetime:
-    return dt.datetime.strptime(time, '%Y-%m-%d %H:%M:%S.%f') if '.' in time else dt.datetime.strptime(time, '%Y-%m-%d %H:%M:%S')
+    return (dt.datetime.strptime(time, '%Y-%m-%d %H:%M:%S.%f') if '.' in time else dt.datetime.strptime(time, '%Y-%m-%d %H:%M:%S')).replace(tzinfo=dt.timezone.utc)
 
 
 def datetimeToSeconds(time: dt.datetime) -> float:
@@ -58,8 +58,8 @@ def earliestDate() -> dt.datetime:
 
 
 def now() -> dt.datetime:
-    return dt.datetime.utcnow()
-    # return dt.datetime.now(dt.UTC)
+    # return dt.datetime.utcnow()
+    return dt.datetime.now(dt.timezone.utc)
 
 
 def nowStr() -> str:

@@ -503,7 +503,6 @@ class Wallet(WalletBase):
         logging.debug('pulling transactions from blockchain...')
         self.stats = self.electrumx.getStats()
         # self.divisibility = self.stats.get('divisions', 8)
-        print('getting divisibility')
         self.divisibility = openSafely(self.stats, 'divisions', 8)
         self.divisibility = self.divisibility if self.divisibility is not None else 8
         # self.assetTransactions = self.electrumx.assetTransactions
@@ -526,10 +525,9 @@ class Wallet(WalletBase):
             logging.debug('self.unspentAssets', self.unspentAssets)
         # for logging purposes
         for x in self.unspentCurrency:
-            print('x in unspent currency', x, len(self.unspentCurrency))
-            openSafely(x, 'value')
+            openSafely(x, 'value', 0)
         self.currency = sum([
-            x.get('value')for x in self.unspentCurrency
+            x.get('value', 0) for x in self.unspentCurrency
             if x.get('asset') == None])
         self.currencyAmount = TxUtils.asAmount(self.currency or 0, 8)
         # for logging purposes
@@ -548,7 +546,7 @@ class Wallet(WalletBase):
         # else:
         if 'SATORI' in self.watchAssets:
             self.balance = sum([
-                x.get('value') for x in self.unspentAssets
+                x.get('value', 0) for x in self.unspentAssets
                 if x.get('name', x.get('asset')) == 'SATORI' and x.get('value') > 0])
             logging.debug('self.balance', self.balance)
             self.balanceAmount = TxUtils.asAmount(

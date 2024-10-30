@@ -148,7 +148,8 @@ class StreamId:
         work for the same quality work around.
         """
         return hash(
-            self.__source + self.__author + self.__stream + (self.__target or "")
+            self.__source + self.__author +
+            self.__stream + (self.__target or "")
         )
 
     @property
@@ -234,7 +235,8 @@ class StreamIdMap:
         )
 
     def remove(self, streamId: StreamId, greedy: bool = True):
-        condition = partial(StreamIdMap._condition, streamId=streamId, default=greedy)
+        condition = partial(StreamIdMap._condition,
+                            streamId=streamId, default=greedy)
         removed = []
         for k in self.d.keys():
             if condition(k):
@@ -246,19 +248,23 @@ class StreamIdMap:
     def get(self, streamId: StreamId = None, default=None, greedy: bool = False):
         if streamId is None:
             return self.d
-        condition = partial(StreamIdMap._condition, streamId=streamId, default=greedy)
+        condition = partial(StreamIdMap._condition,
+                            streamId=streamId, default=greedy)
         matches = [self.d.get(k) for k in self.d.keys() if condition(k)]
         return matches[0] if len(matches) > 0 else default
 
     def getAll(self, streamId: StreamId = None, greedy: bool = True):
         if streamId is None:
             return self.d
-        condition = partial(StreamIdMap._condition, streamId=streamId, default=greedy)
+        condition = partial(StreamIdMap._condition,
+                            streamId=streamId, default=greedy)
         return {k: v for k, v in self.d.items() if condition(k)}
 
     def isFilled(self, streamId: StreamId, greedy: bool = True):
-        condition = partial(StreamIdMap._condition, streamId=streamId, default=greedy)
-        matches = [self.d.get(k) is not None for k in self.d.keys() if condition(k)]
+        condition = partial(StreamIdMap._condition,
+                            streamId=streamId, default=greedy)
+        matches = [self.d.get(
+            k) is not None for k in self.d.keys() if condition(k)]
         return len(matches) > 0 and all(matches)
 
     def getAllAsList(self, streamId: StreamId = None, greedy: bool = True):
@@ -496,7 +502,8 @@ class StreamOverviews:
     def blank():
         return [
             StreamOverview(
-                streamId=StreamId(source="-", author="-", stream="-", target="-"),
+                streamId=StreamId(source="-", author="-",
+                                  stream="-", target="-"),
                 subscribers="-",
                 accuracy="-",
                 prediction="-",

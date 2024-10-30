@@ -73,7 +73,7 @@ class SatoriServerClient(object):
 
         if payload is not None:
             logging.info(
-                'outgoing:',
+                f'outgoing: {endpoint}',
                 payload[0:40], f'{"..." if len(payload) > 40 else ""}',
                 print=True)
         r = function(
@@ -93,7 +93,7 @@ class SatoriServerClient(object):
                               r.text, e, color='red')
                 r.raise_for_status()
         logging.info(
-            'incoming:',
+            f'incoming: {endpoint}',
             r.text[0:40], f'{"..." if len(r.text) > 40 else ""}',
             print=True)
         return r

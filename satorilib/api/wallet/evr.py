@@ -25,6 +25,7 @@ class EvrmoreWallet(Wallet):
         password: Union[str, None] = None,
         connection: Electrumx = None,
         type: str = 'wallet',
+        watchAssets: list[str] = None,
     ):
         self.connection = connection or EvrmoreWallet.createElectrumxConnection()
         self.type = type
@@ -32,7 +33,8 @@ class EvrmoreWallet(Wallet):
             walletPath,
             reserve=reserve,
             isTestnet=isTestnet,
-            password=password)
+            password=password,
+            watchAssets=watchAssets)
 
     @staticmethod
     def createElectrumxConnection():

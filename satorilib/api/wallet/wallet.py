@@ -160,10 +160,12 @@ class Wallet(WalletBase):
         reserve: float = .25,
         isTestnet: bool = False,
         password: str = None,
+        watchAssets: list[str] = None,
     ):
         if walletPath == cachePath:
             raise Exception('wallet and cache paths cannot be the same')
         super().__init__()
+        self.watchAssets = ['SATORI'] if watchAssets is None else watchAssets
         self.satoriFee = 0.00000001
         self.isTestnet = isTestnet
         self.password = password
@@ -429,7 +431,7 @@ class Wallet(WalletBase):
                 return supposedDict.get(key, default)
             except Exception as e:
                 logging.error('openSafely err:', supposedDict, e)
-                return None
+                return default
 
         def getBalanceTheHardWay() -> int:
             '''
@@ -499,10 +501,6 @@ class Wallet(WalletBase):
                 return
 
         logging.debug('pulling transactions from blockchain...')
-        self.currencyOnChain = self.electrumx.getCurrency()
-        logging.debug('self.currencyOnChain', self.currencyOnChain)
-        self.balanceOnChain = self.electrumx.getBalance()
-        logging.debug('self.currencyOnChain', self.currencyOnChain)
         self.stats = self.electrumx.getStats()
         # self.divisibility = self.stats.get('divisions', 8)
         self.divisibility = openSafely(self.stats, 'divisions', 8)
@@ -511,20 +509,27 @@ class Wallet(WalletBase):
         self.banner = self.electrumx.getBanner()
         self.transactionHistory = self.electrumx.getTransactionHistory()
         # self.getTransactionsThread.join()
+
+        self.currencyOnChain = self.electrumx.getCurrency()
+        logging.debug('self.currencyOnChain', self.currencyOnChain)
         self.unspentCurrency = self.electrumx.getUnspentCurrency()
-        self.unspentAssets = self.electrumx.getUnspentAssets()
-        # mempool sends all unspent transactions in currency and assets so we have to filter them here:
         self.unspentCurrency = [
             x for x in self.unspentCurrency if x.get('asset') == None]
-        self.unspentAssets = [
-            x for x in self.unspentAssets if x.get('asset') != None]
-        logging.debug('self.unspentAssets', self.unspentAssets)
+        if 'SATORI' in self.watchAssets:
+            self.balanceOnChain = self.electrumx.getBalance()
+            logging.debug('self.balanceOnChain', self.balanceOnChain)
+            # mempool sends all unspent transactions in currency and assets so we have to filter them here:
+            self.unspentAssets = self.electrumx.getUnspentAssets()
+            self.unspentAssets = [
+                x for x in self.unspentAssets if x.get('asset') != None]
+            logging.debug('self.unspentAssets', self.unspentAssets)
         # for logging purposes
         for x in self.unspentCurrency:
-            openSafely(x, 'value')
+            openSafely(x, 'value', 0)
         self.currency = sum([
-            x.get('value')for x in self.unspentCurrency
+            x.get('value', 0) for x in self.unspentCurrency
             if x.get('asset') == None])
+        self.currencyAmount = TxUtils.asAmount(self.currency or 0, 8)
         # for logging purposes
         # for x in self.unspentAssets:
         #    openSafely(x, 'value')
@@ -539,13 +544,13 @@ class Wallet(WalletBase):
         #    if sum([x.get('value', 0) for x in unspents]) == sum([x.get('value', 0) for x in self.unspentCurrency]):
         #        self.unspentAssets = assetUnspents
         # else:
-        self.balance = sum([
-            x.get('value') for x in self.unspentAssets
-            if x.get('name', x.get('asset')) == 'SATORI' and x.get('value') > 0])
-        logging.debug('self.balance', self.balance)
-        self.currencyAmount = TxUtils.asAmount(self.currency or 0, 8)
-        self.balanceAmount = TxUtils.asAmount(
-            self.balance or 0, self.divisibility)
+        if 'SATORI' in self.watchAssets:
+            self.balance = sum([
+                x.get('value', 0) for x in self.unspentAssets
+                if x.get('name', x.get('asset')) == 'SATORI' and x.get('value') > 0])
+            logging.debug('self.balance', self.balance)
+            self.balanceAmount = TxUtils.asAmount(
+                self.balance or 0, self.divisibility)
         # self.currencyVouts = self.electrumx.evrVouts
         # self.assetVouts = self.electrumx.assetVouts
 
@@ -658,12 +663,15 @@ class Wallet(WalletBase):
         and it requires lots of calls for individual transactions.
         we just need them available when we're creating transactions.
         '''
-        if (
-            not force and
-            len([
+        if 'SATORI' in self.watchAssets:
+            unspents = [
                 u for u in self.unspentCurrency + self.unspentAssets
-                if 'scriptPubKey' not in u]) == 0
-        ):
+                if 'scriptPubKey' not in u]
+        else:
+            unspents = [
+                u for u in self.unspentCurrency
+                if 'scriptPubKey' not in u]
+        if not force and len(unspents) == 0:
             # already have them all
             return True
 
@@ -691,22 +699,23 @@ class Wallet(WalletBase):
                             'scriptPubKey', {}).get('hex', None)
                         if scriptPubKey is not None:
                             uc['scriptPubKey'] = scriptPubKey
-            for ua in self.unspentAssets:
-                if len([tx for tx in self.transactions if tx.txid == ua['tx_hash']]) == 0:
-                    new_transactions = {}  # Collect new transactions here
-                    new_tranaction = self.appendTransaction(ua['tx_hash'])
-                    if new_tranaction is not None:
-                        new_transactions[ua['tx_hash']] = new_tranaction
-                    self.saveCache(new_transactions)
-                tx = [tx for tx in self.transactions if tx.txid == ua['tx_hash']]
-                if len(tx) > 0:
-                    vout = [vout for vout in tx[0].raw.get(
-                        'vout', []) if vout.get('n') == ua['tx_pos']]
-                    if len(vout) > 0:
-                        scriptPubKey = vout[0].get(
-                            'scriptPubKey', {}).get('hex', None)
-                        if scriptPubKey is not None:
-                            ua['scriptPubKey'] = scriptPubKey
+            if 'SATORI' in self.watchAssets:
+                for ua in self.unspentAssets:
+                    if len([tx for tx in self.transactions if tx.txid == ua['tx_hash']]) == 0:
+                        new_transactions = {}  # Collect new transactions here
+                        new_tranaction = self.appendTransaction(ua['tx_hash'])
+                        if new_tranaction is not None:
+                            new_transactions[ua['tx_hash']] = new_tranaction
+                        self.saveCache(new_transactions)
+                    tx = [tx for tx in self.transactions if tx.txid == ua['tx_hash']]
+                    if len(tx) > 0:
+                        vout = [vout for vout in tx[0].raw.get(
+                            'vout', []) if vout.get('n') == ua['tx_pos']]
+                        if len(vout) > 0:
+                            scriptPubKey = vout[0].get(
+                                'scriptPubKey', {}).get('hex', None)
+                            if scriptPubKey is not None:
+                                ua['scriptPubKey'] = scriptPubKey
         except Exception as e:
             logging.warning(
                 'unable to acquire signatures of unspent transactions, maybe unable to send', e, print=True)

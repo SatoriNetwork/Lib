@@ -14,6 +14,21 @@ from satoriwallet.api.blockchain import Electrumx
 from satorilib import logging
 from satorilib.api.wallet.wallet import Wallet, TransactionFailure
 
+evrmoreElectrumServers: list[str] = [
+    '128.199.1.149:50002',
+    '146.190.149.237:50002',
+    '146.190.38.120:50002',
+    'electrum1-mainnet.evrmorecoin.org:50002',
+    'electrum2-mainnet.evrmorecoin.org:50002',
+]
+evrmoreElectrumServersSubscription: list[str] = [
+    '128.199.1.149:50001',
+    '146.190.149.237:50001',
+    '146.190.38.120:50001',
+    'electrum1-mainnet.evrmorecoin.org:50001',
+    'electrum2-mainnet.evrmorecoin.org:50001',
+]
+
 
 class EvrmoreWallet(Wallet):
 
@@ -38,18 +53,9 @@ class EvrmoreWallet(Wallet):
 
     @staticmethod
     def createElectrumxConnection():
-        servers: list[str] = [
-            '146.190.149.237:50002',
-            '146.190.38.120:50002',
-            'electrum1-mainnet.evrmorecoin.org:50002',
-            'electrum2-mainnet.evrmorecoin.org:50002']
-        serversSubscription: list[str] = [
-            '146.190.149.237:50001',
-            '146.190.38.120:50001',
-            'electrum1-mainnet.evrmorecoin.org:50001',
-            'electrum2-mainnet.evrmorecoin.org:50001']
-        hostPort = random.choice(servers)
-        hostPortSubscription = random.choice(serversSubscription)
+        hostPort = random.choice(evrmoreElectrumServers)
+        hostPortSubscription = random.choice(
+            evrmoreElectrumServersSubscription)
         return Electrumx(
             host=hostPort.split(':')[0],
             port=int(hostPort.split(':')[1]),
@@ -68,6 +74,7 @@ class EvrmoreWallet(Wallet):
                 onBlockNotification=None,
                 servers=[
                     # 'moontree.com:50022',  # mainnet ssl evr
+                    '128.199.1.149:50002',
                     '146.190.149.237:50002',
                     '146.190.38.120:50002',  # backup - maybe just use for server
                     'electrum1-mainnet.evrmorecoin.org:50002',

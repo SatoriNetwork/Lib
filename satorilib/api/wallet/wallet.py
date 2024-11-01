@@ -500,6 +500,21 @@ class Wallet(WalletBase):
                 logging.error(f'unable to connect {e}')
                 return
 
+        if not self.electrumx.connected():
+            self.stats = {'status': 'not connected'}
+            self.divisibility = 8
+            self.banner = 'not connected'
+            self.transactionHistory = []
+            self.currencyOnChain = 0
+            self.unspentCurrency = []
+            self.balanceOnChain = 0
+            self.unspentAssets = []
+            self.currency = 0
+            self.currencyAmount = 0
+            self.balance = 0
+            self.balanceAmount = 0
+            return
+
         logging.debug('pulling transactions from blockchain...')
         self.stats = self.electrumx.getStats()
         # self.divisibility = self.stats.get('divisions', 8)

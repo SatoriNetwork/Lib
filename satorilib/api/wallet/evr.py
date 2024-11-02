@@ -64,42 +64,50 @@ class EvrmoreWallet(Wallet):
 
     def connect(self):
         try:
-            self.electrumx = ElectrumxAPI(
-                chain=self.chain,
-                address=self.address,
-                scripthash=self.scripthash,
-                connection=self.connection,
-                type=self.type,
-                onScripthashNotification=self.get,  # self.callTransactionHistory()
-                onBlockNotification=None,
-                servers=[
-                    # 'moontree.com:50022',  # mainnet ssl evr
-                    '128.199.1.149:50002',
-                    '146.190.149.237:50002',
-                    '146.190.38.120:50002',  # backup - maybe just use for server
-                    'electrum1-mainnet.evrmorecoin.org:50002',
-                    'electrum2-mainnet.evrmorecoin.org:50002',  # keeps erroring out
+            print('EvrmoreWallet.connect()')
+            reconnected = False
+            if not self.connection.connected():
+                print('EvrmoreWallet.connect() - not connected')
+                self.connection = EvrmoreWallet.createElectrumxConnection()
+                reconnected = True
+            if self.electrumx is None or reconnected:
+                print('EvrmoreWallet.connect() - reconnected ')
+                self.electrumx = ElectrumxAPI(
+                    chain=self.chain,
+                    address=self.address,
+                    scripthash=self.scripthash,
+                    connection=self.connection,
+                    type=self.type,
+                    onScripthashNotification=self.get,  # self.callTransactionHistory()
+                    onBlockNotification=None,
+                    servers=[
+                        # 'moontree.com:50022',  # mainnet ssl evr
+                        '128.199.1.149:50002',
+                        '146.190.149.237:50002',
+                        '146.190.38.120:50002',  # backup - maybe just use for server
+                        'electrum1-mainnet.evrmorecoin.org:50002',
+                        'electrum2-mainnet.evrmorecoin.org:50002',  # keeps erroring out
 
-                    # '146.190.149.237:50022',  # mainnet ssl evr # not working yet
+                        # '146.190.149.237:50022',  # mainnet ssl evr # not working yet
 
-                    # updated to more recent version, now getting errors:
-                    # """{'code': -32601, 'message': 'unknown method "blockchain.scripthash.listassets"'} <class 'dict'>"""
-                    # 'electrum1-mainnet.evrmorecoin.org:50002',  # ssl
-                    # 'electrum2-mainnet.evrmorecoin.org:50002',  # ssl
+                        # updated to more recent version, now getting errors:
+                        # """{'code': -32601, 'message': 'unknown method "blockchain.scripthash.listassets"'} <class 'dict'>"""
+                        # 'electrum1-mainnet.evrmorecoin.org:50002',  # ssl
+                        # 'electrum2-mainnet.evrmorecoin.org:50002',  # ssl
 
-                    # no good:
-                    # 'electrum1-mainnet.evrmorecoin.org:50001',  # tcp
-                    # 'electrum2-mainnet.evrmorecoin.org:50001',  # tcp
-                    # 'moontree.com:50021',  # mainnet tcp evr
-                    # 'moontree.com:50031', # testnet tcp evr
-                    # 'moontree.com:50032', # testnet ssl evr
-                    # 'electrum1-mainnet.evrmorecoin.org:50004', # wss
-                    # 'electrum2-mainnet.evrmorecoin.org:50004', # wss
-                    # 'electrum1-testnet.evrmorecoin.org:50001', # tcp
-                    # 'electrum1-testnet.evrmorecoin.org:50002', # ssl
-                    # 'electrum1-testnet.evrmorecoin.org:50004', # wss
-                ])
-            # self.setupSubscriptions()
+                        # no good:
+                        # 'electrum1-mainnet.evrmorecoin.org:50001',  # tcp
+                        # 'electrum2-mainnet.evrmorecoin.org:50001',  # tcp
+                        # 'moontree.com:50021',  # mainnet tcp evr
+                        # 'moontree.com:50031', # testnet tcp evr
+                        # 'moontree.com:50032', # testnet ssl evr
+                        # 'electrum1-mainnet.evrmorecoin.org:50004', # wss
+                        # 'electrum2-mainnet.evrmorecoin.org:50004', # wss
+                        # 'electrum1-testnet.evrmorecoin.org:50001', # tcp
+                        # 'electrum1-testnet.evrmorecoin.org:50002', # ssl
+                        # 'electrum1-testnet.evrmorecoin.org:50004', # wss
+                    ])
+                # self.setupSubscriptions()
         except Exception as e:
             logging.warning(
                 'ElectrumxAPI issue', e)

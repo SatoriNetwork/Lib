@@ -123,7 +123,7 @@ class EvrmoreWallet(Wallet):
 
         def pingPeriodically():
             while True:
-                time.sleep(30)
+                time.sleep(60*3)
                 try:
                     self.electrumx.conn.send(method='server.ping')
                     self.electrumx.conn.sendSubscription(method='server.ping')

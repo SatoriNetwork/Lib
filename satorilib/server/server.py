@@ -786,6 +786,23 @@ class SatoriServerClient(object):
             logging.error(error_message)
             logging.error(traceback.format_exc())
             return False, {"error": error_message}
+        
+    def getProposalById(self, proposal_id: str) -> dict:
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint=f'/proposals/get/{proposal_id}'  # Update endpoint path
+            )
+            if response.status_code == 200:
+                return response.json()
+            else:
+                logging.error(f"Failed to get proposal. Status code: {response.status_code}")
+                return None
+        except Exception as e:
+            logging.error(f"Error occurred while fetching proposal: {str(e)}")
+            return None        
+
+    
 
     def getProposals(self):
         """
@@ -794,13 +811,10 @@ class SatoriServerClient(object):
         try:
             response = self._makeUnauthenticatedCall(
                 function=requests.get,
-                endpoint='/proposals/get'
+                endpoint='/proposals/get/all'
             )
             if response.status_code == 200:
-                response_data = response.json()
-                # Use load to deserialize JSON data into Python objects
-                # proposals = ProposalSchema().load(response_data, many=True)
-                proposals = response_data  # Directly use the JSON response
+                proposals = response.json()
                 return proposals
             else:
                 logging.error(
@@ -810,30 +824,308 @@ class SatoriServerClient(object):
             logging.error(
                 f"Error occurred while fetching proposals: {str(e)}", color='red')
             return []
-        # except marshmallow.exceptions.ValidationError as e:
-        #     print(f"Error validating proposal data: {str(e)}")
-        #     return []
 
-    def getProposalVotes(self, proposal_id: str) -> dict:
+
+    def getApprovedProposals(self):
         """
-        Function to get all votes for a specific proposal by calling the API endpoint.
+        Function to get all approved proposals by calling the API endpoint.
         """
         try:
             response = self._makeUnauthenticatedCall(
                 function=requests.get,
-                endpoint=f'/proposal/votes/get/{proposal_id}'
+                endpoint='/proposals/get/approved'
             )
+            if response.status_code == 200:
+                proposals = response.json()
+                return proposals
+            else:
+                logging.error(
+                    f"Failed to get approved proposals. Status code: {response.status_code}", color='red')
+                return []
+        except requests.RequestException as e:
+            logging.error(
+                f"Error occurred while fetching approved proposals: {str(e)}", color='red')
+            return []
 
+    
+
+    
+    def submitProposal(self, proposal_data: dict) -> tuple[bool, dict]:
+        '''submits proposal'''
+        try:
+            # Ensure options is a JSON string
+            if 'options' in proposal_data and isinstance(proposal_data['options'], list):
+                proposal_data['options'] = json.dumps(proposal_data['options'])
+
+            # Convert the entire proposal_data to a JSON string
+            proposal_json_string = json.dumps(proposal_data)
+
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/proposal/submit',
+                payload=proposal_json_string
+            )
+            if response.status_code < 400:
+                return True, response.text
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                logging.error(f"Error in submitProposal: {error_message}")
+                return False, {"error": error_message}
+
+        except RequestException as re:
+            error_message = f"Request error in submitProposal: {str(re)}"
+            logging.error(error_message)
+            logging.error(traceback.format_exc())
+            return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Unexpected error in submitProposal: {str(e)}"
+            logging.error(error_message)
+            logging.error(traceback.format_exc())
+            return False, {"error": error_message}
+        
+    def getProposalById(self, proposal_id: str) -> dict:
+        """
+        Function to get a specific proposal by ID by calling the API endpoint.
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint=f'/proposal/{proposal_id}'
+            )
+            if response.status_code == 200:
+                return response.json()['proposal']
+            else:
+                logging.error(
+                    f"Failed to get proposal. Status code: {response.status_code}", 
+                    extra={'color': 'red'}
+                )
+                return None
+        except requests.RequestException as e:
+            logging.error(
+                f"Error occurred while fetching proposal: {str(e)}", 
+                extra={'color': 'red'}
+            )
+            return None
+        
+
+    
+    
+
+    
+    def getProposalVotes(self, proposal_id: str, format_type: str = None) -> dict:
+        '''Gets proposal votes with option for raw or processed format'''
+        try:
+            endpoint = f'/proposal/votes/get/{proposal_id}'
+            if format_type:
+                endpoint += f'?format={format_type}'
+                
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint=endpoint
+            )
+            
             if response.status_code == 200:
                 return response.json()
             else:
-                logging.error(
-                    f"Failed to get proposal votes. Status code: {response.status_code}", color='red')
-                return {}
-        except requests.RequestException as e:
-            logging.error(
-                f"Error occurred while fetching proposal votes: {str(e)}", color='red')
-            return {}
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return {'status': 'error', 'message': error_message}
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
+                    
+            
+    def approveProposal(self, proposal_id: int) -> tuple[bool, dict]:
+        """
+        Approves a proposal
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint=f'/proposals/approve/{proposal_id}'
+            )
+            if response.status_code == 200:
+                return True, response.json()
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+
+        except Exception as e:
+            error_message = f"Error in approveProposal: {str(e)}"
+            return False, {"error": error_message}
+        
+    def disapproveProposal(self, proposal_id: int) -> tuple[bool, dict]:
+        """
+        Disapproves and deletes a proposal
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint=f'/proposals/disapprove/{proposal_id}'
+            )
+            if response.status_code == 200:
+                return True, response.json()
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in disapproveProposal: {str(e)}"
+            return False, {"error": error_message}
+        
+    def getActiveProposals(self) -> dict:
+        """
+        Fetches active proposals
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/proposals/active'
+            )
+            if response.status_code == 200:
+                return {'status': 'success', 'proposals': response.json()}
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return {'status': 'error', 'message': error_message}
+        except Exception as e:
+            error_message = f"Error in getActiveProposals: {str(e)}"
+            return {'status': 'error', 'message': error_message}
+        
+    def getExpiredProposals(self) -> dict:
+        """
+        Fetches expired proposals
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/proposals/expired'
+            )
+            if response.status_code == 200:
+                return {'status': 'success', 'proposals': response.json()}
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return {'status': 'error', 'message': error_message}
+        except Exception as e:
+            error_message = f"Error in getExpiredProposals: {str(e)}"
+            return {'status': 'error', 'message': error_message}
+        
+
+    APPROVED_ADMIN_ADDRESSES = {
+        # Satori admin wallets
+        "EQGB7cBW3HvafARDoYsgceJS2W7ZhKe3b6",  
+        "EHkDUkADkYnUY1cjCa5Lgc9qxLTMUQEBQm",  
+       
+    }
+
+    def isApprovedAdmin(self, wallet_address: str) -> bool:
+        """Check if a wallet address has admin rights"""
+        if not wallet_address:
+            return False
+        return wallet_address in self.APPROVED_ADMIN_ADDRESSES
+        
+    def getUnapprovedProposals(self, wallet_address: str = None) -> dict:
+        """Get unapproved proposals only if user has admin rights"""
+        try:
+            if not self.isApprovedAdmin(wallet_address):
+                return {
+                    'status': 'error',
+                    'message': 'Unauthorized access'
+                }
+
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/proposals/unapproved'
+            )
+            
+            if response.status_code == 200:
+                return {
+                    'status': 'success',
+                    'proposals': response.json()
+                }
+            else:
+                return {
+                    'status': 'error',
+                    'message': 'Failed to fetch unapproved proposals'
+                }
+                
+        except Exception as e:
+            logging.error(f"Error in getUnapprovedProposals: {str(e)}")
+            return {
+                'status': 'error',
+                'message': str(e)
+            }
+
+    def approveProposal(self, wallet_address: str, proposal_id: int) -> tuple[bool, dict]:
+        """Approve a proposal only if user has admin rights"""
+        try:
+            if not self.isApprovedAdmin(wallet_address):
+                return False, {'error': 'Unauthorized access'}
+
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint=f'/proposals/approve/{proposal_id}'
+            )
+            
+            if response.status_code == 200:
+                return True, response.json()
+            else:
+                return False, {'error': f"Failed to approve proposal: {response.text}"}
+
+        except Exception as e:
+            return False, {'error': str(e)}
+
+    def disapproveProposal(self, wallet_address: str, proposal_id: int) -> tuple[bool, dict]:
+        """Disapprove a proposal only if user has admin rights"""
+        try:
+            if not self.isApprovedAdmin(wallet_address):
+                return False, {'error': 'Unauthorized access'}
+
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint=f'/proposals/disapprove/{proposal_id}'
+            )
+            
+            if response.status_code == 200:
+                return True, response.json()
+            else:
+                return False, {'error': f"Failed to disapprove proposal: {response.text}"}
+
+        except Exception as e:
+            return False, {'error': str(e)}
+    def getActiveProposals(self) -> dict:
+        """
+        Fetches active proposals
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/proposals/active'
+            )
+            if response.status_code == 200:
+                return {'status': 'success', 'proposals': response.json()}
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return {'status': 'error', 'message': error_message}
+        except Exception as e:
+            error_message = f"Error in getActiveProposals: {str(e)}"
+            return {'status': 'error', 'message': error_message}
+        
+    def getExpiredProposals(self) -> dict:
+        """
+        Fetches expired proposals
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/proposals/expired'
+            )
+            if response.status_code == 200:
+                return {'status': 'success', 'proposals': response.json()}
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return {'status': 'error', 'message': error_message}
+        except Exception as e:
+            error_message = f"Error in getExpiredProposals: {str(e)}"
+            return {'status': 'error', 'message': error_message}
+        
+
 
     def submitProposalVote(self, proposal_id: int, vote: str) -> tuple[bool, dict]:
         """
@@ -855,23 +1147,6 @@ class SatoriServerClient(object):
                 error_message = f"Server returned status code {response.status_code}: {response.text}"
                 return False, {"error": error_message}
 
-        except Exception as e:
-            error_message = f"Error in submitProposalVote: {str(e)}"
-            return False, {"error": error_message}
-
-    def poolAccepting(self, status: bool) -> tuple[bool, dict]:
-        """
-        Function to set the pool status to accepting or not accepting
-        """
-        try:
-            response = self._makeAuthenticatedCall(
-                function=requests.get,
-                endpoint='/stake/lend/enable' if status else '/stake/lend/disable')
-            if response.status_code == 200:
-                return True, response.text
-            else:
-                error_message = f"Server returned status code {response.status_code}: {response.text}"
-                return False, {"error": error_message}
         except Exception as e:
             error_message = f"Error in submitProposalVote: {str(e)}"
             return False, {"error": error_message}

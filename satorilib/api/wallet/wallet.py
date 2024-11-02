@@ -408,8 +408,14 @@ class Wallet(WalletBase):
     def connected(self) -> bool:
         return self.electrumx.connected()
 
+    def connectedSubscriptions(self) -> bool:
+        return self.electrumx.connectedSubscriptions()
+
     def disconnect(self) -> bool:
         return self.electrumx.disconnect()
+
+    def disconnectSubscriptions(self) -> bool:
+        return self.electrumx.disconnectSubscriptions()
 
     def connect(self):
         ''' connect to Electrumx '''

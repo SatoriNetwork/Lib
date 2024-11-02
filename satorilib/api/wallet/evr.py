@@ -1,5 +1,6 @@
 from typing import Union
 import threading
+import time
 import random
 from evrmore import SelectParams
 from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret
@@ -117,6 +118,21 @@ class EvrmoreWallet(Wallet):
         self.processThread = threading.Thread(
             target=self.electrumx.processNotifications)
         self.processThread.start()
+
+    def keepAlive(self):
+
+        def pingPeriodically():
+            while True:
+                time.sleep(30)
+                try:
+                    self.electrumx.conn.send(method='server.ping')
+                    self.electrumx.conn.sendSubscription(method='server.ping')
+                except Exception as e:
+                    logging.error(f'keepAlive: {e}')
+                    self.connect()
+
+        self.thread = threading.Thread(target=pingPeriodically, daemon=True)
+        self.thread.start()
 
     @property
     def symbol(self) -> str:

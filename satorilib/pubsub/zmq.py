@@ -55,12 +55,10 @@ class ZeroMQ():
     def send(self, data: Union[str, pd.DataFrame]):
         print(1)
         if isinstance(data, str):
-            print("Entered")
             toSend = self.stringToNumpy(data)
         elif isinstance(data, pd.DataFrame):
             toSend = self.dataframeToNumpyArrays(data)
         self.client.send(toSend)
-        print("Success")
 
     @staticmethod
     def detectMessageType(arrays: NDArray[np.uint8]) -> Union[str, pd.DataFrame]:

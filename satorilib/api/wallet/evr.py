@@ -65,14 +65,11 @@ class EvrmoreWallet(Wallet):
 
     def connect(self):
         try:
-            print('EvrmoreWallet.connect()')
             reconnected = False
             if not self.connection.connected():
-                print('EvrmoreWallet.connect() - not connected')
                 self.connection = EvrmoreWallet.createElectrumxConnection()
                 reconnected = True
             if self.electrumx is None or reconnected:
-                print('EvrmoreWallet.connect() - reconnected ')
                 self.electrumx = ElectrumxAPI(
                     chain=self.chain,
                     address=self.address,
@@ -119,14 +116,16 @@ class EvrmoreWallet(Wallet):
             target=self.electrumx.processNotifications)
         self.processThread.start()
 
-    def keepAlive(self):
+    def keepAlive(self, subscriptionToo: bool = False):
 
         def pingPeriodically():
             while True:
                 time.sleep(60*3)
                 try:
                     self.electrumx.conn.send(method='server.ping')
-                    self.electrumx.conn.sendSubscription(method='server.ping')
+                    if subscriptionToo:
+                        self.electrumx.conn.sendSubscription(
+                            method='server.ping')
                 except Exception as e:
                     logging.error(f'keepAlive: {e}')
                     self.connect()

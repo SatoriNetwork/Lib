@@ -1387,43 +1387,29 @@ class Wallet(WalletBase):
                     return changeAddress == self.hash160ToAddress(x)
             return False
 
-        print('1')
         completerAddress = completerAddress or self.address
-        print('2')
         changeAddress = changeAddress or self.address
-        print('3')
         tx = self._deserialize(serialTx)
-        print('4')
         if not _verifyFee():
-            print('5')
             raise TransactionFailure(
                 f'fee mismatch, {reportedFeeSats}, {feeSatsReserved}')
         if not _verifyClaim():
-            print(6)
             raise TransactionFailure(f'claim mismatch, {tx.vout[-2]}')
         if not _verifyClaimAddress():
-            print(7)
             raise TransactionFailure('claim mismatch, _verifyClaimAddress')
         if not _verifyChangeAddress():
-            print(8)
             raise TransactionFailure('claim mismatch, _verifyChangeAddress')
         # add rvn fee input
-        print(9)
         gatheredCurrencyUnspent = self._gatherReservedCurrencyUnspent(
             exactSats=feeSatsReserved)
-        print(10)
         if gatheredCurrencyUnspent is None:
-            print(11)
             raise TransactionFailure(f'unable to find sats {feeSatsReserved}')
-        print(12)
         txins, txinScripts = self._compileInputs(
             gatheredCurrencyUnspents=[gatheredCurrencyUnspent])
-        print(13)
         tx = self._createPartialCompleterSimple(
             tx=tx,
             txins=txins,
             txinScripts=txinScripts)
-        print(14)
         return self._broadcast(self._txToHex(tx))
 
     def sendAllTransaction(self, address: str) -> str:

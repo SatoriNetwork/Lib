@@ -138,26 +138,21 @@ class ZeroMQServer:
         if self.server is not None:
             while True:
                 try:
-                    data = self.server.recv(  # is this a queue - test with a long running callback function
-                        flags=tensorcom.zcom.zmq.NOBLOCK
-                    )  # todo: shouldn't we block here?
-                    print("data", data)  # test
-
+                    data = self.server.recv()
                     messageType = self.detectMessageType(data)
                     if isinstance(messageType, str):
                         data = self.numpyToString(data[0])
                     elif isinstance(messageType, pd.DataFrame):
                         data = self.numpyArraysToDataframe(data)
-                        # self.saveDataframeToCsv(df, f'output.csv')    # additional feature to save as a csv
-                    print(data)
+
                     if callable(self.callback):
+                        print(data)
                         self.callback(data)
                     else:
                         return data
                 except Exception as e:
                     print(f"Error receiving message: {e}")
                     time.sleep(0.001)
-                    continue
 
     def listenForever(self):
         """listen forever in a thread"""
@@ -332,8 +327,7 @@ if __name__ == "__main__":
     option 1: ZeroMQServer and ZeroMQClient
     option 2: ZeroMQ imply that both functionalities of send and receive are present in the same class like pubsub
     """
-    client = ZeroMQClient("://127.0.0.1:7889")
-    client.connectClient()
+    client = ZeroMQClient()
     server = ZeroMQServer(
         scheme="zrsub",
         ip="127.0.0.1",

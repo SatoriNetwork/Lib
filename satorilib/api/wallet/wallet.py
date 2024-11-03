@@ -787,6 +787,7 @@ class Wallet(WalletBase):
 
     def _gatherOneCurrencyUnspent(self, atleastSats: int = 0, claimed: dict = None) -> tuple:
         claimed = claimed or {}
+        print(len(self.unspentCurrency))
         for unspentCurrency in self.unspentCurrency:
             if (
                 unspentCurrency.get('value') >= atleastSats and

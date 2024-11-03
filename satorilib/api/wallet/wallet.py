@@ -429,6 +429,11 @@ class Wallet(WalletBase):
     def stopSubscription(self):
         self.electrumx.cancelSubscriptions()
 
+    def getUnspentCurrency(self, *args, **kwargs):
+        self.unspentCurrency = self.electrumx.getUnspentCurrency()
+        self.unspentCurrency = [
+            x for x in self.unspentCurrency if x.get('asset') == None]
+
     def get(self, *args, **kwargs):
         ''' gets data from the blockchain, saves to attributes '''
 

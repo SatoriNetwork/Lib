@@ -110,6 +110,7 @@ from numpy.typing import NDArray
 import pandas as pd
 from typing import Union
 import tensorcom
+import queue
 
 
 class ZeroMQServer:
@@ -124,9 +125,11 @@ class ZeroMQServer:
         self.scheme = scheme
         self.ip = ip
         self.port = port
-        self.server = None
         self.callback = callback
+        self.server = None
         self.thread = None
+        self.queueThread = None
+        self.queue = queue.Queue()
         self.connectServer()
 
     def connectServer(self):
@@ -138,26 +141,35 @@ class ZeroMQServer:
         if self.server is not None:
             while True:
                 try:
-                    data = self.server.recv()
-                    messageType = self.detectMessageType(data)
-                    if isinstance(messageType, str):
-                        data = self.numpyToString(data[0])
-                    elif isinstance(messageType, pd.DataFrame):
-                        data = self.numpyArraysToDataframe(data)
-
-                    if callable(self.callback):
-                        print(data)
-                        self.callback(data)
-                    else:
-                        return data
+                    self.queue.put(self.server.recv())
                 except Exception as e:
                     print(f"Error receiving message: {e}")
                     time.sleep(0.001)
+
+    def listenToQueue(self):
+
+        def interpretData(data: NDArray[np.uint8]):
+            messageType = ZeroMQServer.detectMessageType(data)
+            if isinstance(messageType, str):
+                data = ZeroMQServer.numpyToString(data[0])
+            elif isinstance(messageType, pd.DataFrame):
+                data = ZeroMQServer.numpyArraysToDataframe(data)
+            return data
+
+        def handleMsg(data):
+            print(data)
+            if callable(self.callback):
+                self.callback(data)
+
+        while True:
+            handleMsg(interpretData(self.queue.get()))
 
     def listenForever(self):
         """listen forever in a thread"""
         self.thread = threading.Thread(target=self.listen(), daemon=True)
         self.thread.start()
+        self.queueThread = threading.Thread(target=self.listenToQueue(), daemon=True)
+        self.queueThread.start()
 
     @staticmethod
     def detectMessageType(arrays: NDArray[np.uint8]) -> Union[str, pd.DataFrame]:

@@ -161,10 +161,12 @@ class Wallet(WalletBase):
         isTestnet: bool = False,
         password: str = None,
         watchAssets: list[str] = None,
+        skipSave: bool = False,
     ):
         if walletPath == cachePath:
             raise Exception('wallet and cache paths cannot be the same')
         super().__init__()
+        self.skipSave = skipSave
         self.watchAssets = ['SATORI'] if watchAssets is None else watchAssets
         self.satoriFee = 0.00000001
         self.isTestnet = isTestnet
@@ -337,6 +339,8 @@ class Wallet(WalletBase):
             path=self.cachePath)
 
     def loadCache(self) -> bool:
+        if self.skipSave:
+            return False
         try:
             if not self.cacheFileExists():
                 return False
@@ -362,6 +366,8 @@ class Wallet(WalletBase):
             logging.error(f'issue loading transaction cache, {e}')
 
     def saveCache(self, new_transactions: dict):
+        if self.skipSave:
+            return False
         try:
             safetify(self.cachePath)
             # if no new transactions return

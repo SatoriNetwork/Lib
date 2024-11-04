@@ -42,6 +42,7 @@ class EvrmoreWallet(Wallet):
         connection: Electrumx = None,
         type: str = 'wallet',
         watchAssets: list[str] = None,
+        skipSave: bool = False,
     ):
         self.connection = connection or EvrmoreWallet.createElectrumxConnection()
         self.type = type
@@ -50,7 +51,8 @@ class EvrmoreWallet(Wallet):
             reserve=reserve,
             isTestnet=isTestnet,
             password=password,
-            watchAssets=watchAssets)
+            watchAssets=watchAssets,
+            skipSave=skipSave)
 
     @staticmethod
     def createElectrumxConnection():

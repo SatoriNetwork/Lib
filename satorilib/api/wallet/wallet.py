@@ -406,6 +406,7 @@ class Wallet(WalletBase):
     ### Electrumx ##############################################################
 
     def connected(self) -> bool:
+        logging.debug('connected2')
         return self.electrumx.connected()
 
     def connectedSubscriptions(self) -> bool:
@@ -430,6 +431,7 @@ class Wallet(WalletBase):
         self.electrumx.cancelSubscriptions()
 
     def preSend(self) -> bool:
+        logging.debug('connected3')
         if not hasattr(self, 'electrumx') or not self.electrumx.connected():
             try:
                 self.connect()
@@ -437,6 +439,7 @@ class Wallet(WalletBase):
                 logging.error(f'unable to connect {e}')
                 return False
 
+        logging.debug('connected4')
         if not self.electrumx.connected():
             self.stats = {'status': 'not connected'}
             self.divisibility = 8
@@ -974,6 +977,7 @@ class Wallet(WalletBase):
         ''' serialize '''
 
     def _broadcast(self, txHex: str) -> str:
+        logging.debug('connected5')
         if self.electrumx.connected():
             return self.electrumx.broadcast(txHex)
         return self.electrumx.broadcast(txHex)

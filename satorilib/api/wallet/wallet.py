@@ -735,21 +735,35 @@ class Wallet(WalletBase):
             for uc in self.unspentCurrency:
                 logging.debug('uc', uc)
                 if len([tx for tx in self.transactions if tx.txid == uc['tx_hash']]) == 0:
+                    logging.debug('uc1')
                     new_transactions = {}  # Collect new transactions here
+                    logging.debug('uc2')
                     new_tranaction = self.appendTransaction(uc['tx_hash'])
+                    logging.debug('uc3')
                     if new_tranaction is not None:
+                        logging.debug('uc4')
                         new_transactions[uc['tx_hash']] = new_tranaction
+                    logging.debug('uc5')
                     self.saveCache(new_transactions)
+                logging.debug('uc6')
                 tx = [tx for tx in self.transactions if tx.txid == uc['tx_hash']]
+                logging.debug('uc7')
                 if len(tx) > 0:
+                    logging.debug('uc8')
                     vout = [vout for vout in tx[0].raw.get(
                         'vout', []) if vout.get('n') == uc['tx_pos']]
+                    logging.debug('uc9')
                     if len(vout) > 0:
+                        logging.debug('uc10')
                         scriptPubKey = vout[0].get(
                             'scriptPubKey', {}).get('hex', None)
+                        logging.debug('uc11')
                         if scriptPubKey is not None:
+                            logging.debug('uc12')
                             uc['scriptPubKey'] = scriptPubKey
+            logging.debug('uc13')
             if 'SATORI' in self.watchAssets:
+                logging.debug('uc14')
                 for ua in self.unspentAssets:
                     logging.debug('ua', ua)
                     if len([tx for tx in self.transactions if tx.txid == ua['tx_hash']]) == 0:
@@ -771,6 +785,7 @@ class Wallet(WalletBase):
             logging.warning(
                 'unable to acquire signatures of unspent transactions, maybe unable to send', e, print=True)
             return False
+        logging.debug('uc15')
         return True
 
     def getUnspentsFromHistory(self) -> tuple[list, list]:

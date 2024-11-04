@@ -64,6 +64,7 @@ class EvrmoreWallet(Wallet):
             portSubscription=int(hostPortSubscription.split(':')[1]))
 
     def connect(self):
+        logging.debug('connecting to evrmore')
         try:
             reconnected = False
             if not self.connection.connected():

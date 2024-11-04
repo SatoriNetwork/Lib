@@ -721,6 +721,7 @@ class Wallet(WalletBase):
 
             # get transactions, save their scriptPubKey hex to the unspents
             for uc in self.unspentCurrency:
+                logging.debug('uc', uc)
                 if len([tx for tx in self.transactions if tx.txid == uc['tx_hash']]) == 0:
                     new_transactions = {}  # Collect new transactions here
                     new_tranaction = self.appendTransaction(uc['tx_hash'])
@@ -738,7 +739,8 @@ class Wallet(WalletBase):
                             uc['scriptPubKey'] = scriptPubKey
             if 'SATORI' in self.watchAssets:
                 for ua in self.unspentAssets:
-                    if len([tx for tx in self.transactions if tx.txid == ua['tx_hash']]) == 0:
+                logging.debug('ua', ua)
+                   if len([tx for tx in self.transactions if tx.txid == ua['tx_hash']]) == 0:
                         new_transactions = {}  # Collect new transactions here
                         new_tranaction = self.appendTransaction(ua['tx_hash'])
                         if new_tranaction is not None:
@@ -1408,9 +1410,13 @@ class Wallet(WalletBase):
                     return changeAddress == self.hash160ToAddress(x)
             return False
 
+        logging.debug('completer')
         completerAddress = completerAddress or self.address
+        logging.debug('completer', completerAddress)
         changeAddress = changeAddress or self.address
+        logging.debug('completer', changeAddress)
         tx = self._deserialize(serialTx)
+        logging.debug('completer', tx)
         if not _verifyFee():
             raise TransactionFailure(
                 f'fee mismatch, {reportedFeeSats}, {feeSatsReserved}')
@@ -1421,16 +1427,21 @@ class Wallet(WalletBase):
         if not _verifyChangeAddress():
             raise TransactionFailure('claim mismatch, _verifyChangeAddress')
         # add rvn fee input
+        logging.debug('completer', gatheredCurrencyUnspent)
         gatheredCurrencyUnspent = self._gatherReservedCurrencyUnspent(
             exactSats=feeSatsReserved)
+        logging.debug('completer1')
         if gatheredCurrencyUnspent is None:
             raise TransactionFailure(f'unable to find sats {feeSatsReserved}')
+        logging.debug('completer2')
         txins, txinScripts = self._compileInputs(
             gatheredCurrencyUnspents=[gatheredCurrencyUnspent])
+        logging.debug('completer3')
         tx = self._createPartialCompleterSimple(
             tx=tx,
             txins=txins,
             txinScripts=txinScripts)
+        logging.debug('completer4')
         return self._broadcast(self._txToHex(tx))
 
     def sendAllTransaction(self, address: str) -> str:

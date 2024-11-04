@@ -1427,10 +1427,10 @@ class Wallet(WalletBase):
         if not _verifyChangeAddress():
             raise TransactionFailure('claim mismatch, _verifyChangeAddress')
         # add rvn fee input
-        logging.debug('completer', gatheredCurrencyUnspent)
+        logging.debug('completer1')
         gatheredCurrencyUnspent = self._gatherReservedCurrencyUnspent(
             exactSats=feeSatsReserved)
-        logging.debug('completer1')
+        logging.debug('completer', gatheredCurrencyUnspent)
         if gatheredCurrencyUnspent is None:
             raise TransactionFailure(f'unable to find sats {feeSatsReserved}')
         logging.debug('completer2')

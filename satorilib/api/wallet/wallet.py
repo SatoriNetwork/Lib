@@ -603,27 +603,39 @@ class Wallet(WalletBase):
     ### Functions ##############################################################
 
     def appendTransaction(self, txid):
+        logging.debug('appending transaction', txid)
         if txid not in self._transactions.keys():
+            logging.debug('appending transaction1')
             raw = self.electrumx.getTransaction(txid)
+            logging.debug('appending transaction2')
             if raw is not None:
+                logging.debug('appending transaction3')
                 txs = []
                 txIds = []
                 for vin in raw.get('vin', []):
+                    logging.debug('appending transaction4', vin)
                     txId = vin.get('txid', '')
                     if txId == '':
                         continue
                     txIds.append(txId)
                     txs.append(
                         self.electrumx.getTransaction(txId))
+                logging.debug('appending transaction5')
                 transaction = TransactionStruct(raw=raw, vinVoutsTxids=txIds, vinVoutsTxs=[
                                                 t for t in txs if t is not None])
+                logging.debug('appending transaction6')
                 self.transactions.append(transaction)
+                logging.debug('appending transaction7')
                 self._transactions[txid] = transaction.export()
+                logging.debug('appending transaction8')
                 return transaction.export()
         else:
+            logging.debug('appending transaction9')
             raw, txids, txs = self._transactions.get(txid, ({}, []))
+            logging.debug('appending transaction10')
             self.transactions.append(
                 TransactionStruct(raw=raw, vinVoutsTxids=txids, vinVoutsTxs=txs))
+            logging.debug('appending transaction11')
 
     def callTransactionHistory(self):
         def getTransactions(transactionHistory: dict) -> list:

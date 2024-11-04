@@ -67,6 +67,7 @@ class EvrmoreWallet(Wallet):
         logging.debug('connecting to evrmore')
         try:
             reconnected = False
+            logging.debug('connected1')
             if not self.connection.connected():
                 self.connection = EvrmoreWallet.createElectrumxConnection()
                 reconnected = True

@@ -68,11 +68,14 @@ class EvrmoreWallet(Wallet):
         try:
             reconnected = False
             logging.debug('connected1')
-            if not self.connection.connected():
+            condition = not self.connection.connected()
+            if condition:
+                logging.debug('what?', condition)
                 self.connection = EvrmoreWallet.createElectrumxConnection()
                 reconnected = True
             if self.electrumx is None or reconnected:
-                logging.debug('making electrumx')
+                logging.debug('making electrumx',
+                              self.electrumx is None, reconnected)
                 self.electrumx = ElectrumxAPI(
                     chain=self.chain,
                     address=self.address,

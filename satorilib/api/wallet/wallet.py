@@ -739,7 +739,7 @@ class Wallet(WalletBase):
                             uc['scriptPubKey'] = scriptPubKey
             if 'SATORI' in self.watchAssets:
                 for ua in self.unspentAssets:
-                logging.debug('ua', ua)
+                    logging.debug('ua', ua)
                    if len([tx for tx in self.transactions if tx.txid == ua['tx_hash']]) == 0:
                         new_transactions = {}  # Collect new transactions here
                         new_tranaction = self.appendTransaction(ua['tx_hash'])

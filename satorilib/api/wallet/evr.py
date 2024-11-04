@@ -43,6 +43,7 @@ class EvrmoreWallet(Wallet):
         type: str = 'wallet',
         watchAssets: list[str] = None,
         skipSave: bool = False,
+        pullFullTransactions: bool = True,
     ):
         self.connection = connection or EvrmoreWallet.createElectrumxConnection()
         self.type = type
@@ -52,7 +53,8 @@ class EvrmoreWallet(Wallet):
             isTestnet=isTestnet,
             password=password,
             watchAssets=watchAssets,
-            skipSave=skipSave)
+            skipSave=skipSave,
+            pullFullTransactions=pullFullTransactions)
 
     @staticmethod
     def createElectrumxConnection():
@@ -66,18 +68,13 @@ class EvrmoreWallet(Wallet):
             portSubscription=int(hostPortSubscription.split(':')[1]))
 
     def connect(self):
-        logging.debug('connecting to evrmore')
         try:
             reconnected = False
-            logging.debug('connected1')
             condition = not self.connection.connected()
             if condition:
-                logging.debug('what?', condition)
                 self.connection = EvrmoreWallet.createElectrumxConnection()
                 reconnected = True
             if self.electrumx is None or reconnected:
-                logging.debug('making electrumx',
-                              self.electrumx is None, reconnected)
                 self.electrumx = ElectrumxAPI(
                     chain=self.chain,
                     address=self.address,

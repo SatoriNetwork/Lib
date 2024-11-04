@@ -162,6 +162,7 @@ class Wallet(WalletBase):
         password: str = None,
         watchAssets: list[str] = None,
         skipSave: bool = False,
+        pullFullTransactions: bool = True,
     ):
         if walletPath == cachePath:
             raise Exception('wallet and cache paths cannot be the same')
@@ -196,12 +197,12 @@ class Wallet(WalletBase):
         self.balanceOnChain = None
         self.unspentCurrency = None
         self.unspentAssets = None
+        self.pullFullTransactions = pullFullTransactions
         self.load()
         self.loadCache()
 
     def __call__(self):
         self.connect()
-        logging.debug('called wallet')
         self.get()
         return self
 
@@ -413,7 +414,6 @@ class Wallet(WalletBase):
     ### Electrumx ##############################################################
 
     def connected(self) -> bool:
-        logging.debug('connected2')
         return self.electrumx.connected()
 
     def connectedSubscriptions(self) -> bool:
@@ -438,7 +438,6 @@ class Wallet(WalletBase):
         self.electrumx.cancelSubscriptions()
 
     def preSend(self) -> bool:
-        logging.debug('connected3')
         if not hasattr(self, 'electrumx') or not self.electrumx.connected():
             try:
                 self.connect()
@@ -446,7 +445,6 @@ class Wallet(WalletBase):
                 logging.error(f'unable to connect {e}')
                 return False
 
-        logging.debug('connected4')
         if not self.electrumx.connected():
             self.stats = {'status': 'not connected'}
             self.divisibility = 8
@@ -609,39 +607,40 @@ class Wallet(WalletBase):
     ### Functions ##############################################################
 
     def appendTransaction(self, txid):
-        logging.debug('appending transaction', txid)
         if txid not in self._transactions.keys():
-            logging.debug('appending transaction1')
             raw = self.electrumx.getTransaction(txid)
-            logging.debug('appending transaction2')
             if raw is not None:
-                logging.debug('appending transaction3')
-                txs = []
-                txIds = []
-                for vin in raw.get('vin', []):
-                    logging.debug('appending transaction4', vin)
-                    txId = vin.get('txid', '')
-                    if txId == '':
-                        continue
-                    txIds.append(txId)
-                    txs.append(
-                        self.electrumx.getTransaction(txId))
-                logging.debug('appending transaction5')
-                transaction = TransactionStruct(raw=raw, vinVoutsTxids=txIds, vinVoutsTxs=[
-                                                t for t in txs if t is not None])
-                logging.debug('appending transaction6')
-                self.transactions.append(transaction)
-                logging.debug('appending transaction7')
-                self._transactions[txid] = transaction.export()
-                logging.debug('appending transaction8')
-                return transaction.export()
+                if self.pullFullTransactions:
+                    txs = []
+                    txIds = []
+                    for vin in raw.get('vin', []):
+                        txId = vin.get('txid', '')
+                        if txId == '':
+                            continue
+                        txIds.append(txId)
+                        txs.append(
+                            self.electrumx.getTransaction(txId))
+                    transaction = TransactionStruct(raw=raw, vinVoutsTxids=txIds, vinVoutsTxs=[
+                                                    t for t in txs if t is not None])
+                    self.transactions.append(transaction)
+                    self._transactions[txid] = transaction.export()
+                    return transaction.export()
+                else:
+                    txs = []
+                    txIds = []
+                    for vin in raw.get('vin', []):
+                        txId = vin.get('txid', '')
+                        if txId == '':
+                            continue
+                        txIds.append(txId)
+                        # <--- don't get the inputs to the transaction here
+                    transaction = TransactionStruct(
+                        raw=raw, vinVoutsTxids=txIds)
+                    self.transactions.append(transaction)
         else:
-            logging.debug('appending transaction9')
             raw, txids, txs = self._transactions.get(txid, ({}, []))
-            logging.debug('appending transaction10')
             self.transactions.append(
                 TransactionStruct(raw=raw, vinVoutsTxids=txids, vinVoutsTxs=txs))
-            logging.debug('appending transaction11')
 
     def callTransactionHistory(self):
         def getTransactions(transactionHistory: dict) -> list:
@@ -741,37 +740,22 @@ class Wallet(WalletBase):
             for uc in self.unspentCurrency:
                 logging.debug('uc', uc)
                 if len([tx for tx in self.transactions if tx.txid == uc['tx_hash']]) == 0:
-                    logging.debug('uc1')
                     new_transactions = {}  # Collect new transactions here
-                    logging.debug('uc2')
                     new_tranaction = self.appendTransaction(uc['tx_hash'])
-                    logging.debug('uc3')
                     if new_tranaction is not None:
-                        logging.debug('uc4')
                         new_transactions[uc['tx_hash']] = new_tranaction
-                    logging.debug('uc5')
                     self.saveCache(new_transactions)
-                logging.debug('uc6')
                 tx = [tx for tx in self.transactions if tx.txid == uc['tx_hash']]
-                logging.debug('uc7')
                 if len(tx) > 0:
-                    logging.debug('uc8')
                     vout = [vout for vout in tx[0].raw.get(
                         'vout', []) if vout.get('n') == uc['tx_pos']]
-                    logging.debug('uc9')
                     if len(vout) > 0:
-                        logging.debug('uc10')
                         scriptPubKey = vout[0].get(
                             'scriptPubKey', {}).get('hex', None)
-                        logging.debug('uc11')
                         if scriptPubKey is not None:
-                            logging.debug('uc12')
                             uc['scriptPubKey'] = scriptPubKey
-            logging.debug('uc13')
             if 'SATORI' in self.watchAssets:
-                logging.debug('uc14')
                 for ua in self.unspentAssets:
-                    logging.debug('ua', ua)
                     if len([tx for tx in self.transactions if tx.txid == ua['tx_hash']]) == 0:
                         new_transactions = {}  # Collect new transactions here
                         new_tranaction = self.appendTransaction(ua['tx_hash'])
@@ -791,7 +775,6 @@ class Wallet(WalletBase):
             logging.warning(
                 'unable to acquire signatures of unspent transactions, maybe unable to send', e, print=True)
             return False
-        logging.debug('uc15')
         return True
 
     def getUnspentsFromHistory(self) -> tuple[list, list]:

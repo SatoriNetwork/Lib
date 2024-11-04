@@ -429,7 +429,34 @@ class Wallet(WalletBase):
     def stopSubscription(self):
         self.electrumx.cancelSubscriptions()
 
+    def preSend(self) -> bool:
+        if not hasattr(self, 'electrumx') or not self.electrumx.connected():
+            try:
+                self.connect()
+            except Exception as e:
+                logging.error(f'unable to connect {e}')
+                return False
+
+        if not self.electrumx.connected():
+            self.stats = {'status': 'not connected'}
+            self.divisibility = 8
+            self.banner = 'not connected'
+            self.transactionHistory = []
+            self.currencyOnChain = 0
+            self.unspentCurrency = []
+            self.balanceOnChain = 0
+            self.unspentAssets = []
+            self.currency = 0
+            self.currencyAmount = 0
+            self.balance = 0
+            self.balanceAmount = 0
+            return False
+
+        return True
+
     def getUnspentCurrency(self, *args, **kwargs):
+        if not self.preSend():
+            return
         self.unspentCurrency = self.electrumx.getUnspentCurrency()
         self.unspentCurrency = [
             x for x in self.unspentCurrency if x.get('asset') == None]
@@ -504,28 +531,8 @@ class Wallet(WalletBase):
         # todo:
         # on connect ask for peers, add each to our list of electrumxServers
         # if unable to connect, remove that server from our list
-        if not hasattr(self, 'electrumx') or not self.electrumx.connected():
-            try:
-                self.connect()
-            except Exception as e:
-                logging.error(f'unable to connect {e}')
-                return
-
-        if not self.electrumx.connected():
-            self.stats = {'status': 'not connected'}
-            self.divisibility = 8
-            self.banner = 'not connected'
-            self.transactionHistory = []
-            self.currencyOnChain = 0
-            self.unspentCurrency = []
-            self.balanceOnChain = 0
-            self.unspentAssets = []
-            self.currency = 0
-            self.currencyAmount = 0
-            self.balance = 0
-            self.balanceAmount = 0
+        if not self.preSend():
             return
-
         logging.debug('pulling transactions from blockchain...')
         self.stats = self.electrumx.getStats()
         # self.divisibility = self.stats.get('divisions', 8)

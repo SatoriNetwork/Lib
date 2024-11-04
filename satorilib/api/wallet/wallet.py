@@ -199,6 +199,7 @@ class Wallet(WalletBase):
 
     def __call__(self):
         self.connect()
+        logging.debug('called wallet')
         self.get()
         return self
 

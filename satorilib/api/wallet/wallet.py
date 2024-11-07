@@ -414,31 +414,38 @@ class Wallet(WalletBase):
     ### Electrumx ##############################################################
 
     def connected(self) -> bool:
-        return self.electrumx.connected()
+        if isinstance(self.electrumx, ElectrumxAPI):
+            return self.electrumx.connected()
 
     def connectedSubscriptions(self) -> bool:
-        return self.electrumx.connectedSubscriptions()
+        if isinstance(self.electrumx, ElectrumxAPI):
+            return self.electrumx.connectedSubscriptions()
 
     def disconnect(self) -> bool:
-        return self.electrumx.disconnect()
+        if isinstance(self.electrumx, ElectrumxAPI):
+            return self.electrumx.disconnect()
 
     def disconnectSubscriptions(self) -> bool:
-        return self.electrumx.disconnectSubscriptions()
+        if isinstance(self.electrumx, ElectrumxAPI):
+            return self.electrumx.disconnectSubscriptions()
 
     def connect(self):
         ''' connect to Electrumx '''
 
     def clearSubscriptions(self):
-        self.electrumx.cancelSubscriptions()
+        if isinstance(self.electrumx, ElectrumxAPI):
+            self.electrumx.cancelSubscriptions()
 
     def setupSubscriptions(self):
-        self.electrumx.makeSubscriptions()
+        if isinstance(self.electrumx, ElectrumxAPI):
+            self.electrumx.makeSubscriptions()
 
     def stopSubscription(self):
-        self.electrumx.cancelSubscriptions()
+        if isinstance(self.electrumx, ElectrumxAPI):
+            self.electrumx.cancelSubscriptions()
 
     def preSend(self) -> bool:
-        if not hasattr(self, 'electrumx') or not self.electrumx.connected():
+        if not hasattr(self, 'electrumx') or self.electrumx is None or not self.electrumx.connected():
             try:
                 self.connect()
             except Exception as e:

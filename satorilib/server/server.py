@@ -30,6 +30,7 @@ from satorilib.api.time.time import timeToTimestamp
 from satorilib.api.wallet import Wallet
 from satorilib.concepts.structs import Stream
 from satorilib.server.api import ProposalSchema, VoteSchema
+from satorilib.utils.json import sanitizeJson
 from requests.exceptions import RequestException
 import json
 import traceback
@@ -291,23 +292,61 @@ class SatoriServerClient(object):
         return self._makeUnauthenticatedCall(
             function=requests.get,
             endpoint=f'/votes_for/sanction/{walletPubkey}/{vaultPubkey}').json()
-        
-    def getSearchStreams(self):
-        return self._makeUnauthenticatedCall(
-            function=requests.post,
-            endpoint=f'/streams/search',
-            payload=json.dumps({
-                'address': self.wallet.address
-            })).json()
-    
+
+    def getSearchStreams(self, searchText: str = None):
+        '''
+        returns [{
+            'author': 27790,
+            'cadence': 600.0,
+            'datatype': 'float',
+            'description': 'Price AED 10min interval coinbase',
+            'oracle_address': 'EHJKq4EW2GfGBvhweasMXCZBVbAaTuDERS',
+            'oracle_alias': 'WilQSL_x10',
+            'oracle_pubkey': '03e3f3a15c2e174cac7ef8d1d9ff81e9d4ef7e33a59c20cc5cc142f9c69493f306',
+            'predicting_id': 0,
+            'sanctioned': 0,
+            'source': 'satori',
+            'stream': 'Coinbase.AED.USDT',
+            'stream_created_ts': 'Tue, 09 Jul 2024 10:20:11 GMT',
+            'stream_id': 326076,
+            'tags': 'AED, coinbase',
+            'target': 'data.rates.AED',
+            'total_vote': 6537.669052915435,
+            'url': 'https://api.coinbase.com/v2/exchange-rates',
+            'utc_offset': 227.0,
+            'vote': 33.333333333333336},...]
+        '''
+
+        def cleanAndSort(streams: str, searchText: str = None):
+            # Commenting down as of now, will be used in future if we need to make the call to server for search streams
+            # as of now we have limited streams so we can search in client side
+            # if searchText:
+            #     searchedStreams = [s for s in streams if searchText.lower() in s['stream'].lower()]
+            #     return sanitizeJson(searchedStreams)
+            sanitizedStreams = sanitizeJson(streams)
+            # sorting streams based on vote and total_vote
+            sortedStreams = sorted(
+                sanitizedStreams,
+                key=lambda x: (x.get('vote', 0) == 0, -
+                               x.get('vote', 0), -x.get('total_vote', 0))
+            )
+            return sortedStreams
+
+        return cleanAndSort(
+            streams=self._makeUnauthenticatedCall(
+                function=requests.post,
+                endpoint='/streams/search',
+                payload=json.dumps({'address': self.wallet.address})).json(),
+            searchText=searchText)
+
     def incrementVote(self, streamId: str):
         return self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/vote_on/sanction/incremental',
             payload=json.dumps({
                 'streamId': streamId
-            })).text 
-                
+            })).text
+
     def removeVote(self, streamId: str):
         return self._makeAuthenticatedCall(
             function=requests.post,
@@ -315,7 +354,7 @@ class SatoriServerClient(object):
             payload=json.dumps({
                 'streamId': streamId
             })).text
-        
+
     def submitMaifestVote(self, wallet: Wallet, votes: dict[str, int]):
         # todo authenticate the vault instead
         return self._makeAuthenticatedCall(

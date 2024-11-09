@@ -133,7 +133,7 @@ class WalletBase():
             sig_script_raw(address), 'hex_codec')).digest()[::-1].hex()
         return scripthash(forAddress or self.address)
 
-    def _generateEntropy(self):
+    def _generateEntropy(self) -> bytes:
         # return m.to_entropy(m.generate())
         # return b64encode(x.to_seed(x.generate(strength=128))).decode('utf-8')
         return os.urandom(32)
@@ -161,10 +161,13 @@ class Wallet(WalletBase):
         isTestnet: bool = False,
         password: str = None,
         watchAssets: list[str] = None,
+        skipSave: bool = False,
+        pullFullTransactions: bool = True,
     ):
         if walletPath == cachePath:
             raise Exception('wallet and cache paths cannot be the same')
         super().__init__()
+        self.skipSave = skipSave
         self.watchAssets = ['SATORI'] if watchAssets is None else watchAssets
         self.satoriFee = 0.00000001
         self.isTestnet = isTestnet
@@ -194,6 +197,7 @@ class Wallet(WalletBase):
         self.balanceOnChain = None
         self.unspentCurrency = None
         self.unspentAssets = None
+        self.pullFullTransactions = pullFullTransactions
         self.load()
         self.loadCache()
 
@@ -336,6 +340,8 @@ class Wallet(WalletBase):
             path=self.cachePath)
 
     def loadCache(self) -> bool:
+        if self.skipSave:
+            return False
         try:
             if not self.cacheFileExists():
                 return False
@@ -361,6 +367,8 @@ class Wallet(WalletBase):
             logging.error(f'issue loading transaction cache, {e}')
 
     def saveCache(self, new_transactions: dict):
+        if self.skipSave:
+            return False
         try:
             safetify(self.cachePath)
             # if no new transactions return
@@ -406,22 +414,67 @@ class Wallet(WalletBase):
     ### Electrumx ##############################################################
 
     def connected(self) -> bool:
-        return self.electrumx.connected()
+        if isinstance(self.electrumx, ElectrumxAPI):
+            return self.electrumx.connected()
+
+    def connectedSubscriptions(self) -> bool:
+        if isinstance(self.electrumx, ElectrumxAPI):
+            return self.electrumx.connectedSubscriptions()
 
     def disconnect(self) -> bool:
-        return self.electrumx.disconnect()
+        if isinstance(self.electrumx, ElectrumxAPI):
+            return self.electrumx.disconnect()
+
+    def disconnectSubscriptions(self) -> bool:
+        if isinstance(self.electrumx, ElectrumxAPI):
+            return self.electrumx.disconnectSubscriptions()
 
     def connect(self):
         ''' connect to Electrumx '''
 
     def clearSubscriptions(self):
-        self.electrumx.cancelSubscriptions()
+        if isinstance(self.electrumx, ElectrumxAPI):
+            self.electrumx.cancelSubscriptions()
 
     def setupSubscriptions(self):
-        self.electrumx.makeSubscriptions()
+        if isinstance(self.electrumx, ElectrumxAPI):
+            self.electrumx.makeSubscriptions()
 
     def stopSubscription(self):
-        self.electrumx.cancelSubscriptions()
+        if isinstance(self.electrumx, ElectrumxAPI):
+            self.electrumx.cancelSubscriptions()
+
+    def preSend(self) -> bool:
+        if not hasattr(self, 'electrumx') or self.electrumx is None or not self.electrumx.connected():
+            try:
+                self.connect()
+            except Exception as e:
+                logging.error(f'unable to connect {e}')
+                return False
+
+        if not self.electrumx.connected():
+            self.stats = {'status': 'not connected'}
+            self.divisibility = 8
+            self.banner = 'not connected'
+            self.transactionHistory = []
+            self.currencyOnChain = 0
+            self.unspentCurrency = []
+            self.balanceOnChain = 0
+            self.unspentAssets = []
+            self.currency = 0
+            self.currencyAmount = 0
+            self.balance = 0
+            self.balanceAmount = 0
+            return False
+
+        return True
+
+    def getUnspentCurrency(self, *args, **kwargs):
+        if not self.preSend():
+            return
+        self.unspentCurrency = self.electrumx.getUnspentCurrency()
+        self.unspentCurrency = [
+            x for x in self.unspentCurrency if x.get('asset') == None]
 
     def get(self, *args, **kwargs):
         ''' gets data from the blockchain, saves to attributes '''
@@ -493,13 +546,8 @@ class Wallet(WalletBase):
         # todo:
         # on connect ask for peers, add each to our list of electrumxServers
         # if unable to connect, remove that server from our list
-        if not hasattr(self, 'electrumx') or not self.electrumx.connected():
-            try:
-                self.connect()
-            except Exception as e:
-                logging.error(f'unable to connect {e}')
-                return
-
+        if not self.preSend():
+            return
         logging.debug('pulling transactions from blockchain...')
         self.stats = self.electrumx.getStats()
         # self.divisibility = self.stats.get('divisions', 8)
@@ -569,20 +617,33 @@ class Wallet(WalletBase):
         if txid not in self._transactions.keys():
             raw = self.electrumx.getTransaction(txid)
             if raw is not None:
-                txs = []
-                txIds = []
-                for vin in raw.get('vin', []):
-                    txId = vin.get('txid', '')
-                    if txId == '':
-                        continue
-                    txIds.append(txId)
-                    txs.append(
-                        self.electrumx.getTransaction(txId))
-                transaction = TransactionStruct(raw=raw, vinVoutsTxids=txIds, vinVoutsTxs=[
-                                                t for t in txs if t is not None])
-                self.transactions.append(transaction)
-                self._transactions[txid] = transaction.export()
-                return transaction.export()
+                if self.pullFullTransactions:
+                    txs = []
+                    txIds = []
+                    for vin in raw.get('vin', []):
+                        txId = vin.get('txid', '')
+                        if txId == '':
+                            continue
+                        txIds.append(txId)
+                        txs.append(
+                            self.electrumx.getTransaction(txId))
+                    transaction = TransactionStruct(raw=raw, vinVoutsTxids=txIds, vinVoutsTxs=[
+                                                    t for t in txs if t is not None])
+                    self.transactions.append(transaction)
+                    self._transactions[txid] = transaction.export()
+                    return transaction.export()
+                else:
+                    txs = []
+                    txIds = []
+                    for vin in raw.get('vin', []):
+                        txId = vin.get('txid', '')
+                        if txId == '':
+                            continue
+                        txIds.append(txId)
+                        # <--- don't get the inputs to the transaction here
+                    transaction = TransactionStruct(
+                        raw=raw, vinVoutsTxids=txIds)
+                    self.transactions.append(transaction)
         else:
             raw, txids, txs = self._transactions.get(txid, ({}, []))
             self.transactions.append(
@@ -684,6 +745,7 @@ class Wallet(WalletBase):
 
             # get transactions, save their scriptPubKey hex to the unspents
             for uc in self.unspentCurrency:
+                logging.debug('uc', uc)
                 if len([tx for tx in self.transactions if tx.txid == uc['tx_hash']]) == 0:
                     new_transactions = {}  # Collect new transactions here
                     new_tranaction = self.appendTransaction(uc['tx_hash'])
@@ -759,11 +821,15 @@ class Wallet(WalletBase):
             return None
         return unspentCurrency[0]
 
-    def _gatherOneCurrencyUnspent(self, atleastSats: int = 0) -> tuple:
+    def _gatherOneCurrencyUnspent(self, atleastSats: int = 0, claimed: dict = None) -> tuple:
+        claimed = claimed or {}
         for unspentCurrency in self.unspentCurrency:
-            if unspentCurrency.get('value') >= atleastSats:
-                return unspentCurrency, unspentCurrency.get('value')
-        return None, 0
+            if (
+                unspentCurrency.get('value') >= atleastSats and
+                unspentCurrency.get('tx_hash') not in claimed.keys()
+            ):
+                return unspentCurrency, unspentCurrency.get('value'), len(self.unspentCurrency)
+        return None, 0, 0
 
     def _gatherCurrencyUnspents(
         self,
@@ -937,6 +1003,7 @@ class Wallet(WalletBase):
         ''' serialize '''
 
     def _broadcast(self, txHex: str) -> str:
+        logging.debug('connected5')
         if self.electrumx.connected():
             return self.electrumx.broadcast(txHex)
         return self.electrumx.broadcast(txHex)
@@ -1366,9 +1433,13 @@ class Wallet(WalletBase):
                     return changeAddress == self.hash160ToAddress(x)
             return False
 
+        logging.debug('completer')
         completerAddress = completerAddress or self.address
+        logging.debug('completer', completerAddress)
         changeAddress = changeAddress or self.address
+        logging.debug('completer', changeAddress)
         tx = self._deserialize(serialTx)
+        logging.debug('completer', tx)
         if not _verifyFee():
             raise TransactionFailure(
                 f'fee mismatch, {reportedFeeSats}, {feeSatsReserved}')
@@ -1379,16 +1450,21 @@ class Wallet(WalletBase):
         if not _verifyChangeAddress():
             raise TransactionFailure('claim mismatch, _verifyChangeAddress')
         # add rvn fee input
+        logging.debug('completer1')
         gatheredCurrencyUnspent = self._gatherReservedCurrencyUnspent(
             exactSats=feeSatsReserved)
+        logging.debug('completer', gatheredCurrencyUnspent)
         if gatheredCurrencyUnspent is None:
             raise TransactionFailure(f'unable to find sats {feeSatsReserved}')
+        logging.debug('completer2')
         txins, txinScripts = self._compileInputs(
             gatheredCurrencyUnspents=[gatheredCurrencyUnspent])
+        logging.debug('completer3')
         tx = self._createPartialCompleterSimple(
             tx=tx,
             txins=txins,
             txinScripts=txinScripts)
+        logging.debug('completer4')
         return self._broadcast(self._txToHex(tx))
 
     def sendAllTransaction(self, address: str) -> str:

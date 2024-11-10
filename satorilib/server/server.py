@@ -30,6 +30,7 @@ from satorilib.api.time.time import timeToTimestamp
 from satorilib.api.wallet import Wallet
 from satorilib.concepts.structs import Stream
 from satorilib.server.api import ProposalSchema, VoteSchema
+from satorilib.utils.json import sanitizeJson
 from requests.exceptions import RequestException
 import json
 import traceback
@@ -73,7 +74,7 @@ class SatoriServerClient(object):
 
         if payload is not None:
             logging.info(
-                'outgoing:',
+                f'outgoing: {endpoint}',
                 payload[0:40], f'{"..." if len(payload) > 40 else ""}',
                 print=True)
         r = function(
@@ -93,7 +94,7 @@ class SatoriServerClient(object):
                               r.text, e, color='red')
                 r.raise_for_status()
         logging.info(
-            'incoming:',
+            f'incoming: {endpoint}',
             r.text[0:40], f'{"..." if len(r.text) > 40 else ""}',
             print=True)
         return r
@@ -275,9 +276,6 @@ class SatoriServerClient(object):
             endpoint='/get_wallet_alias').text
 
     def getManifestVote(self, wallet: Wallet = None):
-        # TODO: when we implement a split in the server /votes_for/manifest
-        #       might be on the website domain, along with others (that don't
-        #       require authentication) so we will have to handle that.
         return self._makeUnauthenticatedCall(
             function=requests.get,
             endpoint=(
@@ -294,6 +292,64 @@ class SatoriServerClient(object):
         return self._makeUnauthenticatedCall(
             function=requests.get,
             endpoint=f'/votes_for/sanction/{walletPubkey}/{vaultPubkey}').json()
+
+    def getSearchStreams(self, searchText: str = None):
+        '''
+        returns [{
+            'author': 27790,
+            'cadence': 600.0,
+            'datatype': 'float',
+            'description': 'Price AED 10min interval coinbase',
+            'oracle_address': 'EHJKq4EW2GfGBvhweasMXCZBVbAaTuDERS',
+            'oracle_alias': 'WilQSL_x10',
+            'oracle_pubkey': '03e3f3a15c2e174cac7ef8d1d9ff81e9d4ef7e33a59c20cc5cc142f9c69493f306',
+            'predicting_id': 0,
+            'sanctioned': 0,
+            'source': 'satori',
+            'stream': 'Coinbase.AED.USDT',
+            'stream_created_ts': 'Tue, 09 Jul 2024 10:20:11 GMT',
+            'stream_id': 326076,
+            'tags': 'AED, coinbase',
+            'target': 'data.rates.AED',
+            'total_vote': 6537.669052915435,
+            'url': 'https://api.coinbase.com/v2/exchange-rates',
+            'utc_offset': 227.0,
+            'vote': 33.333333333333336},...]
+        '''
+
+        def cleanAndSort(streams: str, searchText: str = None):
+            # Commenting down as of now, will be used in future if we need to make the call to server for search streams
+            # as of now we have limited streams so we can search in client side
+            # if searchText:
+            #     searchedStreams = [s for s in streams if searchText.lower() in s['stream'].lower()]
+            #     return sanitizeJson(searchedStreams)
+            sanitizedStreams = sanitizeJson(streams)
+            # sorting streams based on vote and total_vote
+            sortedStreams = sorted(
+                sanitizedStreams,
+                key=lambda x: (x.get('vote', 0) == 0, -
+                               x.get('vote', 0), -x.get('total_vote', 0))
+            )
+            return sortedStreams
+
+        return cleanAndSort(
+            streams=self._makeUnauthenticatedCall(
+                function=requests.post,
+                endpoint='/streams/search',
+                payload=json.dumps({'address': self.wallet.address})).json(),
+            searchText=searchText)
+
+    def incrementVote(self, streamId: str):
+        return self._makeAuthenticatedCall(
+            function=requests.post,
+            endpoint='/vote_on/sanction/incremental',
+            payload=json.dumps({'streamId': streamId})).text
+
+    def removeVote(self, streamId: str):
+        return self._makeAuthenticatedCall(
+            function=requests.post,
+            endpoint='/clear_vote_on/sanction/incremental',
+            payload=json.dumps({'streamId': streamId})).text
 
     def submitMaifestVote(self, wallet: Wallet, votes: dict[str, int]):
         # todo authenticate the vault instead
@@ -378,7 +434,7 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/mine/to/address',
-                json=js)
+                payload=js)
             return response.status_code < 400, response.text
         except Exception as e:
             logging.warning(
@@ -617,6 +673,18 @@ class SatoriServerClient(object):
                 'unable to claim beta due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
 
+    def poolAddresses(self) -> tuple[bool, dict]:
+        ''' removes a stream from the server '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/stake/lend/addresses')
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to stakeProxyRequest due to connection timeout; try again Later.', e, color='yellow')
+            return False, {}
+
     def stakeProxyChildren(self) -> tuple[bool, dict]:
         ''' removes a stream from the server '''
         try:
@@ -706,7 +774,6 @@ class SatoriServerClient(object):
         #    return
         # if isPrediction and self.topicTime.get(topic, 0) > time.time() - 60*60:
         #    return
-
         if self.topicTime.get(topic, 0) > time.time() - (Stream.minimumCadence*.95):
             return
         self.setTopicTime(topic)
@@ -715,7 +782,7 @@ class SatoriServerClient(object):
                 response = self._makeAuthenticatedCall(
                     function=requests.post,
                     endpoint='/record/prediction/authed' if isPrediction else '/record/observation/authed',
-                    json=json.dumps({
+                    payload=json.dumps({
                         'topic': topic,
                         'data': str(data),
                         'time': str(observationTime),

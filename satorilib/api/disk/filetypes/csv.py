@@ -3,6 +3,7 @@ import os
 import pandas as pd
 from satorilib.api.interfaces.data import FileManager
 from satorilib import logging
+# pd.options.display.float_format = '{:.10f}'.format
 
 
 class CSVManager(FileManager):
@@ -60,14 +61,14 @@ class CSVManager(FileManager):
 
     def write(self, filePath: str, data: pd.DataFrame) -> bool:
         try:
-            data.to_csv(filePath, header=False)
+            data.to_csv(filePath, float_format='%.10f', header=False)
             return True
         except Exception as _:
             return False
 
     def append(self, filePath: str, data: pd.DataFrame) -> bool:
         try:
-            data.to_csv(filePath, mode='a', header=False)
+            data.to_csv(filePath, float_format='%.10f', mode='a', header=False)
             return True
         except Exception as _:
             return False

@@ -9,7 +9,7 @@ df = pd.DataFrame(data)
 # Timing the process of saving to CSV
 start_time = time.time()
 csv_file = 'data.csv'
-df.to_csv(csv_file, index=False)
+df.to_csv(csv_file, float_format='%.10g', index=False)
 save_time = time.time() - start_time
 print(f"Time taken to save to CSV: {save_time} seconds")
 

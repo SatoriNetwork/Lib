@@ -110,17 +110,17 @@ class StreamId:
         a list of values and the target an index for that list.
 
         note 0: the above note is helpful, but np.inf cannot be concatenated
-        with strings so it would be preferable to use a random string here, 
+        with strings so it would be preferable to use a random string here,
         rather than an empty string becuase it would be less likely to clash.
         we'll use the Mersenne Twister algorithm with seed 'dR3jS9lMqXcTfYvA':
         q7jDmL8kV4HvCnX
 
         note 1: that's a great idea, but here's the situation: the server has
-        this same problem and solves it with an empty string. So since this 
+        this same problem and solves it with an empty string. So since this
         problem manifest at the domain level, not merely in this equality check,
         we'll use that solution for now.
 
-        note 2: alright, so that doesn't work in this endpoint: 
+        note 2: alright, so that doesn't work in this endpoint:
         /remove_stream/<source>/<stream>/<target> because target is an empty
         string. so. target always has to be a non-null non-empty string. I think
         the default should be a - then. To be honest... the best solution is to
@@ -134,7 +134,7 @@ class StreamId:
         to be an unlimited hierarchy requiring at least source. for now we'll
         use the '-' solution which requires a server change anyway.
 
-        note 3: instead of that I decided to change the endpoint to 
+        note 3: instead of that I decided to change the endpoint to
         /remove_stream/<topic> and parse out the topic instead. it's just less
         work for the same quality work around.
         '''
@@ -531,13 +531,15 @@ class Observation:
         return Observation.fromGuess(raw)
 
     @staticmethod
-    def fromTopic(raw):
+    def fromTopic(raw, realtime: bool = True):
         '''
         this is the structur that hte Satori PubSub delivers data in: {
             'topic': '{"source": "satori", "author": "02a85fb71485c6d7c62a3784c5549bd3849d0afa3ee44ce3f9ea5541e4c56402d8", "stream": "WeatherBerlin", "target": "temperature"}',
             'time': '2024-04-13 17:53:00.661619',
             'data': 4.2,
             'hash': 'abc'}
+        if realtime is false then we trust the observationTime because we're
+        running this function on past data. however, we probably never do that.
         '''
         if isinstance(raw, str):
             j = json.loads(raw)
@@ -545,8 +547,22 @@ class Observation:
             j = raw
         topic = j.get('topic', None)
         streamId = StreamId.fromTopic(topic)
-        observationTime = j.get('time',
-                                dt.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))
+        now = dt.datetime.now(dt.timezone.utc)
+        nowStr = now.strftime('%Y-%m-%d %H:%M:%S.%f')
+        if not realtime:
+            observationTime = j.get('time', )
+            try:
+                observationDt = dt.datetime.strptime(
+                    observationTime,
+                    format='%Y-%m-%d %H:%M:%S.%f')
+                if (observationDt > now or observationDt < now - 60):
+                    observationDt = now
+                    observationTime = nowStr
+            except Exception as _:
+                observationDt = now
+                observationTime = nowStr
+        else:
+            observationTime = j.get('time', now)
         observationHash = j.get('observationHash', j.get('hash', None))
         value = j.get('data', None)
         target = None

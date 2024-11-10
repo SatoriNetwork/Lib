@@ -1,4 +1,7 @@
 from typing import Union
+import threading
+import time
+import random
 from evrmore import SelectParams
 from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret
 from evrmore.core.scripteval import VerifyScript, SCRIPT_VERIFY_P2SH
@@ -12,6 +15,21 @@ from satoriwallet.api.blockchain import Electrumx
 from satorilib import logging
 from satorilib.api.wallet.wallet import Wallet, TransactionFailure
 
+evrmoreElectrumServers: list[str] = [
+    '128.199.1.149:50002',
+    '146.190.149.237:50002',
+    '146.190.38.120:50002',
+    'electrum1-mainnet.evrmorecoin.org:50002',
+    'electrum2-mainnet.evrmorecoin.org:50002',
+]
+evrmoreElectrumServersSubscription: list[str] = [
+    '128.199.1.149:50001',
+    '146.190.149.237:50001',
+    '146.190.38.120:50001',
+    'electrum1-mainnet.evrmorecoin.org:50001',
+    'electrum2-mainnet.evrmorecoin.org:50001',
+]
+
 
 class EvrmoreWallet(Wallet):
 
@@ -23,55 +41,102 @@ class EvrmoreWallet(Wallet):
         password: Union[str, None] = None,
         connection: Electrumx = None,
         type: str = 'wallet',
+        watchAssets: list[str] = None,
+        skipSave: bool = False,
+        pullFullTransactions: bool = True,
     ):
-        self.connection = connection
+        self.connection = connection or EvrmoreWallet.createElectrumxConnection()
         self.type = type
         super().__init__(
             walletPath,
             reserve=reserve,
             isTestnet=isTestnet,
-            password=password)
+            password=password,
+            watchAssets=watchAssets,
+            skipSave=skipSave,
+            pullFullTransactions=pullFullTransactions)
+
+    @staticmethod
+    def createElectrumxConnection():
+        hostPort = random.choice(evrmoreElectrumServers)
+        hostPortSubscription = random.choice(
+            evrmoreElectrumServersSubscription)
+        return Electrumx(
+            host=hostPort.split(':')[0],
+            port=int(hostPort.split(':')[1]),
+            hostSubscription=hostPortSubscription.split(':')[0],
+            portSubscription=int(hostPortSubscription.split(':')[1]))
 
     def connect(self):
         try:
-            self.electrumx = ElectrumxAPI(
-                chain=self.chain,
-                address=self.address,
-                scripthash=self.scripthash,
-                connection=self.connection,
-                type=self.type,
-                onScripthashNotification=self.get,
-                onBlockNotification=None,
-                servers=[
-                    # 'moontree.com:50022',  # mainnet ssl evr
-                    '146.190.149.237:50002',
-                    '146.190.38.120:50002',  # backup - maybe just use for server
-                    'electrum1-mainnet.evrmorecoin.org:50002',
-                    'electrum2-mainnet.evrmorecoin.org:50002',  # keeps erroring out
+            reconnected = False
+            condition = not self.connection.connected()
+            if condition:
+                self.connection = EvrmoreWallet.createElectrumxConnection()
+                reconnected = True
+            if self.electrumx is None or reconnected:
+                self.electrumx = ElectrumxAPI(
+                    chain=self.chain,
+                    address=self.address,
+                    scripthash=self.scripthash,
+                    connection=self.connection,
+                    type=self.type,
+                    onScripthashNotification=self.get,  # self.callTransactionHistory()
+                    onBlockNotification=None,
+                    servers=[
+                        # 'moontree.com:50022',  # mainnet ssl evr
+                        '128.199.1.149:50002',
+                        '146.190.149.237:50002',
+                        '146.190.38.120:50002',  # backup - maybe just use for server
+                        'electrum1-mainnet.evrmorecoin.org:50002',
+                        'electrum2-mainnet.evrmorecoin.org:50002',  # keeps erroring out
 
-                    # '146.190.149.237:50022',  # mainnet ssl evr # not working yet
+                        # '146.190.149.237:50022',  # mainnet ssl evr # not working yet
 
-                    # updated to more recent version, now getting errors:
-                    # """{'code': -32601, 'message': 'unknown method "blockchain.scripthash.listassets"'} <class 'dict'>"""
-                    # 'electrum1-mainnet.evrmorecoin.org:50002',  # ssl
-                    # 'electrum2-mainnet.evrmorecoin.org:50002',  # ssl
+                        # updated to more recent version, now getting errors:
+                        # """{'code': -32601, 'message': 'unknown method "blockchain.scripthash.listassets"'} <class 'dict'>"""
+                        # 'electrum1-mainnet.evrmorecoin.org:50002',  # ssl
+                        # 'electrum2-mainnet.evrmorecoin.org:50002',  # ssl
 
-                    # no good:
-                    # 'electrum1-mainnet.evrmorecoin.org:50001',  # tcp
-                    # 'electrum2-mainnet.evrmorecoin.org:50001',  # tcp
-                    # 'moontree.com:50021',  # mainnet tcp evr
-                    # 'moontree.com:50031', # testnet tcp evr
-                    # 'moontree.com:50032', # testnet ssl evr
-                    # 'electrum1-mainnet.evrmorecoin.org:50004', # wss
-                    # 'electrum2-mainnet.evrmorecoin.org:50004', # wss
-                    # 'electrum1-testnet.evrmorecoin.org:50001', # tcp
-                    # 'electrum1-testnet.evrmorecoin.org:50002', # ssl
-                    # 'electrum1-testnet.evrmorecoin.org:50004', # wss
-                ])
-            # self.setupSubscriptions()
+                        # no good:
+                        # 'electrum1-mainnet.evrmorecoin.org:50001',  # tcp
+                        # 'electrum2-mainnet.evrmorecoin.org:50001',  # tcp
+                        # 'moontree.com:50021',  # mainnet tcp evr
+                        # 'moontree.com:50031', # testnet tcp evr
+                        # 'moontree.com:50032', # testnet ssl evr
+                        # 'electrum1-mainnet.evrmorecoin.org:50004', # wss
+                        # 'electrum2-mainnet.evrmorecoin.org:50004', # wss
+                        # 'electrum1-testnet.evrmorecoin.org:50001', # tcp
+                        # 'electrum1-testnet.evrmorecoin.org:50002', # ssl
+                        # 'electrum1-testnet.evrmorecoin.org:50004', # wss
+                    ])
+                # self.setupSubscriptions()
         except Exception as e:
             logging.warning(
                 'ElectrumxAPI issue', e)
+
+    def subscribe(self):
+        # Start a thread to listen for updates
+        self.processThread = threading.Thread(
+            target=self.electrumx.processNotifications)
+        self.processThread.start()
+
+    def keepAlive(self, subscriptionToo: bool = False):
+
+        def pingPeriodically():
+            while True:
+                time.sleep(60*3)
+                try:
+                    self.electrumx.conn.send(method='server.ping')
+                    if subscriptionToo:
+                        self.electrumx.conn.sendSubscription(
+                            method='server.ping')
+                except Exception as e:
+                    logging.error(f'keepAlive: {e}')
+                    self.connect()
+
+        self.thread = threading.Thread(target=pingPeriodically, daemon=True)
+        self.thread.start()
 
     @property
     def symbol(self) -> str:

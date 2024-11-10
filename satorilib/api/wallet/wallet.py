@@ -612,6 +612,7 @@ class Wallet(WalletBase):
         logging.info('pulled transactions from blockchain', color='blue')
 
     ### Functions ##############################################################
+
     def appendTransaction(self, txid):
         if txid not in self._transactions.keys():
             raw = self.electrumx.getTransaction(txid)

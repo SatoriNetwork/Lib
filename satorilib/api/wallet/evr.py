@@ -192,7 +192,7 @@ class EvrmoreWallet(Wallet):
 
     def _checkSatoriValue(self, output: CMutableTxOut) -> bool:
         '''
-        returns true if the output is a satori output of self.satoriFee
+        returns true if the output is a satori output of self.mundoFee
         '''
         nextOne = False
         for i, x in enumerate(output.scriptPubKey):
@@ -204,7 +204,7 @@ class EvrmoreWallet(Wallet):
                     AssetTransaction.satoriHex(self.symbol) +
                     TxUtils.padHexStringTo8Bytes(
                         TxUtils.intToLittleEndianHex(
-                            TxUtils.asSats(self.satoriFee)))))
+                            TxUtils.asSats(self.mundoFee)))))
             if x == OP_EVR_ASSET:
                 nextOne = True
         return False

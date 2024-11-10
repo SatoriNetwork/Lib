@@ -169,7 +169,12 @@ class Wallet(WalletBase):
         super().__init__()
         self.skipSave = skipSave
         self.watchAssets = ['SATORI'] if watchAssets is None else watchAssets
-        self.satoriFee = 0.00000001
+        # at $100 SATORI this is 1 penny (for evr tx fee)
+        self.mundoFee = 0.00010000
+        # at $100 SATORI this is 5 dollars (for eth gas fee)
+        self.bridgeFee: float = 0.05000000
+        self.bridgeAddress: str = 'E...'  # TODO finish
+        self.burnAddress: str = 'ExxxxxxxxxxSatoriBridgeBurnAddress'  # valid?
         self.isTestnet = isTestnet
         self.password = password
         self.walletPath = walletPath
@@ -811,7 +816,7 @@ class Wallet(WalletBase):
 
     def _checkSatoriValue(self, output: 'CMutableTxOut') -> bool:
         '''
-        returns true if the output is a satori output of self.satoriFee
+        returns true if the output is a satori output of self.mundoFee
         '''
 
     def _gatherReservedCurrencyUnspent(self, exactSats: int = 0):
@@ -1227,8 +1232,8 @@ class Wallet(WalletBase):
     #    ):
     #        raise TransactionFailure('satoriTransaction bad params')
     #    if pullFeeFromAmount:
-    #        amount -= self.satoriFee
-    #    satoriTotalSats = TxUtils.asSats(amount + self.satoriFee)
+    #        amount -= self.mundoFee
+    #    satoriTotalSats = TxUtils.asSats(amount + self.mundoFee)
     #    satoriSats = TxUtils.asSats(amount)
     #    (
     #        gatheredSatoriUnspents,
@@ -1251,8 +1256,8 @@ class Wallet(WalletBase):
     #        if outAmount > 0:
     #            satoriOuts.append(
     #                self._compileSatoriOutputs({address: outAmount})[0])
-    #    if change - self.satoriFee > 0:
-    #        change -= self.satoriFee
+    #    if change - self.mundoFee > 0:
+    #        change -= self.mundoFee
     #    if change > 0:
     #        satoriOuts.append(self._compileSatoriOutputs(
     #            {self.address: change})[0])
@@ -1260,7 +1265,7 @@ class Wallet(WalletBase):
     #    # satoriOuts = self._compileSatoriOutputs({address: amount})
     #    satoriChangeOut = self._compileSatoriChangeOutput(
     #        satoriSats=satoriSats,
-    #        gatheredSatoriSats=gatheredSatoriSats - TxUtils.asSats(self.satoriFee))
+    #        gatheredSatoriSats=gatheredSatoriSats - TxUtils.asSats(self.mundoFee))
     #    tx = self._createPartialOriginator(
     #        txins=txins,
     #        txinScripts=txinScripts,
@@ -1291,7 +1296,7 @@ class Wallet(WalletBase):
     #        inputCount=len(tx.vin) + len(txins),
     #        outputCount=len(tx.vout) + 2)
     #    # add satori fee output to self
-    #    satoriClaimOut = self._compileSatoriOutputs({address: self.satoriFee})
+    #    satoriClaimOut = self._compileSatoriOutputs({address: self.mundoFee})
     #    # sign rvn fee inputs and complete the transaction
     #    tx = self._createTransaction(
     #        tx=tx,
@@ -1345,9 +1350,9 @@ class Wallet(WalletBase):
         ):
             raise TransactionFailure('satoriTransaction bad params')
         if pullFeeFromAmount:
-            amount -= self.satoriFee
+            amount -= self.mundoFee
         satoriTotalSats = TxUtils.asSats(
-            amount) + TxUtils.asSats(self.satoriFee)
+            amount) + TxUtils.asSats(self.mundoFee)
         satoriSats = TxUtils.roundSatsDownToDivisibility(
             sats=TxUtils.asSats(amount),
             divisibility=self.divisibility)
@@ -1359,11 +1364,11 @@ class Wallet(WalletBase):
         satoriOuts = self._compileSatoriOutputs({address: satoriSats})
         satoriChangeOut = self._compileSatoriChangeOutput(
             satoriSats=satoriSats,
-            gatheredSatoriSats=gatheredSatoriSats - TxUtils.asSats(self.satoriFee))
+            gatheredSatoriSats=gatheredSatoriSats - TxUtils.asSats(self.mundoFee))
         # fee out to server
-        satoriFeeOut = self._compileSatoriOutputs(
-            {completerAddress: TxUtils.asSats(self.satoriFee)})[0]
-        if satoriFeeOut is None:
+        mundoFeeOut = self._compileSatoriOutputs(
+            {completerAddress: TxUtils.asSats(self.mundoFee)})[0]
+        if mundoFeeOut is None:
             raise TransactionFailure('unable to generate satori fee')
         # change out to server
         currencyChangeOut, currencyChange = self._compileCurrencyChangeOutput(
@@ -1379,14 +1384,14 @@ class Wallet(WalletBase):
         # logging.debug('txinScripts', txinScripts, color='magenta')
         # logging.debug('satoriOuts', satoriOuts, color='magenta')
         # logging.debug('satoriChangeOut', satoriChangeOut, color='magenta')
-        # logging.debug('satoriFeeOut', satoriFeeOut, color='magenta')
+        # logging.debug('mundoFeeOut', mundoFeeOut, color='magenta')
         # logging.debug('currencyChangeOut', currencyChangeOut, color='magenta')
         tx = self._createPartialOriginatorSimple(
             txins=txins,
             txinScripts=txinScripts,
             txouts=satoriOuts + [
                 x for x in [satoriChangeOut]
-                if x is not None] + [satoriFeeOut, currencyChangeOut])
+                if x is not None] + [mundoFeeOut, currencyChangeOut])
         reportedFeeSats = feeSatsReserved - currencyChange
         # logging.debug('reportedFeeSats', reportedFeeSats, color='magenta')
         # logging.debug('reportedFeeSats', reportedFeeSats, color='magenta')
@@ -1534,7 +1539,7 @@ class Wallet(WalletBase):
     #    def _generateOutputs():
     #        '''
     #        we must guarantee we have the same number of inputs to outputs.
-    #        we must guarantee sum of ouputs = sum of inputs - satoriFee.
+    #        we must guarantee sum of ouputs = sum of inputs - mundoFee.
     #        that is all.
     #
     #        we could run into a situation where we need to take the fee out of
@@ -1543,19 +1548,19 @@ class Wallet(WalletBase):
     #        '''
     #        reservedFee = 0
     #        outs = []
-    #        satoriFeeSats = TxUtils.asSats(self.satoriFee)
+    #        mundoFeeSats = TxUtils.asSats(self.mundoFee)
     #        for x in gatheredCurrencyUnspents:
     #            if x.get('value') > reservedFee:
     #        for x in gatheredSatoriUnspents:
-    #            if reservedFee < satoriFeeSats:
-    #                if x.get('value') > satoriFeeSats - reservedFee:
-    #                    reservedFee += (satoriFeeSats - reservedFee)
+    #            if reservedFee < mundoFeeSats:
+    #                if x.get('value') > mundoFeeSats - reservedFee:
+    #                    reservedFee += (mundoFeeSats - reservedFee)
     #                    # compile output with
-    #                    satoriFeeSats x.get('value') -
+    #                    mundoFeeSats x.get('value') -
     #                reservedFee = x.get('value') -
     #        return ( # not finished, combine with above
     #            self._compileSatoriOutputs({
-    #                address: unspent.get('x') - self.satoriFee # on first item
+    #                address: unspent.get('x') - self.mundoFee # on first item
     #                for unspent in gatheredSatoriUnspents
     #                }) +
     #            self._compileCurrencyOutputs(currencySats, address))
@@ -1564,7 +1569,7 @@ class Wallet(WalletBase):
     #        raise TransactionFailure('sendAllTransaction')
     #    logging.debug('currency', self.currency,
     #                'self.reserve', self.reserve, color='yellow')
-    #    if self.balanceAmount <= self.satoriFee*2:
+    #    if self.balanceAmount <= self.mundoFee*2:
     #        # what if they have 2 satoris in 2 different utxos?
     #        # one goes to the destination, and what about the other?
     #        # server supplies the fee claim so... we can't create this
@@ -1609,7 +1614,7 @@ class Wallet(WalletBase):
             raise TransactionFailure('sendAllTransaction')
         # logging.debug('currency', self.currency,
         #              'self.reserve', self.reserve, color='yellow')
-        if self.balanceAmount < self.satoriFee:
+        if self.balanceAmount < self.mundoFee:
             raise TransactionFailure(
                 'sendAllTransaction: not enough Satori for fee')
         # grab everything
@@ -1629,10 +1634,10 @@ class Wallet(WalletBase):
                 {address:
                     TxUtils.roundSatsDownToDivisibility(
                         sats=TxUtils.asSats(
-                            self.balanceAmount) - TxUtils.asSats(self.satoriFee),
+                            self.balanceAmount) - TxUtils.asSats(self.mundoFee),
                         divisibility=self.divisibility)}))
-        satoriFeeOut = self._compileSatoriOutputs(
-            {completerAddress: TxUtils.asSats(self.satoriFee)})[0]
+        mundoFeeOut = self._compileSatoriOutputs(
+            {completerAddress: TxUtils.asSats(self.mundoFee)})[0]
         # change out to server
         currencyChangeOut, currencyChange = self._compileCurrencyChangeOutput(
             gatheredCurrencySats=feeSatsReserved,
@@ -1645,7 +1650,7 @@ class Wallet(WalletBase):
         tx = self._createPartialOriginatorSimple(
             txins=txins,
             txinScripts=txinScripts,
-            txouts=sweepOuts + [satoriFeeOut, currencyChangeOut])
+            txouts=sweepOuts + [mundoFeeOut, currencyChangeOut])
         reportedFeeSats = feeSatsReserved - currencyChange
         return tx.serialize(), reportedFeeSats
 
@@ -1761,3 +1766,70 @@ class Wallet(WalletBase):
                     result=None,
                     success=False,
                     msg=f'Send Failed: {e}')
+
+    def typicalNeuronBridgeTransaction(
+        self,
+        amount: float,
+        ethAddress: str,
+        completerAddress: str = None,
+        changeAddress: str = None,
+        feeSatsReserved: int = 0
+    ) -> TransactionResult:
+        try:
+            if amount <= self.bridgeFee:
+                raise TransactionFailure('amount too low')
+            if self.currency < self.reserve:
+                # if we have to make a partial we need more data so we need
+                # to return, telling them we need more data, asking for more
+                # information, and then if we get more data we can do this:
+                # logging.debug('k', color='magenta')
+                if feeSatsReserved == 0 or completerAddress is None:
+                    # logging.debug('l', color='magenta')
+                    return TransactionResult(
+                        result='try again',
+                        success=True,
+                        tx=None,
+                        msg='creating partial, need feeSatsReserved.')
+                result = self.satoriOnlyPartialSimple(
+                    amount=amount,
+                    address=burnAddress,
+                    feeSatsReserved=feeSatsReserved,
+                    completerAddress=completerAddress,
+                    changeAddress=changeAddress)
+                # logging.debug('n', color='magenta')
+                if result is None:
+                    # logging.debug('o', color='magenta')
+                    return TransactionResult(
+                        result=None,
+                        success=False,
+                        msg='Send Failed: try again in a few minutes.')
+                # logging.debug('p', color='magenta')
+                return TransactionResult(
+                    result=result,
+                    success=True,
+                    tx=result[0],
+                    reportedFeeSats=result[1],
+                    msg='send transaction requires fee.')
+            # logging.debug('q', color='magenta')
+            # TODO: validate ethAddress
+            # TODO: finish
+            result = self.satoriDistribution(
+                amountByAddress={
+                    self.bridgeAddress: self.bridgeFee,
+                    self.burnAddress: amount - self.bridgeFee},
+                memo=ethAddress)
+            # logging.debug('r', result,  color='magenta')
+            if result is None:
+                # logging.debug('s', color='magenta')
+                return TransactionResult(
+                    result=result,
+                    success=False,
+                    msg='Send Failed: try again in a few minutes.')
+            # logging.debug('t', color='magenta')
+            return TransactionResult(result=str(result), success=True)
+        except TransactionFailure as e:
+            # logging.debug('v', color='magenta')
+            return TransactionResult(
+                result=None,
+                success=False,
+                msg=f'Send Failed: {e}')

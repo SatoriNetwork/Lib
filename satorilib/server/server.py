@@ -242,6 +242,13 @@ class SatoriServerClient(object):
             url=self.sendingUrl,
             endpoint=f'/simple_partial/request/{network}').json()
 
+    def requestSimpleBridgePartial(self):
+        ''' sends a satori bridge partial transaction to the server '''
+        return self._makeUnauthenticatedCall(
+            function=requests.get,
+            url=self.sendingUrl,
+            endpoint='/simple/bridge/partial/request/main').json()
+
     def broadcastSimplePartial(
         self,
         tx: bytes,

@@ -1776,7 +1776,7 @@ class Wallet(WalletBase):
         feeSatsReserved: int = 0
     ) -> TransactionResult:
         try:
-            if amount <= self.bridgeFee:
+            if self.balanceAmount - amount - self.bridgeFee < 0:
                 raise TransactionFailure('amount too low')
             if self.currency < self.reserve:
                 # if we have to make a partial we need more data so we need
@@ -1816,7 +1816,7 @@ class Wallet(WalletBase):
             result = self.satoriDistribution(
                 amountByAddress={
                     self.bridgeAddress: self.bridgeFee,
-                    self.burnAddress: amount - self.bridgeFee},
+                    self.burnAddress: amount},
                 memo=ethAddress)
             # logging.debug('r', result,  color='magenta')
             if result is None:

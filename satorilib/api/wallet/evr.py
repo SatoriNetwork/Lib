@@ -116,10 +116,11 @@ class EvrmoreWallet(Wallet):
                 'ElectrumxAPI issue', e)
 
     def subscribe(self):
-        # Start a thread to listen for updates
-        self.processThread = threading.Thread(
-            target=self.electrumx.processNotifications)
-        self.processThread.start()
+        if self.electrumx is not None:
+            # Start a thread to listen for updates
+            self.processThread = threading.Thread(
+                target=self.electrumx.processNotifications)
+            self.processThread.start()
 
     def keepAlive(self, subscriptionToo: bool = False):
 

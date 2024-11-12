@@ -242,13 +242,6 @@ class SatoriServerClient(object):
             url=self.sendingUrl,
             endpoint=f'/simple_partial/request/{network}').json()
 
-    def requestSimpleBridgePartial(self):
-        ''' sends a satori bridge partial transaction to the server '''
-        return self._makeUnauthenticatedCall(
-            function=requests.get,
-            url=self.sendingUrl,
-            endpoint='/simple/bridge/partial/request/main').json()
-
     def broadcastSimplePartial(
         self,
         tx: bytes,
@@ -262,6 +255,21 @@ class SatoriServerClient(object):
             function=requests.post,
             url=self.sendingUrl,
             endpoint=f'/simple_partial/broadcast/{network}/{feeSatsReserved}/{reportedFeeSats}/{walletId}',
+            payload=tx)
+
+    def broadcastBridgeSimplePartial(
+        self,
+        tx: bytes,
+        feeSatsReserved: float,
+        reportedFeeSats: float,
+        walletId: float,
+        network: str
+    ):
+        ''' sends a satori partial transaction to the server '''
+        return self._makeUnauthenticatedCall(
+            function=requests.post,
+            url=self.sendingUrl,
+            endpoint=f'/simple/bridge/partial/broadcast/{network}/{feeSatsReserved}/{reportedFeeSats}/{walletId}',
             payload=tx)
 
     def removeWalletAlias(self):

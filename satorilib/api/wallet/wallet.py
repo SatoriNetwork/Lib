@@ -1308,6 +1308,103 @@ class Wallet(WalletBase):
     #    return self._broadcast(self._txToHex(tx))
     #    # return tx  # testing
 
+    def satoriOnlyBridgePartialSimple(
+        self,
+        amount: int,
+        ethAddress: str,
+        pullFeeFromAmount: bool = False,
+        feeSatsReserved: int = 0,
+        completerAddress: str = None,
+        changeAddress: str = None,
+    ) -> tuple[str, int]:
+        '''
+        if people do not have a balance of rvn, they can still send satori.
+        they have to pay the fee in satori. So this function produces a partial
+        transaction that can be sent to the server and the rest of the network
+        to be completed. he who completes the transaction will pay the rvn fee
+        and collect the satori fee. we will probably broadcast as a json object.
+
+        Because the Sighash_single is too complex this simple version was
+        created which allows others (ie the server) to add inputs but not
+        outputs. This makes it simple because we can add the output on our side
+        and keep the rest of the code basically the same while using
+        SIGHASH_ANYONECANPAY | SIGHASH_ALL
+
+        dealing with the limitations of this signature we need to provide all
+        outputs on our end, includeing the rvn fee output. so that needs to be
+        an input to this function. Which means we have to call the server ask it
+        to reserve an input for us and ask it how much that input is going to
+        be, then include the Raven output change back to the server. Then when
+        the server gets this transaction it will have to inspect it to verify
+        that the last output is the raven fee change and that the second to last
+        output is the Satori fee for itself.
+        '''
+        if completerAddress is None or changeAddress is None or feeSatsReserved == 0:
+            raise TransactionFailure('need completer details')
+        if (
+            amount <= 0 or
+            # not TxUtils.isAmountDivisibilityValid(
+            #    amount=amount,
+            #    divisibility=self.divisibility) or
+            not Validate.ethAddress(ethAddress, self.symbol)
+        ):
+            raise TransactionFailure('satoriTransaction bad params')
+        if pullFeeFromAmount:
+            amount -= self.mundoFee
+            amount -= self.bridgeFee
+        mundoSatsFee = TxUtils.asSats(self.mundoFee)
+        bridgeSatsFee = TxUtils.asSats(self.bridgeFee)
+        satoriSats = TxUtils.roundSatsDownToDivisibility(
+            sats=TxUtils.asSats(amount),
+            divisibility=self.divisibility)
+        satoriTotalSats = satoriSats + mundoSatsFee + bridgeSatsFee
+        (
+            gatheredSatoriUnspents,
+            gatheredSatoriSats) = self._gatherSatoriUnspents(satoriTotalSats)
+        txins, txinScripts = self._compileInputs(
+            gatheredSatoriUnspents=gatheredSatoriUnspents)
+        satoriOuts = self._compileSatoriOutputs({self.burnAddress: satoriSats})
+        satoriChangeOut = self._compileSatoriChangeOutput(
+            satoriSats=satoriSats + mundoSatsFee + bridgeSatsFee,
+            gatheredSatoriSats=gatheredSatoriSats)
+        # fee out to server
+        mundoFeeOut = self._compileSatoriOutputs(
+            {completerAddress: mundoSatsFee})[0]
+        if mundoFeeOut is None:
+            raise TransactionFailure('unable to generate mundo fee')
+        # fee out to server
+        bridgeFeeOut = self._compileSatoriOutputs(
+            {self.bridgeAddress: bridgeSatsFee})[0]
+        if bridgeFeeOut is None:
+            raise TransactionFailure('unable to generate bridge fee')
+        # change out to server
+        currencyChangeOut, currencyChange = self._compileCurrencyChangeOutput(
+            gatheredCurrencySats=feeSatsReserved,
+            inputCount=len(gatheredSatoriUnspents),
+            # len([mundoFeeOut, bridgeFeeOut, currencyChangeOut, memoOut]) +
+            outputCount=len(satoriOuts) + 4 +
+            (1 if satoriChangeOut is not None else 0),
+            scriptPubKey=self._generateScriptPubKeyFromAddress(changeAddress),
+            returnSats=True)
+        if currencyChangeOut is None:
+            raise TransactionFailure('unable to generate currency change')
+        # logging.debug('txins', txins, color='magenta')
+        # logging.debug('txinScripts', txinScripts, color='magenta')
+        # logging.debug('satoriOuts', satoriOuts, color='magenta')
+        # logging.debug('satoriChangeOut', satoriChangeOut, color='magenta')
+        # logging.debug('mundoFeeOut', mundoFeeOut, color='magenta')
+        # logging.debug('currencyChangeOut', currencyChangeOut, color='magenta')
+        memoOut = self._compileMemoOutput(ethAddress)
+        tx = self._createPartialOriginatorSimple(
+            txins=txins,
+            txinScripts=txinScripts,
+            txouts=satoriOuts + [
+                x for x in [satoriChangeOut]
+                if x is not None] + [mundoFeeOut, bridgeFeeOut, currencyChangeOut, memoOut])
+        reportedFeeSats = feeSatsReserved - currencyChange
+        # logging.debug('reportedFeeSats', reportedFeeSats, color='magenta')
+        return tx.serialize(), reportedFeeSats
+
     def satoriOnlyPartialSimple(
         self,
         amount: int,
@@ -1351,11 +1448,11 @@ class Wallet(WalletBase):
             raise TransactionFailure('satoriTransaction bad params')
         if pullFeeFromAmount:
             amount -= self.mundoFee
-        satoriTotalSats = TxUtils.asSats(
-            amount) + TxUtils.asSats(self.mundoFee)
+        mundoFeeSats = TxUtils.asSats(self.mundoFee)
         satoriSats = TxUtils.roundSatsDownToDivisibility(
             sats=TxUtils.asSats(amount),
             divisibility=self.divisibility)
+        satoriTotalSats = satoriSats + mundoFeeSats
         (
             gatheredSatoriUnspents,
             gatheredSatoriSats) = self._gatherSatoriUnspents(satoriTotalSats)
@@ -1364,16 +1461,17 @@ class Wallet(WalletBase):
         satoriOuts = self._compileSatoriOutputs({address: satoriSats})
         satoriChangeOut = self._compileSatoriChangeOutput(
             satoriSats=satoriSats,
-            gatheredSatoriSats=gatheredSatoriSats - TxUtils.asSats(self.mundoFee))
+            gatheredSatoriSats=gatheredSatoriSats - mundoFeeSats)
         # fee out to server
         mundoFeeOut = self._compileSatoriOutputs(
-            {completerAddress: TxUtils.asSats(self.mundoFee)})[0]
+            {completerAddress: mundoFeeSats})[0]
         if mundoFeeOut is None:
-            raise TransactionFailure('unable to generate satori fee')
+            raise TransactionFailure('unable to generate mundo fee')
         # change out to server
         currencyChangeOut, currencyChange = self._compileCurrencyChangeOutput(
             gatheredCurrencySats=feeSatsReserved,
             inputCount=len(gatheredSatoriUnspents),
+            # len([mundoFeeOut, currencyChange]) +
             outputCount=len(satoriOuts) + 2 +
             (1 if satoriChangeOut is not None else 0),
             scriptPubKey=self._generateScriptPubKeyFromAddress(changeAddress),
@@ -1404,6 +1502,7 @@ class Wallet(WalletBase):
         reportedFeeSats: int,
         changeAddress: Union[str, None] = None,
         completerAddress: Union[str, None] = None,
+        bridgeTransaction: bool = False,
     ) -> str:
         '''
         a companion function to satoriOnlyPartialSimple which completes the
@@ -1416,16 +1515,30 @@ class Wallet(WalletBase):
                 reportedFeeSats < TxUtils.asSats(1)
                 feeSatsReserved is greater than TxUtils.asSats(1)
             '''
+            if bridgeTransaction:
+                return (
+                    reportedFeeSats < TxUtils.asSats(1) and
+                    reportedFeeSats < feeSatsReserved and
+                    tx.vout[-2].nValue == feeSatsReserved - reportedFeeSats)
             return (
                 reportedFeeSats < TxUtils.asSats(1) and
                 reportedFeeSats < feeSatsReserved and
                 tx.vout[-1].nValue == feeSatsReserved - reportedFeeSats)
 
         def _verifyClaim():
+            if bridgeTransaction:
+                # [mundoFeeOut, bridgeFeeOut, currencyChangeOut, memoOut]
+                return self._checkSatoriValue(tx.vout[-4]) and self._checkSatoriValue(tx.vout[-3])
+            # [mundoFeeOut, currencyChangeOut]
             return self._checkSatoriValue(tx.vout[-2])
 
         def _verifyClaimAddress():
             ''' verify the claim output goes to completerAddress '''
+            if bridgeTransaction:
+                for i, x in enumerate(tx.vout[-4].scriptPubKey):
+                    if i == 2 and isinstance(x, bytes):
+                        return completerAddress == self.hash160ToAddress(x)
+                return False
             for i, x in enumerate(tx.vout[-2].scriptPubKey):
                 if i == 2 and isinstance(x, bytes):
                     return completerAddress == self.hash160ToAddress(x)
@@ -1433,6 +1546,11 @@ class Wallet(WalletBase):
 
         def _verifyChangeAddress():
             ''' verify the change output goes to us at changeAddress '''
+            if bridgeTransaction:
+                for i, x in enumerate(tx.vout[-2].scriptPubKey):
+                    if i == 2 and isinstance(x, bytes):
+                        return changeAddress == self.hash160ToAddress(x)
+                return False
             for i, x in enumerate(tx.vout[-1].scriptPubKey):
                 if i == 2 and isinstance(x, bytes):
                     return changeAddress == self.hash160ToAddress(x)
@@ -1449,6 +1567,9 @@ class Wallet(WalletBase):
             raise TransactionFailure(
                 f'fee mismatch, {reportedFeeSats}, {feeSatsReserved}')
         if not _verifyClaim():
+            if bridgeTransaction:
+                raise TransactionFailure(
+                    f'claim mismatch, {tx.vout[-4]}, {tx.vout[-3]}')
             raise TransactionFailure(f'claim mismatch, {tx.vout[-2]}')
         if not _verifyClaimAddress():
             raise TransactionFailure('claim mismatch, _verifyClaimAddress')
@@ -1790,9 +1911,9 @@ class Wallet(WalletBase):
                         success=True,
                         tx=None,
                         msg='creating partial, need feeSatsReserved.')
-                result = self.satoriOnlyPartialSimple(
+                result = self.satoriOnlyBridgePartialSimple(
                     amount=amount,
-                    address=burnAddress,
+                    ethAddress=ethAddress,
                     feeSatsReserved=feeSatsReserved,
                     completerAddress=completerAddress,
                     changeAddress=changeAddress)
@@ -1811,8 +1932,13 @@ class Wallet(WalletBase):
                     reportedFeeSats=result[1],
                     msg='send transaction requires fee.')
             # logging.debug('q', color='magenta')
-            # TODO: validate ethAddress
-            # TODO: finish
+            # validate ethAddress
+            if not Validate.ethAddress(ethAddress):
+                return TransactionResult(
+                    result=None,
+                    success=True,
+                    tx=None,
+                    msg='invalid eth address.')
             result = self.satoriDistribution(
                 amountByAddress={
                     self.bridgeAddress: self.bridgeFee,

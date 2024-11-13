@@ -754,20 +754,20 @@ class SatoriServerClient(object):
             return None
         return True
         
-    def getProposalById(self, proposal_id: str) -> dict:
-        try:
-            response = self._makeUnauthenticatedCall(
-                function=requests.get,
-                endpoint=f'/proposals/get/{proposal_id}'  # Update endpoint path
-            )
-            if response.status_code == 200:
-                return response.json()
-            else:
-                logging.error(f"Failed to get proposal. Status code: {response.status_code}")
-                return None
-        except Exception as e:
-            logging.error(f"Error occurred while fetching proposal: {str(e)}")
-            return None        
+    #def getProposalById(self, proposal_id: str) -> dict:
+    #    try:
+    #        response = self._makeUnauthenticatedCall(
+    #            function=requests.get,
+    #            endpoint=f'/proposals/get/{proposal_id}'  # Update endpoint path
+    #        )
+    #        if response.status_code == 200:
+    #            return response.json()
+    #        else:
+    #            logging.error(f"Failed to get proposal. Status code: {response.status_code}")
+    #            return None
+    #    except Exception as e:
+    #        logging.error(f"Error occurred while fetching proposal: {str(e)}")
+    #        return None        
 
     
 

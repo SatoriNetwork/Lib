@@ -720,7 +720,7 @@ class SatoriServerClient(object):
                 endpoint='/stake/proxy/charity',
                 payload=json.dumps({
                     'child': address,
-                    **({} childId in [None, 0, '0'] else {'childId': childId})
+                    **({} if childId in [None, 0, '0'] else {'childId': childId})
                 }))
             return response.status_code < 400, response.text
         except Exception as e:
@@ -736,7 +736,7 @@ class SatoriServerClient(object):
                 endpoint='/stake/proxy/charity/not',
                 payload=json.dumps({
                     'child': address,
-                    **({} childId in [None, 0, '0'] else {'childId': childId})
+                    **({} if childId in [None, 0, '0'] else {'childId': childId})
                 }))
             return response.status_code < 400, response.text
         except Exception as e:

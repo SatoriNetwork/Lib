@@ -4,3 +4,4 @@ from .secret import encrypt, decrypt
 from .types import SuccessValue
 from .name import getRandomName, getRandomQuote
 from .nested import Nested
+from .json import sanitizeJson

@@ -718,7 +718,10 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/stake/proxy/charity',
-                payload=json.dumps({'child': address, 'childId': childId}))
+                payload=json.dumps({
+                    'child': address,
+                    **({} childId in [None, 0, '0'] else {'childId': childId})
+                }))
             return response.status_code < 400, response.text
         except Exception as e:
             logging.warning(
@@ -731,7 +734,10 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/stake/proxy/charity/not',
-                payload=json.dumps({'child': address, 'childId': childId}))
+                payload=json.dumps({
+                    'child': address,
+                    **({} childId in [None, 0, '0'] else {'childId': childId})
+                }))
             return response.status_code < 400, response.text
         except Exception as e:
             logging.warning(
@@ -827,8 +833,8 @@ class SatoriServerClient(object):
             #    'unable to determine if prediction was accepted; try again Later.', e, color='yellow')
             return None
         return True
-        
-    #def getProposalById(self, proposal_id: str) -> dict:
+
+    # def getProposalById(self, proposal_id: str) -> dict:
     #    try:
     #        response = self._makeUnauthenticatedCall(
     #            function=requests.get,
@@ -841,9 +847,7 @@ class SatoriServerClient(object):
     #            return None
     #    except Exception as e:
     #        logging.error(f"Error occurred while fetching proposal: {str(e)}")
-    #        return None        
-
-    
+    #        return None
 
     def getProposals(self):
         """
@@ -866,7 +870,6 @@ class SatoriServerClient(object):
                 f"Error occurred while fetching proposals: {str(e)}", color='red')
             return []
 
-
     def getApprovedProposals(self):
         """
         Function to get all approved proposals by calling the API endpoint.
@@ -888,9 +891,6 @@ class SatoriServerClient(object):
                 f"Error occurred while fetching approved proposals: {str(e)}", color='red')
             return []
 
-    
-
-    
     def submitProposal(self, proposal_data: dict) -> tuple[bool, dict]:
         '''submits proposal'''
         try:
@@ -923,7 +923,7 @@ class SatoriServerClient(object):
             logging.error(error_message)
             logging.error(traceback.format_exc())
             return False, {"error": error_message}
-        
+
     def getProposalById(self, proposal_id: str) -> dict:
         """
         Function to get a specific proposal by ID by calling the API endpoint.
@@ -937,34 +937,29 @@ class SatoriServerClient(object):
                 return response.json()['proposal']
             else:
                 logging.error(
-                    f"Failed to get proposal. Status code: {response.status_code}", 
+                    f"Failed to get proposal. Status code: {response.status_code}",
                     extra={'color': 'red'}
                 )
                 return None
         except requests.RequestException as e:
             logging.error(
-                f"Error occurred while fetching proposal: {str(e)}", 
+                f"Error occurred while fetching proposal: {str(e)}",
                 extra={'color': 'red'}
             )
             return None
-        
 
-    
-    
-
-    
     def getProposalVotes(self, proposal_id: str, format_type: str = None) -> dict:
         '''Gets proposal votes with option for raw or processed format'''
         try:
             endpoint = f'/proposal/votes/get/{proposal_id}'
             if format_type:
                 endpoint += f'?format={format_type}'
-                
+
             response = self._makeUnauthenticatedCall(
                 function=requests.get,
                 endpoint=endpoint
             )
-            
+
             if response.status_code == 200:
                 return response.json()
             else:
@@ -972,8 +967,7 @@ class SatoriServerClient(object):
                 return {'status': 'error', 'message': error_message}
         except Exception as e:
             return {'status': 'error', 'message': str(e)}
-    
-        
+
     def getExpiredProposals(self) -> dict:
         """
         Fetches expired proposals
@@ -991,13 +985,12 @@ class SatoriServerClient(object):
         except Exception as e:
             error_message = f"Error in getExpiredProposals: {str(e)}"
             return {'status': 'error', 'message': error_message}
-        
 
     APPROVED_ADMIN_ADDRESSES = {
         # Satori admin wallets
-        "EQGB7cBW3HvafARDoYsgceJS2W7ZhKe3b6",  
-        "EHkDUkADkYnUY1cjCa5Lgc9qxLTMUQEBQm",  
-       
+        "EQGB7cBW3HvafARDoYsgceJS2W7ZhKe3b6",
+        "EHkDUkADkYnUY1cjCa5Lgc9qxLTMUQEBQm",
+
     }
 
     def isApprovedAdmin(self, wallet_address: str) -> bool:
@@ -1005,7 +998,7 @@ class SatoriServerClient(object):
         if not wallet_address:
             return False
         return wallet_address in self.APPROVED_ADMIN_ADDRESSES
-        
+
     def getUnapprovedProposals(self, wallet_address: str = None) -> dict:
         """Get unapproved proposals only if user has admin rights"""
         try:
@@ -1019,7 +1012,7 @@ class SatoriServerClient(object):
                 function=requests.get,
                 endpoint='/proposals/unapproved'
             )
-            
+
             if response.status_code == 200:
                 return {
                     'status': 'success',
@@ -1030,7 +1023,7 @@ class SatoriServerClient(object):
                     'status': 'error',
                     'message': 'Failed to fetch unapproved proposals'
                 }
-                
+
         except Exception as e:
             logging.error(f"Error in getUnapprovedProposals: {str(e)}")
             return {
@@ -1048,7 +1041,7 @@ class SatoriServerClient(object):
                 function=requests.post,
                 endpoint=f'/proposals/approve/{proposal_id}'
             )
-            
+
             if response.status_code == 200:
                 return True, response.json()
             else:
@@ -1067,7 +1060,7 @@ class SatoriServerClient(object):
                 function=requests.post,
                 endpoint=f'/proposals/disapprove/{proposal_id}'
             )
-            
+
             if response.status_code == 200:
                 return True, response.json()
             else:
@@ -1075,6 +1068,7 @@ class SatoriServerClient(object):
 
         except Exception as e:
             return False, {'error': str(e)}
+
     def getActiveProposals(self) -> dict:
         """
         Fetches active proposals
@@ -1092,7 +1086,7 @@ class SatoriServerClient(object):
         except Exception as e:
             error_message = f"Error in getActiveProposals: {str(e)}"
             return {'status': 'error', 'message': error_message}
-    
+
     def submitProposalVote(self, proposal_id: int, vote: str) -> tuple[bool, dict]:
         """
         Submits a vote for a proposal
@@ -1116,7 +1110,7 @@ class SatoriServerClient(object):
         except Exception as e:
             error_message = f"Error in submitProposalVote: {str(e)}"
             return False, {"error": error_message}
-            
+
     def poolAccepting(self, status: bool) -> tuple[bool, dict]:
         """
         Function to set the pool status to accepting or not accepting

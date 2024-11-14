@@ -1340,15 +1340,20 @@ class Wallet(WalletBase):
         output is the Satori fee for itself.
         '''
         if completerAddress is None or changeAddress is None or feeSatsReserved == 0:
-            raise TransactionFailure('need completer details')
-        if (
-            amount <= 0 or
-            # not TxUtils.isAmountDivisibilityValid(
-            #    amount=amount,
-            #    divisibility=self.divisibility) or
-            not Validate.ethAddress(ethAddress, self.symbol)
-        ):
-            raise TransactionFailure('satoriTransaction bad params')
+            raise TransactionFailure(
+                'Satori Bridge Transaction bad params: need completer details')
+        if amount <= 0:
+            raise TransactionFailure(
+                'Satori Bridge Transaction bad params: amount <= 0')
+        if amount > 100:
+            raise TransactionFailure(
+                'Satori Bridge Transaction bad params: amount > 100')
+        if not Validate.ethAddress(ethAddress):
+            raise TransactionFailure(
+                'Satori Bridge Transaction bad params: eth address')
+        if self.balanceAmount >= amount + self.bridgeFee + self.mundoFee:
+            raise TransactionFailure(
+                f'Satori Bridge Transaction bad params: balance too low to pay for bridgeFee {self.balanceAmount} < {amount} + {self.bridgeFee} + {self.mundoFee}')
         if pullFeeFromAmount:
             amount -= self.mundoFee
             amount -= self.bridgeFee
@@ -1896,9 +1901,22 @@ class Wallet(WalletBase):
         changeAddress: str = None,
         feeSatsReserved: int = 0
     ) -> TransactionResult:
+        if completerAddress is None or changeAddress is None or feeSatsReserved == 0:
+            raise TransactionFailure(
+                'Satori Bridge Transaction bad params: need completer details')
+        if amount <= 0:
+            raise TransactionFailure(
+                'Satori Bridge Transaction bad params: amount <= 0')
+        if amount > 100:
+            raise TransactionFailure(
+                'Satori Bridge Transaction bad params: amount > 100')
+        if not Validate.ethAddress(ethAddress):
+            raise TransactionFailure(
+                'Satori Bridge Transaction bad params: eth address')
         try:
-            if self.balanceAmount - amount - self.bridgeFee < 0:
-                raise TransactionFailure('amount too low')
+            if self.balanceAmount >= amount + self.bridgeFee:
+                raise TransactionFailure(
+                    f'Satori Bridge Transaction bad params: balance too low to pay for bridgeFee {self.balanceAmount} < {amount} + {self.bridgeFee}')
             if self.currency < self.reserve:
                 # if we have to make a partial we need more data so we need
                 # to return, telling them we need more data, asking for more

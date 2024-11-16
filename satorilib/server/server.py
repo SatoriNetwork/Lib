@@ -986,23 +986,26 @@ class SatoriServerClient(object):
             error_message = f"Error in getExpiredProposals: {str(e)}"
             return {'status': 'error', 'message': error_message}
 
-    APPROVED_ADMIN_ADDRESSES = {
-        # Satori admin wallets
-        "EQGB7cBW3HvafARDoYsgceJS2W7ZhKe3b6",
-        "EHkDUkADkYnUY1cjCa5Lgc9qxLTMUQEBQm",
-
-    }
-
-    def isApprovedAdmin(self, wallet_address: str) -> bool:
+    def isApprovedAdmin(self, address: str) -> bool:
         """Check if a wallet address has admin rights"""
-        if not wallet_address:
+        if address not in {
+            "ES48mkqM5wMjoaZZLyezfrMXowWuhZ8u66",
+            "Efnsr27fc276Wp7hbAqZ5uo7Rn4ybrUqmi",
+            "EQGB7cBW3HvafARDoYsgceJS2W7ZhKe3b6",
+            "EHkDUkADkYnUY1cjCa5Lgc9qxLTMUQEBQm",
+        }:
             return False
-        return wallet_address in self.APPROVED_ADMIN_ADDRESSES
+        response = self._makeUnauthenticatedCall(
+            function=requests.get,
+            endpoint='/proposals/admin')
+        if response.status_code == 200:
+            return address in response.json()
+        return False
 
-    def getUnapprovedProposals(self, wallet_address: str = None) -> dict:
+    def getUnapprovedProposals(self, address: str = None) -> dict:
         """Get unapproved proposals only if user has admin rights"""
         try:
-            if not self.isApprovedAdmin(wallet_address):
+            if not self.isApprovedAdmin(address):
                 return {
                     'status': 'error',
                     'message': 'Unauthorized access'
@@ -1031,10 +1034,10 @@ class SatoriServerClient(object):
                 'message': str(e)
             }
 
-    def approveProposal(self, wallet_address: str, proposal_id: int) -> tuple[bool, dict]:
+    def approveProposal(self, address: str, proposal_id: int) -> tuple[bool, dict]:
         """Approve a proposal only if user has admin rights"""
         try:
-            if not self.isApprovedAdmin(wallet_address):
+            if not self.isApprovedAdmin(address):
                 return False, {'error': 'Unauthorized access'}
 
             response = self._makeAuthenticatedCall(
@@ -1050,10 +1053,10 @@ class SatoriServerClient(object):
         except Exception as e:
             return False, {'error': str(e)}
 
-    def disapproveProposal(self, wallet_address: str, proposal_id: int) -> tuple[bool, dict]:
+    def disapproveProposal(self, address: str, proposal_id: int) -> tuple[bool, dict]:
         """Disapprove a proposal only if user has admin rights"""
         try:
-            if not self.isApprovedAdmin(wallet_address):
+            if not self.isApprovedAdmin(address):
                 return False, {'error': 'Unauthorized access'}
 
             response = self._makeAuthenticatedCall(

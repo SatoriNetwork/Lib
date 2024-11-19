@@ -541,7 +541,7 @@ class SatoriServerClient(object):
                 'unable to get reward address; try again Later.', e, color='yellow')
             return ''
 
-    def reportVault(
+    def registerVault(
         self,
         walletSignature: Union[str, bytes],
         vaultSignature: Union[str, bytes],
@@ -556,7 +556,7 @@ class SatoriServerClient(object):
         try:
             response = self._makeAuthenticatedCall(
                 function=requests.post,
-                endpoint='/vault/report',
+                endpoint='/register/vault',
                 payload=json.dumps({
                     'walletSignature': walletSignature,
                     'vaultSignature': vaultSignature,

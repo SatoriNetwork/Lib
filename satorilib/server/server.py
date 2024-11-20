@@ -565,7 +565,7 @@ class SatoriServerClient(object):
             return response.status_code < 400, response.text
         except Exception as e:
             logging.warning(
-                'unable to enable status of Mine-To-Vault feature due to connection timeout; try again Later.', e, color='yellow')
+                'unable to register vault address due to connection timeout; try again Later.', e, color='yellow')
             return False, ''
 
     def enableMineToVault(

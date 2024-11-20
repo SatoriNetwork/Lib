@@ -6,6 +6,7 @@ from websockets.server import serve
 from websockets.client import connect
 from websockets.exceptions import ConnectionClosed
 
+
 class WebSocketServer:
     def __init__(
         self,
@@ -54,6 +55,7 @@ class WebSocketServer:
                 *[connection.send(message) for connection in self.connections]
             )
 
+
 class WebSocketClient:
     def __init__(
         self,
@@ -92,7 +94,6 @@ class WebSocketClient:
         """Send data to the server"""
         if not self.websocket:
             raise ConnectionError("Not connected to server")
-        
         try:
             if isinstance(data, pd.DataFrame):
                 await self.websocket.send(pickle.dumps(data))
@@ -105,6 +106,7 @@ class WebSocketClient:
         """Start the client"""
         if await self.connect():
             await self.listen()
+
 
 async def main():
     def message_handler(data):
@@ -119,6 +121,7 @@ async def main():
         client.start(),
         send_data(client)
     )
+
 
 async def send_data(client):
     await asyncio.sleep(1)

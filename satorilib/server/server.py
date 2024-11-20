@@ -556,7 +556,7 @@ class SatoriServerClient(object):
                 'unable to get reward address; try again Later.', e, color='yellow')
             return ''
 
-    def reportVault(
+    def registerVault(
         self,
         walletSignature: Union[str, bytes],
         vaultSignature: Union[str, bytes],
@@ -571,7 +571,7 @@ class SatoriServerClient(object):
         try:
             response = self._makeAuthenticatedCall(
                 function=requests.post,
-                endpoint='/vault/report',
+                endpoint='/register/vault',
                 payload=json.dumps({
                     'walletSignature': walletSignature,
                     'vaultSignature': vaultSignature,
@@ -580,7 +580,7 @@ class SatoriServerClient(object):
             return response.status_code < 400, response.text
         except Exception as e:
             logging.warning(
-                'unable to enable status of Mine-To-Vault feature due to connection timeout; try again Later.', e, color='yellow')
+                'unable to register vault address due to connection timeout; try again Later.', e, color='yellow')
             return False, ''
 
     def enableMineToVault(

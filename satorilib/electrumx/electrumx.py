@@ -71,10 +71,8 @@ class Electrumx(ElectrumxConnection):
                         r = json.loads(message)
                         method = r.get('method', '')
                         if 'subscribe' in method:
-                            print(f'adding to subscriptions for {method} {r}')
                             self.subscriptions[method].put(r)
                         else:
-                            print(f'adding to responses {r}')
                             self.responses.put(r)
                     except json.decoder.JSONDecodeError as e:
                         logging.error((
@@ -160,11 +158,9 @@ class Electrumx(ElectrumxConnection):
     ) -> Union[dict, list, None]:
         payload = self._preparePayload(method, *args)
         with self.lock:
-            print('sending...')
             self.connection.send(payload)
             if sendOnly:
                 return None
-            print('waiting for response...')
             return self.listenForResponse()
 
     def subscribe(self, method: str, *args):

@@ -207,7 +207,6 @@ class Wallet(WalletBase):
         self.loadCache()
 
     def __call__(self):
-        self.connect()
         self.get()
         return self
 
@@ -242,6 +241,11 @@ class Wallet(WalletBase):
     @property
     def isDecrypted(self) -> bool:
         return not self.isEncrypted
+
+    @property
+    def networkByte(self) -> bytes:
+        return (33).to_bytes(1, 'big') # evrmore by default
+
 
     ### Loading ################################################################
 
@@ -428,32 +432,30 @@ class Wallet(WalletBase):
             self.electrumx.api.subscribeScripthash(scripthash=self.scripthash)
 
     def preSend(self) -> bool:
-        if not hasattr(self, 'electrumx') or self.electrumx is None or not self.electrumx.connected():
-            try:
-                self.connect()
-            except Exception as e:
-                logging.error(f'unable to connect {e}')
-                return False
-        if not self.electrumx.connected():
+        if  (
+            self.electrumx is None or (
+                isinstance(self.electrumx, Electrumx) and
+                not self.electrumx.connected())
+        ):
             self.stats = {'status': 'not connected'}
-            self.divisibility = 8
+            self.divisibility = self.divisibility or 8
             self.banner = 'not connected'
-            self.transactionHistory = []
-            self.currencyOnChain = 0
-            self.unspentCurrency = []
-            self.balanceOnChain = 0
-            self.unspentAssets = []
-            self.currency = 0
-            self.currencyAmount = 0
-            self.balance = 0
-            self.balanceAmount = 0
+            self.transactionHistory = self.transactionHistory or []
+            self.currencyOnChain = self.currencyOnChain or 0
+            self.unspentCurrency = self.unspentCurrency or []
+            self.balanceOnChain = self.balanceOnChain or 0
+            self.unspentAssets = self.unspentAssets or []
+            self.currency = self.currency or 0
+            self.currencyAmount = self.currencyAmount or 0
+            self.balance = self.balance or 0
+            self.balanceAmount = self.balanceAmount or 0
             return False
         return True
 
     def getUnspentCurrency(self, *args, **kwargs):
         if not self.preSend():
             return
-        self.unspentCurrency = self.electrumx.getUnspentCurrency()
+        self.unspentCurrency = self.electrumx.api.getUnspentCurrency()
         self.unspentCurrency = [
             x for x in self.unspentCurrency if x.get('asset') == None]
 
@@ -467,39 +469,39 @@ class Wallet(WalletBase):
                 logging.error('openSafely err:', supposedDict, e)
                 return default
 
-        def getBalanceTheHardWay() -> int:
-            '''
-            using unspents get all transactions
-            cycle through the vouts to find the asset you want and that was sent to your address:
-            'vout': [{
-                'n': 0,
-                'scriptPubKey': {
-                    'type': 'transfer_asset',
-                    'asset': {
-                        'name': 'KINKAJOU/GROOMER1',
-                        'amount': 1.0},
-                    'addresses': ['Eevy1hooby2SmCMZHcGbFVArPMYUY8EThs']}}]
-            OR you could get a list of all addresses that hold the asset and find your address in the list:
-            e.send('blockchain.asset.list_addresses_by_asset', 'SATORI')
-            {
-                'Eagq7rNFUEnR7kciQafV38kzpocef74J44': 1.0,
-                'EbdsuYpb3URjafVLaSCzfnjGAc9gzH8gwg': 136.0,
-                'EdLRYNrPVJLqXz9Pxp6fwD4gNdvk4dZNnP': 1.0
-            }
-            '''
-            return self.electrumx.getAssetHolders(self.address).get(self.address, 0)
+        #def getBalanceTheHardWay() -> int:
+        #    '''
+        #    using unspents get all transactions
+        #    cycle through the vouts to find the asset you want and that was sent to your address:
+        #    'vout': [{
+        #        'n': 0,
+        #        'scriptPubKey': {
+        #            'type': 'transfer_asset',
+        #            'asset': {
+        #                'name': 'KINKAJOU/GROOMER1',
+        #                'amount': 1.0},
+        #            'addresses': ['Eevy1hooby2SmCMZHcGbFVArPMYUY8EThs']}}]
+        #    OR you could get a list of all addresses that hold the asset and find your address in the list:
+        #    e.send('blockchain.asset.list_addresses_by_asset', 'SATORI')
+        #    {
+        #        'Eagq7rNFUEnR7kciQafV38kzpocef74J44': 1.0,
+        #        'EbdsuYpb3URjafVLaSCzfnjGAc9gzH8gwg': 136.0,
+        #        'EdLRYNrPVJLqXz9Pxp6fwD4gNdvk4dZNnP': 1.0
+        #    }
+        #    '''
+        #    return self.electrumx.api.getAssetHolders(self.address).get(self.address, 0)
 
         def getTransactions(transactionHistory: dict) -> list:
             self.transactions = []
             for tx in transactionHistory:
                 txid = tx.get('tx_hash', '')
                 if txid not in self._transactions.keys():
-                    raw = self.electrumx.getTransaction(txid)
+                    raw = self.electrumx.api.getTransaction(txid)
                     if raw is not None:
                         txs = []
-                        for vin in raw.get('vin', []):
+                        for vin in raw.get('vin', {}):
                             txs.append(
-                                self.electrumx.getTransaction(vin.get('txid', '')))
+                                self.electrumx.api.getTransaction(vin.get('txid', '')))
                         transaction = TransactionStruct(
                             raw=raw, vinVoutsTxs=[t for t in txs if t is not None])
                         self.transactions.append(transaction)
@@ -510,125 +512,109 @@ class Wallet(WalletBase):
                         TransactionStruct(raw=raw, vinVoutsTxs=txs))
 
         # unused - alternative to getTransactions - just gets the ones we need.
-        def getVouts(self, unspentCurrency, unspentAssets):
-            currencyVouts = [
-                self.electrumx.getTransaction(tx.get('tx_hash'))
-                for tx in unspentCurrency
-            ]
-            assetVouts = [
-                self.electrumx.getTransaction(tx.get('tx_hash'))
-                for tx in unspentAssets
-            ]
-            return currencyVouts, assetVouts
+        #def getVouts(self, unspentCurrency, unspentAssets):
+        #    currencyVouts = [
+        #        self.electrumx.api.getTransaction(tx.get('tx_hash'))
+        #        for tx in unspentCurrency
+        #    ]
+        #    assetVouts = [
+        #        self.electrumx.api.getTransaction(tx.get('tx_hash'))
+        #        for tx in unspentAssets
+        #    ]
+        #    return currencyVouts, assetVouts
 
-        # x = Evrmore(self.address, self.scripthash, config.electrumxServers())
-        # todo: this list of servers should be parameterized from configuration
-
-        # todo:
-        # on connect ask for peers, add each to our list of electrumxServers
-        # if unable to connect, remove that server from our list
         if not self.preSend():
             return
         logging.debug('pulling transactions from blockchain...')
-        self.stats = self.electrumx.getStats()
-        # self.divisibility = self.stats.get('divisions', 8)
+        self.stats = self.electrumx.api.getStats()
         self.divisibility = openSafely(self.stats, 'divisions', 8)
         self.divisibility = self.divisibility if self.divisibility is not None else 8
-        # self.assetTransactions = self.electrumx.assetTransactions
-        self.banner = self.electrumx.getBanner()
-        self.transactionHistory = self.electrumx.getTransactionHistory()
-        # self.getTransactionsThread.join()
-
-        self.currencyOnChain = self.electrumx.getCurrency()
+        self.banner = self.electrumx.api.getBanner()
+        self.transactionHistory = self.electrumx.api.getTransactionHistory()
+        self.currencyOnChain = self.electrumx.api.getCurrency()
         logging.debug('self.currencyOnChain', self.currencyOnChain)
-        self.unspentCurrency = self.electrumx.getUnspentCurrency()
+        self.unspentCurrency = self.electrumx.api.getUnspentCurrency()
         self.unspentCurrency = [
             x for x in self.unspentCurrency if x.get('asset') == None]
         if 'SATORI' in self.watchAssets:
-            self.balanceOnChain = self.electrumx.getBalance()
+            self.balanceOnChain = self.electrumx.api.getBalance()
             logging.debug('self.balanceOnChain', self.balanceOnChain)
             # mempool sends all unspent transactions in currency and assets so we have to filter them here:
-            self.unspentAssets = self.electrumx.getUnspentAssets()
+            self.unspentAssets = self.electrumx.api.getUnspentAssets()
             self.unspentAssets = [
                 x for x in self.unspentAssets if x.get('asset') != None]
             logging.debug('self.unspentAssets', self.unspentAssets)
-        # for logging purposes
         for x in self.unspentCurrency:
             openSafely(x, 'value', 0)
         self.currency = sum([
             x.get('value', 0) for x in self.unspentCurrency
             if x.get('asset') == None])
         self.currencyAmount = TxUtils.asAmount(self.currency or 0, 8)
-        # for logging purposes
-        # for x in self.unspentAssets:
-        #    openSafely(x, 'value')
-        #    openSafely(x, 'name')
-        # don't need this anymore because we're getting it from the server correctly
-        # if (
-        #    isinstance(self.unspentAssets, dict)
-        #    and self.unspentAssets.get('message') == 'unknown method "blockchain.scripthash.listassets"'
-        # ):
-        #    self.balance = getBalanceTheHardWay()
-        #    unspents, assetUnspents = self.getUnspentsFromHistory()
-        #    if sum([x.get('value', 0) for x in unspents]) == sum([x.get('value', 0) for x in self.unspentCurrency]):
-        #        self.unspentAssets = assetUnspents
-        # else:
         if 'SATORI' in self.watchAssets:
             self.balance = sum([
                 x.get('value', 0) for x in self.unspentAssets
                 if x.get('name', x.get('asset')) == 'SATORI' and x.get('value') > 0])
             logging.debug('self.balance', self.balance)
             self.balanceAmount = TxUtils.asAmount(
-                self.balance or 0, self.divisibility)
-        # self.currencyVouts = self.electrumx.evrVouts
-        # self.assetVouts = self.electrumx.assetVouts
-
+                self.balance or 0,
+                self.divisibility)
         # getTransactions(self.transactionHistory)
-
-        # threaded interferring with other calls...
+        # # above can take too long so thread:
+        # # threaded interferring with other calls...
         # self.getTransactionsThread = threading.Thread(
-        #     target=getTransactions, args=(self.transactionHistory,), daemon=True)
+        #    target=getTransactions,
+        #    args=(self.transactionHistory,),
+        #    daemon=True)
         # self.getTransactionsThread.start()
         # self.saveCache()
-        logging.info('pulled transactions from blockchain', color='blue')
+        # logging.info('pulled transactions from blockchain', color='blue')
+        # we commented all this out because in most cases we don't need all the
+        # transactions, we only need our unspents, and we pull the transactions
+        # for those in order to get the signatures needed for signing just
+        # before create transactions.
 
     ### Functions ##############################################################
 
     def appendTransaction(self, txid):
         if txid not in self._transactions.keys():
-            raw = self.electrumx.getTransaction(txid)
+            raw = self.electrumx.api.getTransaction(txid)
             if raw is not None:
                 if self.pullFullTransactions:
                     txs = []
                     txIds = []
-                    for vin in raw.get('vin', []):
+                    for vin in raw.get('vin', {}):
                         txId = vin.get('txid', '')
                         if txId == '':
                             continue
                         txIds.append(txId)
-                        txs.append(
-                            self.electrumx.getTransaction(txId))
-                    transaction = TransactionStruct(raw=raw, vinVoutsTxids=txIds, vinVoutsTxs=[
-                                                    t for t in txs if t is not None])
+                        txs.append(self.electrumx.api.getTransaction(txId))
+                    transaction = TransactionStruct(
+                        raw=raw,
+                        vinVoutsTxids=txIds,
+                        vinVoutsTxs=[t for t in txs if t is not None])
                     self.transactions.append(transaction)
                     self._transactions[txid] = transaction.export()
                     return transaction.export()
                 else:
                     txs = []
                     txIds = []
-                    for vin in raw.get('vin', []):
+                    for vin in raw.get('vin', {}):
                         txId = vin.get('txid', '')
                         if txId == '':
                             continue
                         txIds.append(txId)
                         # <--- don't get the inputs to the transaction here
                     transaction = TransactionStruct(
-                        raw=raw, vinVoutsTxids=txIds)
+                        raw=raw,
+                        vinVoutsTxids=txIds)
                     self.transactions.append(transaction)
         else:
             raw, txids, txs = self._transactions.get(txid, ({}, []))
             self.transactions.append(
-                TransactionStruct(raw=raw, vinVoutsTxids=txids, vinVoutsTxs=txs))
+                TransactionStruct(
+                    raw=raw,
+                    vinVoutsTxids=txids,
+                    vinVoutsTxs=txs))
 
     def callTransactionHistory(self):
         def getTransactions(transactionHistory: dict) -> list:

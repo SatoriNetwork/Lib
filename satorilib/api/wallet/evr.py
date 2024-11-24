@@ -1,38 +1,41 @@
 from typing import Union
-import threading
-import time
 import random
 from evrmore import SelectParams
 from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret
 from evrmore.core.scripteval import VerifyScript, SCRIPT_VERIFY_P2SH
 from evrmore.core.script import CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, OP_EVR_ASSET, OP_DROP, OP_RETURN, SIGHASH_ANYONECANPAY
-from evrmore.core import b2x, lx, COIN, COutPoint, CMutableTxOut, CMutableTxIn, CMutableTransaction, Hash160
+from evrmore.core import b2x, lx, COutPoint, CMutableTxOut, CMutableTxIn, CMutableTransaction, Hash160
 from evrmore.core.scripteval import EvalScriptError
-from satorilib.electrumx import ElectrumxApi
 from satoriwallet import evrmore
 from satoriwallet import TxUtils, AssetTransaction
 from satorilib.electrumx import Electrumx
-from satorilib import logging
 from satorilib.api.wallet.wallet import Wallet, TransactionFailure
 
-evrmoreElectrumServers: list[str] = [
-    '128.199.1.149:50002',
-    '146.190.149.237:50002',
-    '146.190.38.120:50002',
-    'electrum1-mainnet.evrmorecoin.org:50002',
-    'electrum2-mainnet.evrmorecoin.org:50002',
-]
-
-evrmoreElectrumServersSubscription: list[str] = [
-    '128.199.1.149:50001',
-    '146.190.149.237:50001',
-    '146.190.38.120:50001',
-    'electrum1-mainnet.evrmorecoin.org:50001',
-    'electrum2-mainnet.evrmorecoin.org:50001',
-]
-
-
 class EvrmoreWallet(Wallet):
+
+    electrumxServers: list[str] = [
+        '128.199.1.149:50002',
+        '146.190.149.237:50002',
+        '146.190.38.120:50002',
+        'electrum1-mainnet.evrmorecoin.org:50002',
+        'electrum2-mainnet.evrmorecoin.org:50002',
+    ]
+
+    electrumxServersWithoutSSL: list[str] = [
+        '128.199.1.149:50001',
+        '146.190.149.237:50001',
+        '146.190.38.120:50001',
+        'electrum1-mainnet.evrmorecoin.org:50001',
+        'electrum2-mainnet.evrmorecoin.org:50001',
+    ]
+
+    @staticmethod
+    def createElectrumxConnection(hostPort: str = None, persistent: bool = False) -> Electrumx:
+        hostPort = hostPort or random.choice(EvrmoreWallet.electrumxServers)
+        return Electrumx(
+            persistent=persistent,
+            host=hostPort.split(':')[0],
+            port=int(hostPort.split(':')[1]))
 
     def __init__(
         self,
@@ -56,69 +59,6 @@ class EvrmoreWallet(Wallet):
             pullFullTransactions=pullFullTransactions)
         self.electrumx = electrumx or EvrmoreWallet.createElectrumxConnection()
         self.type = type
-
-    @staticmethod
-    def createElectrumxConnection(hostPort: str = None, persistent: bool = False) -> Electrumx:
-        hostPort = hostPort or random.choice(evrmoreElectrumServers)
-        return Electrumx(
-            persistent=persistent,
-            host=hostPort.split(':')[0],
-            port=int(hostPort.split(':')[1]))
-
-    def connect(self):
-        try:
-            reconnected = False
-            condition = not self.electrumx.connectionected()
-            if condition:
-                self.electrumx = EvrmoreWallet.createElectrumxConnection()
-                reconnected = True
-            if self.electrumx is None or reconnected:
-                self.electrumx = ElectrumxApi(
-                    chain=self.chain,
-                    address=self.address,
-                    scripthash=self.scripthash,
-                    electrumx=self.electrumx,
-                    type=self.type,
-                    onScripthashNotification=self.get,  # self.callTransactionHistory()
-                    onBlockNotification=None,
-                    servers=[
-                        # 'moontree.com:50022',  # mainnet ssl evr
-                        '128.199.1.149:50002',
-                        '146.190.149.237:50002',
-                        '146.190.38.120:50002',  # backup - maybe just use for server
-                        'electrum1-mainnet.evrmorecoin.org:50002',
-                        'electrum2-mainnet.evrmorecoin.org:50002',  # keeps erroring out
-
-                        # '146.190.149.237:50022',  # mainnet ssl evr # not working yet
-
-                        # updated to more recent version, now getting errors:
-                        # """{'code': -32601, 'message': 'unknown method "blockchain.scripthash.listassets"'} <class 'dict'>"""
-                        # 'electrum1-mainnet.evrmorecoin.org:50002',  # ssl
-                        # 'electrum2-mainnet.evrmorecoin.org:50002',  # ssl
-
-                        # no good:
-                        # 'electrum1-mainnet.evrmorecoin.org:50001',  # tcp
-                        # 'electrum2-mainnet.evrmorecoin.org:50001',  # tcp
-                        # 'moontree.com:50021',  # mainnet tcp evr
-                        # 'moontree.com:50031', # testnet tcp evr
-                        # 'moontree.com:50032', # testnet ssl evr
-                        # 'electrum1-mainnet.evrmorecoin.org:50004', # wss
-                        # 'electrum2-mainnet.evrmorecoin.org:50004', # wss
-                        # 'electrum1-testnet.evrmorecoin.org:50001', # tcp
-                        # 'electrum1-testnet.evrmorecoin.org:50002', # ssl
-                        # 'electrum1-testnet.evrmorecoin.org:50004', # wss
-                    ])
-                # self.setupSubscriptions()
-        except Exception as e:
-            logging.warning(
-                'ElectrumxApi issue', e)
-
-    def subscribe(self):
-        if self.electrumx is not None:
-            # Start a thread to listen for updates
-            self.processThread = threading.Thread(
-                target=self.electrumx.processNotifications)
-            self.processThread.start()
 
     @property
     def symbol(self) -> str:
@@ -150,12 +90,18 @@ class EvrmoreWallet(Wallet):
         # SATORI/TEST 15dd33886452c02d58b500903441b81128ef0d21dd22502aa684c002b37880fe
         return 'df745a3ee1050a9557c3b449df87bdd8942980dff365f7f5a93bc10cb1080188'
 
-    def _generatePrivateKey(self):
-        SelectParams('mainnet')
-        return CEvrmoreSecret.from_secret_bytes(self._entropy)
+    # signature ###############################################################
 
-    def _generateAddress(self, pub=None):
-        return P2PKHEvrmoreAddress.from_pubkey(pub or self._privateKeyObj.pub)
+    def sign(self, message: str):
+        return evrmore.signMessage(self._privateKeyObj, message)
+
+    def verify(self, message: str, sig: bytes, address: Union[str, None] = None):
+        return evrmore.verify(
+            message=message,
+            signature=sig,
+            address=address or self.address)
+
+    # generation ##############################################################
 
     @staticmethod
     def generateAddress(pubkey: Union[bytes, str]) -> str:
@@ -163,14 +109,17 @@ class EvrmoreWallet(Wallet):
             pubkey = bytes.fromhex(pubkey)
         return str(P2PKHEvrmoreAddress.from_pubkey(pubkey))
 
+    def _generatePrivateKey(self):
+        SelectParams('mainnet')
+        return CEvrmoreSecret.from_secret_bytes(self._entropy)
+
+    def _generateAddress(self, pub=None):
+        return P2PKHEvrmoreAddress.from_pubkey(pub or self._privateKeyObj.pub)
+
     def _generateScriptPubKeyFromAddress(self, address: str):
         return CEvrmoreAddress(address).to_scriptPubKey()
 
-    def sign(self, message: str):
-        return evrmore.signMessage(self._privateKeyObj, message)
-
-    def verify(self, message: str, sig: bytes, address: Union[str, None] = None):
-        return evrmore.verify(address=address or self.address, message=message, signature=sig)
+    # transaction creation ####################################################
 
     def _checkSatoriValue(self, output: CMutableTxOut) -> bool:
         '''

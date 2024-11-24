@@ -6,15 +6,7 @@ logging.basicConfig(level=logging.INFO)
 
 
 class ElectrumxApi():
-    def __init__(
-        self,
-        address: str,
-        scripthash: str,
-        send: callable,
-        subscribe: callable,
-    ):
-        self.address = address
-        self.scripthash = scripthash
+    def __init__(self, send: callable, subscribe: callable):
         self.send = send
         self.subscribe = subscribe
 
@@ -57,14 +49,14 @@ class ElectrumxApi():
         '''
         return self.sendSubscriptionRequest('blockchain.headers.subscribe') or {}
 
-    def subscribeScriptHash(self) -> dict:
+    def subscribeScriptHash(self, scripthash: str) -> dict:
         ''' Subscribe to the scripthash and start listening for updates. '''
         return self.sendSubscriptionRequest(
             'blockchain.scripthash.subscribe',
             False,
-            self.scripthash) or {}
+            scripthash) or {}
 
-    def getBalance(self, targetAsset: str = 'SATORI') -> dict:
+    def getBalance(self, scripthash: str, targetAsset: str = 'SATORI') -> dict:
         '''
         {
             'jsonrpc': '2.0',
@@ -74,10 +66,10 @@ class ElectrumxApi():
         '''
         return self.sendRequest(
             'blockchain.scripthash.get_asset_balance',
-            self.scripthash,
+            scripthash,
             targetAsset) or {}
 
-    def getTransactionHistory(self) -> list:
+    def getTransactionHistory(self, scripthash: str) -> list:
         '''
         b.send("blockchain.scripthash.get_history",
                script_hash('REsQeZT8KD8mFfcD4ZQQWis4Ju9eYjgxtT'))
@@ -89,30 +81,30 @@ class ElectrumxApi():
             "id":1656046324946
         }\n'
         '''
-        return self.sendRequest('blockchain.scripthash.get_history', self.scripthash) or []
+        return self.sendRequest('blockchain.scripthash.get_history', scripthash) or []
 
     def getTransaction(self, txHash: str, throttle: int = 0.34):
         time.sleep(throttle)
         return self.sendRequest('blockchain.transaction.get', txHash, True)
 
-    def getCurrency(self) -> int:
+    def getCurrency(self, scripthash: str) -> int:
         '''
         >>> b.send("blockchain.scripthash.get_balance", script_hash('REsQeZT8KD8mFfcD4ZQQWis4Ju9eYjgxtT'))
         b'{"jsonrpc":"2.0","result":{"confirmed":18193623332178,"unconfirmed":0},"id":1656046285682}\n'
         '''
         result = self.sendRequest(
             'blockchain.scripthash.get_balance',
-            self.scripthash)
+            scripthash)
         return (result or {}).get('confirmed', 0) + (result or {}).get('unconfirmed', 0)
 
     def getBanner(self) -> dict:
         return self.sendRequest('server.banner')
 
-    def getUnspentCurrency(self) -> list:
+    def getUnspentCurrency(self, scripthash: str) -> list:
         return self.sendRequest(
-            'blockchain.scripthash.listunspent', self.scripthash)
+            'blockchain.scripthash.listunspent', scripthash)
 
-    def getUnspentAssets(self, targetAsset: str = 'SATORI') -> list:
+    def getUnspentAssets(self, scripthash: str, targetAsset: str = 'SATORI') -> list:
         '''
         {
             'jsonrpc': '2.0',
@@ -127,7 +119,7 @@ class ElectrumxApi():
         '''
         return self.sendRequest(
             'blockchain.scripthash.listunspent',
-            self.scripthash,
+            scripthash,
             targetAsset)
 
     def getStats(self, targetAsset: str = 'SATORI'):

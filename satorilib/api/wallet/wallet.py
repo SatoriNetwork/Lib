@@ -421,33 +421,11 @@ class Wallet(WalletBase):
     def connected(self) -> bool:
         if isinstance(self.electrumx, Electrumx):
             return self.electrumx.connected()
+        return False
 
-    def connectedSubscriptions(self) -> bool:
+    def subscribeToScripthashActivity(self):
         if isinstance(self.electrumx, Electrumx):
-            return self.electrumx.connectedSubscriptions()
-
-    def disconnect(self) -> bool:
-        if isinstance(self.electrumx, Electrumx):
-            return self.electrumx.disconnect()
-
-    def disconnectSubscriptions(self) -> bool:
-        if isinstance(self.electrumx, Electrumx):
-            return self.electrumx.disconnectSubscriptions()
-
-    def connect(self):
-        ''' connect to Electrumx '''
-
-    def clearSubscriptions(self):
-        if isinstance(self.electrumx, Electrumx):
-            self.electrumx.cancelSubscriptions()
-
-    def setupSubscriptions(self):
-        if isinstance(self.electrumx, Electrumx):
-            self.electrumx.makeSubscriptions()
-
-    def stopSubscription(self):
-        if isinstance(self.electrumx, Electrumx):
-            self.electrumx.cancelSubscriptions()
+            self.electrumx.api.subscribeScriptHash(scriptHash=self.scripthash)
 
     def preSend(self) -> bool:
         if not hasattr(self, 'electrumx') or self.electrumx is None or not self.electrumx.connected():
@@ -456,7 +434,6 @@ class Wallet(WalletBase):
             except Exception as e:
                 logging.error(f'unable to connect {e}')
                 return False
-
         if not self.electrumx.connected():
             self.stats = {'status': 'not connected'}
             self.divisibility = 8
@@ -471,7 +448,6 @@ class Wallet(WalletBase):
             self.balance = 0
             self.balanceAmount = 0
             return False
-
         return True
 
     def getUnspentCurrency(self, *args, **kwargs):
@@ -1008,7 +984,6 @@ class Wallet(WalletBase):
         ''' serialize '''
 
     def _broadcast(self, txHex: str) -> str:
-        logging.debug('connected5')
         if self.electrumx.connected():
             return self.electrumx.broadcast(txHex)
         return self.electrumx.broadcast(txHex)

@@ -436,40 +436,23 @@ class SatoriServerClient(object):
         self,
         signature: Union[str, bytes],
         pubkey: str,
-        address: str
+        address: str,
+        usingVault: bool = False,
     ) -> tuple[bool, str]:
         ''' just like mine to address but using the wallet '''
         try:
             if isinstance(signature, bytes):
                 signature = signature.decode()
-            js = json.dumps({
-                'signature': signature,
-                'pubkey': pubkey,
-                'address': address})
-            response = self._makeAuthenticatedCall(
-                function=requests.post,
-                endpoint='/mine/to/address',
-                payload=js)
-            return response.status_code < 400, response.text
-        except Exception as e:
-            logging.warning(
-                'unable to set reward address; try again Later.', e, color='yellow')
-            return False, ''
-
-    def mineToAddress(
-        self,
-        vaultSignature: Union[str, bytes],
-        vaultPubkey: str,
-        address: str
-    ) -> tuple[bool, str]:
-        ''' set reward address '''
-        try:
-            if isinstance(vaultSignature, bytes):
-                vaultSignature = vaultSignature.decode()
-            js = json.dumps({
-                'vaultSignature': vaultSignature,
-                'vaultPubkey': vaultPubkey,
-                'address': address})
+            if usingVault:
+                js = json.dumps({
+                    'vaultSignature': signature,
+                    'vaultPubkey': pubkey,
+                    'address': address})
+            else:
+                js = json.dumps({
+                    'signature': signature,
+                    'pubkey': pubkey,
+                    'address': address})
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/mine/to/address',

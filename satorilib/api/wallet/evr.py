@@ -58,9 +58,10 @@ class EvrmoreWallet(Wallet):
             pullFullTransactions=pullFullTransactions)
 
     @staticmethod
-    def createElectrumxConnection(hostPort: str = None):
+    def createElectrumxConnection(hostPort: str = None, persistent: bool = False) -> Electrumx:
         hostPort = hostPort or random.choice(evrmoreElectrumServers)
         return Electrumx(
+            persistent=persistent,
             host=hostPort.split(':')[0],
             port=int(hostPort.split(':')[1]))
 

@@ -13,17 +13,11 @@ class Electrumx(ElectrumxConnection):
     def __init__(
         self,
         *args,
-        address: str = '',
-        scripthash: str = '',
         persistent: bool = False,
         **kwargs,
     ):
         super(type(self), self).__init__(*args, **kwargs)
-        self.api = ElectrumxApi(
-            address=address,
-            scripthash=scripthash,
-            send=self.send,
-            subscribe=self.subscribe)
+        self.api = ElectrumxApi(send=self.send, subscribe=self.subscribe)
         self.lock = threading.Lock()
         self.subscriptions: dict[str, queue.Queue] = {}
         self.subscriptionParams: dict[str, tuple] = {}

@@ -13,7 +13,7 @@ from satorilib import config
 from satorilib.api import system
 from satorilib.api.disk.utils import safetify
 from satoriwallet.lib.structs import TransactionStruct
-from satoriwallet import ElectrumxAPI
+from satorilib.electrumx import Electrumx
 
 
 class TransactionResult():
@@ -197,7 +197,7 @@ class Wallet(WalletBase):
         self.cache = {}
         self.transactions: list[TransactionStruct] = []
         self.assetTransactions = []
-        self.electrumx: ElectrumxAPI = None
+        self.electrumx: Electrumx = None
         self.currencyOnChain = None
         self.balanceOnChain = None
         self.unspentCurrency = None
@@ -419,34 +419,34 @@ class Wallet(WalletBase):
     ### Electrumx ##############################################################
 
     def connected(self) -> bool:
-        if isinstance(self.electrumx, ElectrumxAPI):
+        if isinstance(self.electrumx, Electrumx):
             return self.electrumx.connected()
 
     def connectedSubscriptions(self) -> bool:
-        if isinstance(self.electrumx, ElectrumxAPI):
+        if isinstance(self.electrumx, Electrumx):
             return self.electrumx.connectedSubscriptions()
 
     def disconnect(self) -> bool:
-        if isinstance(self.electrumx, ElectrumxAPI):
+        if isinstance(self.electrumx, Electrumx):
             return self.electrumx.disconnect()
 
     def disconnectSubscriptions(self) -> bool:
-        if isinstance(self.electrumx, ElectrumxAPI):
+        if isinstance(self.electrumx, Electrumx):
             return self.electrumx.disconnectSubscriptions()
 
     def connect(self):
         ''' connect to Electrumx '''
 
     def clearSubscriptions(self):
-        if isinstance(self.electrumx, ElectrumxAPI):
+        if isinstance(self.electrumx, Electrumx):
             self.electrumx.cancelSubscriptions()
 
     def setupSubscriptions(self):
-        if isinstance(self.electrumx, ElectrumxAPI):
+        if isinstance(self.electrumx, Electrumx):
             self.electrumx.makeSubscriptions()
 
     def stopSubscription(self):
-        if isinstance(self.electrumx, ElectrumxAPI):
+        if isinstance(self.electrumx, Electrumx):
             self.electrumx.cancelSubscriptions()
 
     def preSend(self) -> bool:

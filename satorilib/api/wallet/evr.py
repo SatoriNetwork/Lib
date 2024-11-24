@@ -8,10 +8,10 @@ from evrmore.core.scripteval import VerifyScript, SCRIPT_VERIFY_P2SH
 from evrmore.core.script import CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, OP_EVR_ASSET, OP_DROP, OP_RETURN, SIGHASH_ANYONECANPAY
 from evrmore.core import b2x, lx, COIN, COutPoint, CMutableTxOut, CMutableTxIn, CMutableTransaction, Hash160
 from evrmore.core.scripteval import EvalScriptError
-from satoriwallet import ElectrumxAPI
+from satorilib.electrumx import ElectrumxApi
 from satoriwallet import evrmore
 from satoriwallet import TxUtils, AssetTransaction
-from satoriwallet.api.blockchain import Electrumx
+from satorilib.electrumx import Electrumx
 from satorilib import logging
 from satorilib.api.wallet.wallet import Wallet, TransactionFailure
 
@@ -22,6 +22,7 @@ evrmoreElectrumServers: list[str] = [
     'electrum1-mainnet.evrmorecoin.org:50002',
     'electrum2-mainnet.evrmorecoin.org:50002',
 ]
+
 evrmoreElectrumServersSubscription: list[str] = [
     '128.199.1.149:50001',
     '146.190.149.237:50001',
@@ -39,13 +40,13 @@ class EvrmoreWallet(Wallet):
         reserve: float = .25,
         isTestnet: bool = False,
         password: Union[str, None] = None,
-        connection: Electrumx = None,
+        electrumx: Electrumx = None,
         type: str = 'wallet',
         watchAssets: list[str] = None,
         skipSave: bool = False,
         pullFullTransactions: bool = True,
     ):
-        self.connection = connection or EvrmoreWallet.createElectrumxConnection()
+        self.electrumx = electrumx or EvrmoreWallet.createElectrumxConnection()
         self.type = type
         super().__init__(
             walletPath,
@@ -57,29 +58,25 @@ class EvrmoreWallet(Wallet):
             pullFullTransactions=pullFullTransactions)
 
     @staticmethod
-    def createElectrumxConnection():
-        hostPort = random.choice(evrmoreElectrumServers)
-        hostPortSubscription = random.choice(
-            evrmoreElectrumServersSubscription)
+    def createElectrumxConnection(hostPort: str = None):
+        hostPort = hostPort or random.choice(evrmoreElectrumServers)
         return Electrumx(
             host=hostPort.split(':')[0],
-            port=int(hostPort.split(':')[1]),
-            hostSubscription=hostPortSubscription.split(':')[0],
-            portSubscription=int(hostPortSubscription.split(':')[1]))
+            port=int(hostPort.split(':')[1]))
 
     def connect(self):
         try:
             reconnected = False
-            condition = not self.connection.connected()
+            condition = not self.electrumx.connected()
             if condition:
-                self.connection = EvrmoreWallet.createElectrumxConnection()
+                self.electrumx = EvrmoreWallet.createElectrumxConnection()
                 reconnected = True
             if self.electrumx is None or reconnected:
-                self.electrumx = ElectrumxAPI(
+                self.electrumx = ElectrumxApi(
                     chain=self.chain,
                     address=self.address,
                     scripthash=self.scripthash,
-                    connection=self.connection,
+                    electrumx=self.electrumx,
                     type=self.type,
                     onScripthashNotification=self.get,  # self.callTransactionHistory()
                     onBlockNotification=None,
@@ -113,7 +110,7 @@ class EvrmoreWallet(Wallet):
                 # self.setupSubscriptions()
         except Exception as e:
             logging.warning(
-                'ElectrumxAPI issue', e)
+                'ElectrumxApi issue', e)
 
     def subscribe(self):
         if self.electrumx is not None:

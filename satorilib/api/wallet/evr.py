@@ -46,8 +46,6 @@ class EvrmoreWallet(Wallet):
         skipSave: bool = False,
         pullFullTransactions: bool = True,
     ):
-        self.electrumx = electrumx or EvrmoreWallet.createElectrumxConnection()
-        self.type = type
         super().__init__(
             walletPath,
             reserve=reserve,
@@ -56,6 +54,8 @@ class EvrmoreWallet(Wallet):
             watchAssets=watchAssets,
             skipSave=skipSave,
             pullFullTransactions=pullFullTransactions)
+        self.electrumx = electrumx or EvrmoreWallet.createElectrumxConnection()
+        self.type = type
 
     @staticmethod
     def createElectrumxConnection(hostPort: str = None, persistent: bool = False) -> Electrumx:
@@ -68,7 +68,7 @@ class EvrmoreWallet(Wallet):
     def connect(self):
         try:
             reconnected = False
-            condition = not self.electrumx.connected()
+            condition = not self.electrumx.connectionected()
             if condition:
                 self.electrumx = EvrmoreWallet.createElectrumxConnection()
                 reconnected = True
@@ -119,23 +119,6 @@ class EvrmoreWallet(Wallet):
             self.processThread = threading.Thread(
                 target=self.electrumx.processNotifications)
             self.processThread.start()
-
-    def keepAlive(self, subscriptionToo: bool = False):
-
-        def pingPeriodically():
-            while True:
-                time.sleep(60*3)
-                try:
-                    self.electrumx.conn.send(method='server.ping')
-                    if subscriptionToo:
-                        self.electrumx.conn.sendSubscription(
-                            method='server.ping')
-                except Exception as e:
-                    logging.error(f'keepAlive: {e}')
-                    self.connect()
-
-        self.thread = threading.Thread(target=pingPeriodically, daemon=True)
-        self.thread.start()
 
     @property
     def symbol(self) -> str:

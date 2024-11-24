@@ -29,15 +29,24 @@ class ElectrumxApi():
         except Exception as e:
             logging.error(f"Error during {method}: {str(e)}")
 
-    def sendSubscriptionRequest(self, method: str, *params) -> Union[dict, None]:
+    def sendSubscriptionRequest(
+        self,
+        method: str,
+        *params,
+        callback: Union[callable, None] = None
+    ) -> Union[dict, None]:
         try:
-            return ElectrumxApi.interpret(self.subscribe(method, *params))
+            return ElectrumxApi.interpret(
+                self.subscribe(method, *params, callback=callback))
         except Exception as e:
             logging.error(f"Error during {method}: {str(e)}")
 
     # endpoints ###############################################################
 
-    def subscribeToHeaders(self) -> dict:
+    def subscribeToHeaders(
+        self,
+        callback: Union[callable, None] = None
+    ) -> dict:
         '''
         {
             'jsonrpc': '2.0',
@@ -47,14 +56,28 @@ class ElectrumxApi():
                 'height': 1067110}]
         }
         '''
-        return self.sendSubscriptionRequest('blockchain.headers.subscribe') or {}
+        return self.sendSubscriptionRequest('blockchain.headers.subscribe', callback=callback) or {}
 
-    def subscribeScriptHash(self, scripthash: str) -> dict:
-        ''' Subscribe to the scripthash and start listening for updates. '''
+    def subscribeScripthash(
+        self,
+        scripthash: str,
+        callback: Union[callable, None] = None
+    ) -> dict:
+        '''
+        Subscribe to the scripthash and start listening for updates.
+        {
+            'jsonrpc': '2.0',
+            'method': 'blockchain.scripthash.subscribe',
+            'params': [
+                '130946f0c05cd0d3de7e1b8d59273999e0d6964be497ca5e57ffc07e5e9afdae',
+                '5e5bce190932eb2b780574b4004ecdb9dfd8049400424701765e1858f6a817df'
+            ]
+        }
+        '''
         return self.sendSubscriptionRequest(
             'blockchain.scripthash.subscribe',
-            False,
-            scripthash) or {}
+            scripthash,
+            callback=callback) or {}
 
     def getBalance(self, scripthash: str, targetAsset: str = 'SATORI') -> dict:
         '''

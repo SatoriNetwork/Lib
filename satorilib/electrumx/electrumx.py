@@ -8,6 +8,34 @@ import threading
 from satorilib.electrumx import ElectrumxConnection
 from satorilib.electrumx import ElectrumxApi
 
+class Subscription:
+    def __init__(self, method: str, *args, callback: Union[callable, None] = None):
+        self.method = method
+        self.args = args
+        self.shortLivedCallback = callback
+
+    def __hash__(self):
+        return hash((self.method, self.args))
+
+    def __eq__(self, other):
+        if isinstance(other, Subscription):
+            return self.method == other.method and self.args == other.args
+        return False
+
+    def __call__(self, *args, **kwargs):
+        '''
+        This is the callback that is called when a subscription is triggered.
+        it takes time away from listening to the socket, so it should be short-
+        lived, like saving the value to a variable and returning, or logging,
+        or triggering a thread to do something such as listen to the queue and
+        do some long-running process with the data from the queue.
+        example:
+            def foo(*args, **kwargs):
+                print(f'foo. args:{args}, kwargs:{kwargs}')
+        '''
+        if self.shortLivedCallback is None:
+            return None
+        return self.shortLivedCallback(*args, **kwargs)
 
 class Electrumx(ElectrumxConnection):
     def __init__(
@@ -19,8 +47,7 @@ class Electrumx(ElectrumxConnection):
         super(type(self), self).__init__(*args, **kwargs)
         self.api = ElectrumxApi(send=self.send, subscribe=self.subscribe)
         self.lock = threading.Lock()
-        self.subscriptions: dict[str, queue.Queue] = {}
-        self.subscriptionParams: dict[str, tuple] = {}
+        self.subscriptions: dict[Subscription, queue.Queue] = {}
         self.responses = queue.Queue()
         self.quiet = queue.Queue()
         self.listenerStop = threading.Event()
@@ -32,6 +59,12 @@ class Electrumx(ElectrumxConnection):
         self.persistent = persistent
         if self.persistent:
             self.startPinger()
+
+    def findSubscription(self, subscription: Subscription) -> Subscription:
+        for s in self.subscriptions.keys():
+            if s == subscription:
+                return s
+        return subscription
 
     def startListener(self):
         self.listenerStop.clear()
@@ -62,10 +95,22 @@ class Electrumx(ElectrumxConnection):
                 if '\n' in raw:
                     message, _, buffer = handleMultipleMessages(buffer)
                     try:
-                        r = json.loads(message)
+                        r: dict = json.loads(message)
                         method = r.get('method', '')
-                        if 'subscribe' in method:
-                            self.subscriptions[method].put(r)
+                        if method == 'blockchain.headers.subscribe':
+                            subscription = self.findSubscription(
+                                subscription=Subscription(method))
+                            self.subscriptions[subscription].put(r)
+                            subscription(r)
+                        if method == 'blockchain.scripthash.subscribe':
+                            subscription = self.findSubscription(
+                                subscription=Subscription(
+                                    method,
+                                    *r.get(
+                                        'params',
+                                        ['scripthash', 'status'])[0]))
+                            self.subscriptions[subscription].put(r)
+                            subscription(r)
                         else:
                             self.responses.put(r)
                     except json.decoder.JSONDecodeError as e:
@@ -76,10 +121,10 @@ class Electrumx(ElectrumxConnection):
             except socket.timeout:
                 logging.warning("Socket timeout occurred during receive.")
                 self.quiet.put(time.time())
-            except Exception as e:
-                logging.error(f"Socket error during receive: {str(e)}")
-                self.quiet.put(time.time())
-                self.isConnected = False
+            #except Exception as e:
+            #    logging.error(f"Socket error during receive: {str(e)}")
+            #    self.quiet.put(time.time())
+            #    self.isConnected = False
 
     def listenForSubscriptions(self, method: str):
         return self.subscriptions[method].get()
@@ -157,13 +202,18 @@ class Electrumx(ElectrumxConnection):
                 return None
             return self.listenForResponse()
 
-    def subscribe(self, method: str, *args):
-        self.subscriptions[method] = queue.Queue()
-        self.subscriptionParams[method] = args
+    def subscribe(
+        self,
+        method: str,
+        *args,
+        callback: Union[callable, None] = None,
+    ):
+        self.subscriptions[
+            Subscription(method, *args, callback=callback)
+        ] = queue.Queue()
         return self.send(method, *args)
 
     def resubscribe(self):
         if self.connected():
-            for method in self.subscriptions.keys():
-                self.subscribe(
-                    method, *self.subscriptionParams.get(method, []))
+            for subscription in self.subscriptions.keys():
+                self.subscribe(subscription.method, *subscription.args)

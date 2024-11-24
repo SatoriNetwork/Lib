@@ -425,7 +425,7 @@ class Wallet(WalletBase):
 
     def subscribeToScripthashActivity(self):
         if isinstance(self.electrumx, Electrumx):
-            self.electrumx.api.subscribeScriptHash(scriptHash=self.scripthash)
+            self.electrumx.api.subscribeScripthash(scripthash=self.scripthash)
 
     def preSend(self) -> bool:
         if not hasattr(self, 'electrumx') or self.electrumx is None or not self.electrumx.connected():

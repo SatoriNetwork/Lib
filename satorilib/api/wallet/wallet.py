@@ -530,17 +530,18 @@ class Wallet(WalletBase):
         self.divisibility = openSafely(self.stats, 'divisions', 8)
         self.divisibility = self.divisibility if self.divisibility is not None else 8
         self.banner = self.electrumx.api.getBanner()
-        self.transactionHistory = self.electrumx.api.getTransactionHistory()
-        self.currencyOnChain = self.electrumx.api.getCurrency()
+        self.transactionHistory = self.electrumx.api.getTransactionHistory(
+            scripthash=self.scripthash)
+        self.currencyOnChain = self.electrumx.api.getCurrency(scripthash=self.scripthash)
         logging.debug('self.currencyOnChain', self.currencyOnChain)
-        self.unspentCurrency = self.electrumx.api.getUnspentCurrency()
+        self.unspentCurrency = self.electrumx.api.getUnspentCurrency(scripthash=self.scripthash)
         self.unspentCurrency = [
             x for x in self.unspentCurrency if x.get('asset') == None]
         if 'SATORI' in self.watchAssets:
-            self.balanceOnChain = self.electrumx.api.getBalance()
+            self.balanceOnChain = self.electrumx.api.getBalance(scripthash=self.scripthash)
             logging.debug('self.balanceOnChain', self.balanceOnChain)
             # mempool sends all unspent transactions in currency and assets so we have to filter them here:
-            self.unspentAssets = self.electrumx.api.getUnspentAssets()
+            self.unspentAssets = self.electrumx.api.getUnspentAssets(scripthash=self.scripthash)
             self.unspentAssets = [
                 x for x in self.unspentAssets if x.get('asset') != None]
             logging.debug('self.unspentAssets', self.unspentAssets)

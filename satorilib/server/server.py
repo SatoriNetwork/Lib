@@ -350,6 +350,18 @@ class SatoriServerClient(object):
             function=requests.post,
             endpoint='/clear_vote_on/sanction/incremental',
             payload=json.dumps({'streamId': streamId})).text
+        
+    
+    def getObservations(self, streamId: str):
+        return self._makeAuthenticatedCall(
+            function=requests.post,
+            endpoint='/observations/list',
+            payload=json.dumps({'streamId': streamId})).text
+        
+    def getPredictionsObservations(self):
+        return self._makeAuthenticatedCall(
+            function=requests.get,
+            endpoint='/predictions/observations/list').text
 
     def submitMaifestVote(self, wallet: Wallet, votes: dict[str, int]):
         # todo authenticate the vault instead

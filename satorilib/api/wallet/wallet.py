@@ -199,7 +199,7 @@ class Wallet(WalletBase):
         self.unspentAssets = None
         self.pullFullTransactions = pullFullTransactions
         self.load()
-        self.loadCache()
+        #self.loadCache()
 
     def __call__(self):
         self.connect()
@@ -661,7 +661,7 @@ class Wallet(WalletBase):
                 if new_tranaction is not None:
                     new_transactions[txid] = new_tranaction
             # why not save self._transactions to cache? because these are incremental.
-            self.saveCache(new_transactions)
+            #self.saveCache(new_transactions)
 
         # self.getTransactionsThread = threading.Thread(
         #    target=getTransactions, args=(self.transactionHistory,), daemon=True)
@@ -751,7 +751,7 @@ class Wallet(WalletBase):
                     new_tranaction = self.appendTransaction(uc['tx_hash'])
                     if new_tranaction is not None:
                         new_transactions[uc['tx_hash']] = new_tranaction
-                    self.saveCache(new_transactions)
+                    #self.saveCache(new_transactions)
                 tx = [tx for tx in self.transactions if tx.txid == uc['tx_hash']]
                 if len(tx) > 0:
                     vout = [vout for vout in tx[0].raw.get(
@@ -768,7 +768,7 @@ class Wallet(WalletBase):
                         new_tranaction = self.appendTransaction(ua['tx_hash'])
                         if new_tranaction is not None:
                             new_transactions[ua['tx_hash']] = new_tranaction
-                        self.saveCache(new_transactions)
+                        #self.saveCache(new_transactions)
                     tx = [tx for tx in self.transactions if tx.txid == ua['tx_hash']]
                     if len(tx) > 0:
                         vout = [vout for vout in tx[0].raw.get(

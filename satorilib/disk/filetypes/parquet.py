@@ -49,7 +49,7 @@
 # from satorilib import logging
 # from satorilib.concepts import StreamId
 # from satorilib.utils import memory
-# from satorilib import hash
+# from satorilib.utils import hash
 # from satorilib.interfaces.data import DataDiskApi
 # from satorilib.interfaces.model import ModelDataDiskApi
 # from satorilib.disk.utils import safetify, safetifyWithResult

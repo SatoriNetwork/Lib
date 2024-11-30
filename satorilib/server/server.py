@@ -26,7 +26,7 @@ import time
 import json
 import requests
 from satorilib import logging
-from satorilib.utils.time.time import timeToTimestamp
+from satorilib.utils.time import timeToTimestamp
 from satorilib.wallet import Wallet
 from satorilib.concepts.structs import Stream
 from satorilib.server.api import ProposalSchema, VoteSchema

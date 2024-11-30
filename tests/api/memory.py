@@ -1,5 +1,5 @@
 import pandas as pd
-from satorilib.api.memory import Memory
+from satorilib.utils.memory import Memory
 
 
 def test_merge():

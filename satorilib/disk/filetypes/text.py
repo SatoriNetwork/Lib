@@ -1,5 +1,5 @@
 import pandas as pd
-from satorilib.api.interfaces.data import FileManager
+from satorilib.interfaces.data import FileManager
 
 
 class TextManager(FileManager):

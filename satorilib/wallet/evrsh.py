@@ -9,7 +9,7 @@ from satoriwallet import ElectrumxAPI
 from satoriwallet import evrmore
 from satoriwallet import TxUtils, AssetTransaction
 from satorilib import logging
-from satorilib.api.wallet.wallet import Wallet, TransactionFailure
+from satorilib.wallet.wallet import Wallet, TransactionFailure
 
 
 class EvrmoreP2SHWallet(Wallet):

@@ -1,10 +1,10 @@
 """ an api for reading and writing to disk """
 
 import pandas as pd
-from satorilib.api.time import datetimeToTimestamp, now
-from satorilib.api.hash import hashIt
-from satorilib.api.disk.cache import CachedResult
-from satorilib.api.disk.filetypes.csv import CSVManager
+from satorilib.utils.time import datetimeToTimestamp, now
+from satorilib.utils.hash import hashIt
+from satorilib.disk.cache import CachedResult
+from satorilib.disk.filetypes.csv import CSVManager
 
 
 def search(

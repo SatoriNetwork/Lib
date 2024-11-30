@@ -1,7 +1,7 @@
 
 import os
-from satorilib.api.interfaces.wallet import WalletDiskApi
-from satorilib.api.disk.utils import safetify
+from satorilib.interfaces.wallet import WalletDiskApi
+from satorilib.disk.utils import safetify
 
 
 class WalletApi(WalletDiskApi):

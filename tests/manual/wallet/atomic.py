@@ -1,7 +1,7 @@
 from ravencoin.core import CMutableTransaction
 from satorineuron import config
-from satorilib.api.wallet import RavencoinWallet
-from satorilib.api.disk import Cache  # Disk
+from satorilib.wallet import RavencoinWallet
+from satorilib.disk import Cache  # Disk
 Cache.setConfig(config)
 
 VERSION = '0.0.5'

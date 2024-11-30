@@ -3,7 +3,7 @@ import pandas as pd
 from sqlalchemy import create_engine, Table, MetaData, select, insert, delete
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
-from satorilib.api.interfaces.data import FileManager
+from satorilib.interfaces.data import FileManager
 from satorilib import logging
 
 class SqliteManager(FileManager):

@@ -10,8 +10,8 @@ from satoriwallet.lib import connection
 from satoriwallet import TxUtils, Validate
 from satorilib import logging
 from satorilib import config
-from satorilib.api import system
-from satorilib.api.disk.utils import safetify
+from satorilib.utils import system
+from satorilib.disk.utils import safetify
 from satoriwallet.lib.structs import TransactionStruct
 from satorilib.electrumx import Electrumx
 
@@ -100,7 +100,7 @@ class WalletBase():
             scripthash == self.scripthash)
 
     def generateObjects(self):
-        self._entropy = self._entropy or self._generateEntropy()
+        self._entropy = self._entropy or WalletBase.generateEntropy()
         self._entropyStr = b64encode(self._entropy).decode('utf-8')
         self._privateKeyObj = self._generatePrivateKey()
         self._addressObj = self._generateAddress()
@@ -133,7 +133,8 @@ class WalletBase():
             sig_script_raw(address), 'hex_codec')).digest()[::-1].hex()
         return scripthash(forAddress or self.address)
 
-    def _generateEntropy(self) -> bytes:
+    @staticmethod
+    def generateEntropy() -> bytes:
         # return m.to_entropy(m.generate())
         # return b64encode(x.to_seed(x.generate(strength=128))).decode('utf-8')
         return os.urandom(32)
@@ -538,8 +539,9 @@ class Wallet(WalletBase):
         self.unspentCurrency = [
             x for x in self.unspentCurrency if x.get('asset') == None]
         if 'SATORI' in self.watchAssets:
-            self.balanceOnChain = self.electrumx.api.getBalance(scripthash=self.scripthash)
-            logging.debug('self.balanceOnChain', self.balanceOnChain)
+            # never used:
+            #self.balanceOnChain = self.electrumx.api.getBalance(scripthash=self.scripthash)
+            #logging.debug('self.balanceOnChain', self.balanceOnChain)
             # mempool sends all unspent transactions in currency and assets so we have to filter them here:
             self.unspentAssets = self.electrumx.api.getUnspentAssets(scripthash=self.scripthash)
             self.unspentAssets = [
@@ -972,8 +974,8 @@ class Wallet(WalletBase):
 
     def _broadcast(self, txHex: str) -> str:
         if self.electrumx.connected():
-            return self.electrumx.broadcast(txHex)
-        return self.electrumx.broadcast(txHex)
+            return self.electrumx.api.broadcast(txHex)
+        return self.electrumx.api.broadcast(txHex)
 
     ### Transactions ###########################################################
 

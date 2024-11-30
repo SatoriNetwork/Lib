@@ -1,6 +1,6 @@
 '''
 the DataService uses zeroMQ to communicate, manages the data on disk,
-providing it to neuron or engine on demand. uses the satorilib.api.disk api
+providing it to neuron or engine on demand. uses the satorilib.disk api
 
 api basics:
     - accept StreamId objects and returns their data
@@ -20,7 +20,7 @@ stretch:
     this would require that data always be saved in the sqlite database instead.
 '''
 
-# from satorilib.api.disk import something
+# from satorilib.disk import something
 
 
 class DataService(object):

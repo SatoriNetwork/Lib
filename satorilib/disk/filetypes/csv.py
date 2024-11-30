@@ -1,7 +1,7 @@
 from typing import Union
 import os
 import pandas as pd
-from satorilib.api.interfaces.data import FileManager
+from satorilib.interfaces.data import FileManager
 from satorilib import logging
 # pd.options.display.float_format = '{:.10f}'.format
 

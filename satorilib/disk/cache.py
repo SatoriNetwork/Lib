@@ -5,14 +5,14 @@ import os
 import pandas as pd
 from satorilib import logging
 from satorilib.concepts import StreamId
-from satorilib.api import memory
-from satorilib.api.time import datetimeToTimestamp, earliestDate, now
-from satorilib.api.hash import hashIt, generatePathId, historyHashes, verifyHashes, cleanHashes, verifyRoot, verifyHashesReturnError, verifyHashesReturnLastGood
-from satorilib.api.disk import Disk
-from satorilib.api.disk.utils import safetify, safetifyWithResult
-from satorilib.api.disk.model import ModelApi
-from satorilib.api.disk.wallet import WalletApi
-from satorilib.api.disk.filetypes.csv import CSVManager
+from satorilib.utils import memory
+from satorilib.utils.time import datetimeToTimestamp, earliestDate, now
+from satorilib.utils.hash import hashIt, generatePathId, historyHashes, verifyHashes, cleanHashes, verifyRoot, verifyHashesReturnError, verifyHashesReturnLastGood
+from satorilib.disk import Disk
+from satorilib.disk.utils import safetify, safetifyWithResult
+from satorilib.disk.model import ModelApi
+from satorilib.disk.wallet import WalletApi
+from satorilib.disk.filetypes.csv import CSVManager
 from satorilib.concepts import Observation
 
 
@@ -301,7 +301,7 @@ class Cache(Disk):
         hashThis: bool = False,
     ) -> CachedResult:
         '''
-        appends to the end of the file while also hashing, 
+        appends to the end of the file while also hashing,
         returns success and timestamp and observationHash
         '''
         timestamp = timestamp or datetimeToTimestamp(now())

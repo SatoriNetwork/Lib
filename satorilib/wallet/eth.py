@@ -4,7 +4,7 @@ from eth_keys import keys
 from eth_account import Account
 from eth_account.messages import encode_defunct
 from satorilib import logging
-from satorilib.api.disk.wallet import WalletApi
+from satorilib.disk.wallet import WalletApi
 
 
 class EthereumWallet():

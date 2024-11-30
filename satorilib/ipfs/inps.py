@@ -2,10 +2,10 @@
 ipns methods
 see https://docs.ipfs.tech/concepts/ipns/#example-ipns-setup-with-cli
 https://docs.ipfs.tech/how-to/publish-ipns/#publishing-ipns-names-with-kubo
-not finished. 
+not finished.
 '''
 from satorilib.concepts import StreamId
-from satorilib.api.ipfs.cli import CliCommunicator
+from satorilib.ipfs.cli import CliCommunicator
 
 
 class Ipns(CliCommunicator):

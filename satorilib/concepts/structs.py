@@ -4,7 +4,7 @@ import pandas as pd
 import datetime as dt
 from functools import partial
 
-# from satorilib.api.hash import generatePathId
+# from satorilib.utils.hash import generatePathId
 # from enum import Enum
 
 
@@ -154,7 +154,7 @@ class StreamId:
 
     @property
     def generateHash(self) -> str:
-        from satorilib.api.hash import generatePathId, hashIt
+        from satorilib.utils.hash import generatePathId, hashIt
 
         return generatePathId(streamId=self)
 

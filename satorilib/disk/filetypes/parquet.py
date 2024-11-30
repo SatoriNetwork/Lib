@@ -48,13 +48,13 @@
 # import pyarrow.parquet as pq
 # from satorilib import logging
 # from satorilib.concepts import StreamId
-# from satorilib.api import memory
-# from satorilib.api import hash
-# from satorilib.api.interfaces.data import DataDiskApi
-# from satorilib.api.interfaces.model import ModelDataDiskApi
-# from satorilib.api.disk.utils import safetify, safetifyWithResult
-# from satorilib.api.disk.model import ModelApi
-# from satorilib.api.disk.wallet import WalletApi
+# from satorilib.utils import memory
+# from satorilib import hash
+# from satorilib.interfaces.data import DataDiskApi
+# from satorilib.interfaces.model import ModelDataDiskApi
+# from satorilib.disk.utils import safetify, safetifyWithResult
+# from satorilib.disk.model import ModelApi
+# from satorilib.disk.wallet import WalletApi
 
 # class ParquetManager(): #(FileManager):
 #     ''' manages reading and writing to Parquet files '''

@@ -9,7 +9,7 @@ from evrmore.core.scripteval import EvalScriptError
 from satoriwallet import evrmore
 from satoriwallet import TxUtils, AssetTransaction
 from satorilib.electrumx import Electrumx
-from satorilib.api.wallet.wallet import Wallet, TransactionFailure
+from satorilib.wallet.wallet import Wallet, TransactionFailure
 
 class EvrmoreWallet(Wallet):
 

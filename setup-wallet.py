@@ -36,7 +36,7 @@ setup(
     description='satorilib contains domain model and apis for the Satori Network',
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
-    packages=['satorilib.api.wallet'],
+    packages=['satorilib.wallet'],
     dependency_links=[
         'git+https://github.com/SatoriNetwork/python-evrmorelib.git#egg=python-evrmorelib'
     ],

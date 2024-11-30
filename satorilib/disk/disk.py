@@ -5,13 +5,13 @@ import os
 import pandas as pd
 from satorilib import logging
 from satorilib.concepts import StreamId
-from satorilib.api import memory
-from satorilib.api.hash import generatePathId, historyHashes, verifyHashes, cleanHashes, verifyRoot, verifyHashesReturnError
-from satorilib.api.interfaces.model import ModelDataDiskApi
-from satorilib.api.disk.utils import safetify, safetifyWithResult
-from satorilib.api.disk.model import ModelApi
-from satorilib.api.disk.wallet import WalletApi
-from satorilib.api.disk.filetypes.csv import CSVManager
+from satorilib.utils import memory
+from satorilib.utils.hash import generatePathId, historyHashes, verifyHashes, cleanHashes, verifyRoot, verifyHashesReturnError
+from satorilib.interfaces.model import ModelDataDiskApi
+from satorilib.disk.utils import safetify, safetifyWithResult
+from satorilib.disk.model import ModelApi
+from satorilib.disk.wallet import WalletApi
+from satorilib.disk.filetypes.csv import CSVManager
 
 
 class Disk(ModelDataDiskApi):

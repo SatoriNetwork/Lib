@@ -3,8 +3,8 @@ import pandas as pd
 import warnings
 from satorilib import logging
 from satorilib.concepts import StreamId
-from satorilib.api.interfaces.memory import DiskMemory
-from satorilib.api.interfaces.model import ModelMemoryApi
+from satorilib.interfaces.memory import DiskMemory
+from satorilib.interfaces.model import ModelMemoryApi
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -14,8 +14,8 @@ class Memory(ModelMemoryApi, DiskMemory):
     @staticmethod
     def flatten(df: pd.DataFrame):
         '''
-        on disk we store dataframes as flat, with an index, and 
-        [value, hash, prediction] columns, but in memory we always combine 
+        on disk we store dataframes as flat, with an index, and
+        [value, hash, prediction] columns, but in memory we always combine
         datasets into one multi-columned dataframe, so we need to flatten the
         dataframe before saving to disk
         '''
@@ -45,7 +45,7 @@ class Memory(ModelMemoryApi, DiskMemory):
     def mergeAllTime(dfs: list[pd.DataFrame]):
         ''' Layer 1 - not useful?
         combines multiple mutlicolumned dataframes.
-        to support disparate frequencies, 
+        to support disparate frequencies,
         outter join fills in missing values with previous value.
         So this isn't really important anymore becauase I realized
         it'll not be needed anywhere I think, maybe for the live
@@ -77,7 +77,7 @@ class Memory(ModelMemoryApi, DiskMemory):
     def merge(dfs: list[pd.DataFrame], targetColumn: 'str|tuple[str]'):
         ''' Layer 1
         combines multiple mutlicolumned dataframes.
-        to support disparate frequencies, 
+        to support disparate frequencies,
         outter join fills in missing values with previous value.
         filters down to the target column observations.
         '''
@@ -103,11 +103,11 @@ class Memory(ModelMemoryApi, DiskMemory):
     @staticmethod
     def appendInsert(df: pd.DataFrame, incremental: pd.DataFrame):
         ''' Layer 2
-        after datasets merged one cannot merely append a dataframe. 
+        after datasets merged one cannot merely append a dataframe.
         we must insert the incremental at the correct location.
         this function is more of a helper function after we gather,
         to be used by models, it doesn't talk to disk directly.
-        incremental should be a multicolumn, one row DataFrame. 
+        incremental should be a multicolumn, one row DataFrame.
         '''
         df.index = pd.to_datetime(df.index)
         incremental.index = pd.to_datetime(incremental.index)

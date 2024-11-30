@@ -3,10 +3,10 @@ import os
 import joblib
 from satorilib import logging
 from satorilib.concepts import StreamId
-from satorilib.api.hash import generatePathId
-from satorilib.api.interfaces.model import ModelDataDiskApi, ModelDiskApi
-from satorilib.api.disk.utils import safetify
-from satorilib.api.disk.wallet import WalletApi
+from satorilib.utils.hash import generatePathId
+from satorilib.interfaces.model import ModelDataDiskApi, ModelDiskApi
+from satorilib.disk.utils import safetify
+from satorilib.disk.wallet import WalletApi
 
 
 class ModelApi(ModelDiskApi):

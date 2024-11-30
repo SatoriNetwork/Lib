@@ -92,6 +92,28 @@ class ElectrumxApi():
             scripthash,
             targetAsset) or {}
 
+    def getAllBalances(self, scripthash: str) -> dict:
+        '''
+        Zeroth — Today at 11:16 AM
+        Just in case you want to update your python,
+        this way does work and sums the totals for you:
+            const isAddressUsedQuery = {
+                jsonrpc: '2.0',
+                method: 'blockchain.scripthash.get_balance',
+                params: [scriptHash, true],
+                id: 3,
+            };
+        Result:
+            {"jsonrpc":"2.0","id":3,"result":{
+                "rvn":{"confirmed":200000000,"unconfirmed":0},
+                "LOLLIPOP":{"confirmed":100000000,"unconfirmed":0},
+                "SATORI":{"confirmed":155659082600,"unconfirmed":0}}}
+        '''
+        return self.sendRequest(
+            'blockchain.scripthash.get_asset_balance',
+            scripthash,
+            True) or {}
+
     def getTransactionHistory(self, scripthash: str) -> list:
         '''
         b.send("blockchain.scripthash.get_history",

@@ -168,6 +168,12 @@ class Electrumx(ElectrumxConnection):
             self.isConnected = False
             return False
 
+    def ensureConnected(self) -> bool:
+        if not self.connected():
+            self.reconnect()
+            return self.connected()
+        return True
+
     def handshake(self):
         try:
             method = 'server.version'

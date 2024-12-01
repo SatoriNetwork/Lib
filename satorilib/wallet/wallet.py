@@ -250,8 +250,8 @@ class Wallet(WalletBase):
 
     ### Loading ################################################################
 
-    def walletFileExists(self):
-        return os.path.exists(self.walletPath)
+    def walletFileExists(self, path: str = None):
+        return os.path.exists(path or self.walletPath)
 
     def cacheFileExists(self):
         return os.path.exists(self.cachePath)
@@ -311,9 +311,10 @@ class Wallet(WalletBase):
                 return content
         return content
 
-    def save(self):
-        safetify(self.walletPath)
-        if self.walletFileExists():
+    def save(self, path: str = None) -> bool:
+        path = path or self.walletPath
+        safetify(path)
+        if self.walletFileExists(path):
             return False
         config.put(
             data={
@@ -335,7 +336,7 @@ class Wallet(WalletBase):
                     }
                 }
             },
-            path=self.walletPath)
+            path=path)
         return True
 
     def saveCacheOld(self):
@@ -429,7 +430,7 @@ class Wallet(WalletBase):
         return False
 
     def subscribeToScripthashActivity(self):
-        if isinstance(self.electrumx, Electrumx):
+        if self.electrumx.ensureConnected():
             self.electrumx.api.subscribeScripthash(scripthash=self.scripthash)
 
     def preSend(self) -> bool:
@@ -438,6 +439,8 @@ class Wallet(WalletBase):
                 isinstance(self.electrumx, Electrumx) and
                 not self.electrumx.connected())
         ):
+            if self.electrumx.ensureConnected():
+                return True
             self.stats = {'status': 'not connected'}
             self.divisibility = self.divisibility or 8
             self.banner = 'not connected'
@@ -452,13 +455,6 @@ class Wallet(WalletBase):
             self.balanceAmount = self.balanceAmount or 0
             return False
         return True
-
-    def getUnspentCurrency(self, *args, **kwargs):
-        if not self.preSend():
-            return
-        self.unspentCurrency = self.electrumx.api.getUnspentCurrency()
-        self.unspentCurrency = [
-            x for x in self.unspentCurrency if x.get('asset') == None]
 
     def get(self, *args, **kwargs):
         ''' gets data from the blockchain, saves to attributes '''
@@ -493,6 +489,7 @@ class Wallet(WalletBase):
         #    return self.electrumx.api.getAssetHolders(self.address).get(self.address, 0)
 
         def getTransactions(transactionHistory: dict) -> list:
+            self.electrumx.ensureConnected()
             self.transactions = []
             for tx in transactionHistory:
                 txid = tx.get('tx_hash', '')
@@ -579,6 +576,7 @@ class Wallet(WalletBase):
     ### Functions ##############################################################
 
     def appendTransaction(self, txid):
+        self.electrumx.ensureConnected()
         if txid not in self._transactions.keys():
             raw = self.electrumx.api.getTransaction(txid)
             if raw is not None:
@@ -973,8 +971,7 @@ class Wallet(WalletBase):
         ''' serialize '''
 
     def _broadcast(self, txHex: str) -> str:
-        if self.electrumx.connected():
-            return self.electrumx.api.broadcast(txHex)
+        self.electrumx.ensureConnected()
         return self.electrumx.api.broadcast(txHex)
 
     ### Transactions ###########################################################

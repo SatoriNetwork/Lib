@@ -1,7 +1,7 @@
 from typing import Union
 import os
 import pandas as pd
-import threading
+import time
 import json
 from base64 import b64encode, b64decode
 from random import randrange
@@ -14,6 +14,45 @@ from satorilib.utils import system
 from satorilib.disk.utils import safetify
 from satoriwallet.lib.structs import TransactionStruct
 from satorilib.electrumx import Electrumx
+
+class Balance():
+
+    @staticmethod
+    def empty(symbol) -> 'Balance':
+        return Balance(symbol=symbol, confirmed=0, unconfirmed=0)
+
+    @staticmethod
+    def fromBalances(symbol: str, balances: dict) -> 'Balance':
+        if symbol.lower() == 'evr':
+            balance = balances.get('evr', balances.get('rvn'))
+        else:
+            balance = balances.get(symbol)
+        if balance is None:
+            return Balance.empty(symbol)
+        return Balance.fromBalance(symbol, balance)
+
+    @staticmethod
+    def fromBalance(symbol: str, balance: dict) -> 'Balance':
+        return Balance(
+            symbol=symbol,
+            confirmed=balance.get('confirmed', 0),
+            unconfirmed=balance.get('unconfirmed', 0))
+
+    def __init__(self, symbol: str, confirmed: int, unconfirmed: int):
+        self.symbol = symbol
+        self.confirmed = confirmed
+        self.unconfirmed = unconfirmed
+        self.total = confirmed + unconfirmed
+        self.ts = time.time()
+
+    def __repr__(self):
+        return f'{self.symbol} Balance: {self.confirmed}'
+
+    def __str__(self):
+        return f'{self.symbol} Balance: {self.confirmed}'
+
+    def __call__(self):
+        return self.total
 
 
 class TransactionResult():
@@ -530,7 +569,9 @@ class Wallet(WalletBase):
         self.banner = self.electrumx.api.getBanner()
         self.transactionHistory = self.electrumx.api.getTransactionHistory(
             scripthash=self.scripthash)
-        self.currencyOnChain = self.electrumx.api.getCurrency(scripthash=self.scripthash)
+        self.balances = self.electrumx.api.getBalances(scripthash=self.scripthash)
+        #self.currencyOnChain = self.electrumx.api.getCurrency(scripthash=self.scripthash)
+        self.currencyOnChain = Balance.fromBalances('EVR', self.balances or {})
         logging.debug('self.currencyOnChain', self.currencyOnChain)
         self.unspentCurrency = self.electrumx.api.getUnspentCurrency(scripthash=self.scripthash)
         self.unspentCurrency = [

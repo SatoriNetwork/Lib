@@ -8,6 +8,7 @@ import threading
 from satorilib.electrumx import ElectrumxConnection
 from satorilib.electrumx import ElectrumxApi
 
+
 class Subscription:
     def __init__(
         self,
@@ -20,7 +21,7 @@ class Subscription:
         self.shortLivedCallback = callback
 
     def __hash__(self):
-        return hash((self.method, self.params))
+        return hash((self.method, tuple(self.params)))
 
     def __eq__(self, other):
         if isinstance(other, Subscription):
@@ -41,6 +42,7 @@ class Subscription:
         if self.shortLivedCallback is None:
             return None
         return self.shortLivedCallback(*args, **kwargs)
+
 
 class Electrumx(ElectrumxConnection):
     def __init__(
@@ -119,7 +121,8 @@ class Electrumx(ElectrumxConnection):
                             self.subscriptions[subscription].put(r)
                             subscription(r)
                         else:
-                            self.responses[r.get('id', self._generateCallId())] = r
+                            self.responses[
+                                r.get('id', self._generateCallId())] = r
                     except json.decoder.JSONDecodeError as e:
                         logging.error((
                             f"JSONDecodeError: {e} in message: {message} "
@@ -128,7 +131,7 @@ class Electrumx(ElectrumxConnection):
             except socket.timeout:
                 logging.warning("Socket timeout occurred during receive.")
                 self.quiet.put(time.time())
-            #except Exception as e:
+            # except Exception as e:
             #    logging.error(f"Socket error during receive: {str(e)}")
             #    self.quiet.put(time.time())
             #    self.isConnected = False

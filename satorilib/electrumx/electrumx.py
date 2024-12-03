@@ -208,7 +208,6 @@ class Electrumx(ElectrumxConnection):
     def handshake(self):
         try:
             self.handshaked = self.api.handshake()
-            print('handshaked', self.handshaked)
             self.lastHandshake = time.time()
             return True
         except Exception as e:
@@ -237,12 +236,10 @@ class Electrumx(ElectrumxConnection):
     ) -> Union[dict, None]:
         callId = callId or self._generateCallId()
         payload = self._preparePayload(method, callId, params)
-        print('sending', payload)
         self.connection.send(payload)
         if sendOnly:
             return None
         x = self.listenForResponse(callId)
-        print('received', x)
         return x
 
     def subscribe(

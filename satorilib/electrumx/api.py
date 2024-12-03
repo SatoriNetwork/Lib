@@ -23,21 +23,29 @@ class ElectrumxApi():
         else:
             return decoded
 
-    def sendRequest(self, method: str, *params) -> Union[dict, None]:
+    def sendRequest(
+        self,
+        method: str,
+        params: Union[list, None] = None,
+        interpret: bool = True
+    ) -> Union[dict, None]:
         try:
-            return ElectrumxApi.interpret(self.send(method, *params))
+            response = self.send(method, params or [])
+            if interpret:
+                return ElectrumxApi.interpret(response)
+            return response
         except Exception as e:
             logging.error(f"Error during {method}: {str(e)}")
 
     def sendSubscriptionRequest(
         self,
         method: str,
-        *params,
+        params: Union[list, None] = None,
         callback: Union[callable, None] = None
     ) -> Union[dict, None]:
         try:
             return ElectrumxApi.interpret(
-                self.subscribe(method, *params, callback=callback))
+                self.subscribe(method, params or [], callback=callback))
         except Exception as e:
             logging.error(f"Error during {method}: {str(e)}")
 
@@ -56,7 +64,9 @@ class ElectrumxApi():
                 'height': 1067110}]
         }
         '''
-        return self.sendSubscriptionRequest('blockchain.headers.subscribe', callback=callback) or {}
+        return self.sendSubscriptionRequest(
+            method='blockchain.headers.subscribe',
+            callback=callback) or {}
 
     def subscribeScripthash(
         self,
@@ -75,22 +85,43 @@ class ElectrumxApi():
         }
         '''
         return self.sendSubscriptionRequest(
-            'blockchain.scripthash.subscribe',
-            scripthash,
+            method='blockchain.scripthash.subscribe',
+            params=[scripthash],
             callback=callback) or {}
+
+    def handshake(self) -> Union[dict, None]:
+        '''
+        {
+            'jsonrpc': '2.0',
+            'result': {?},
+            'id': '1719672672565'
+        }
+        '''
+        return self.sendRequest(
+            method='server.version',
+            params=[f'Satori Neuron {time.time()}', '1.10'])
+
+    def ping(self) -> Union[dict, None]:
+        '''
+        {
+            'jsonrpc': '2.0',
+            'result': {?},
+            'id': '1719672672565'
+        }
+        '''
+        return self.sendRequest(method='server.ping', interpret=False)
 
     def getBalance(self, scripthash: str, targetAsset: str = 'SATORI') -> dict:
         '''
         {
             'jsonrpc': '2.0',
             'result': {'confirmed': 0, 'unconfirmed': 0},
-            'id': 1719672672565
+            'id': '1719672672565'
         }
         '''
         return self.sendRequest(
-            'blockchain.scripthash.get_asset_balance',
-            scripthash,
-            targetAsset) or {}
+            method='blockchain.scripthash.get_asset_balance',
+            params=[scripthash, targetAsset]) or {}
 
     def getAllBalances(self, scripthash: str) -> dict:
         '''
@@ -110,9 +141,8 @@ class ElectrumxApi():
                 "SATORI":{"confirmed":155659082600,"unconfirmed":0}}}
         '''
         return self.sendRequest(
-            'blockchain.scripthash.get_asset_balance',
-            scripthash,
-            True) or {}
+            method='blockchain.scripthash.get_asset_balance',
+            params=[scripthash, True]) or {}
 
     def getTransactionHistory(self, scripthash: str) -> list:
         '''
@@ -126,11 +156,15 @@ class ElectrumxApi():
             "id":1656046324946
         }\n'
         '''
-        return self.sendRequest('blockchain.scripthash.get_history', scripthash) or []
+        return self.sendRequest(
+            method='blockchain.scripthash.get_history',
+            params=[scripthash]) or []
 
     def getTransaction(self, txHash: str, throttle: int = 0.34):
         time.sleep(throttle)
-        return self.sendRequest('blockchain.transaction.get', txHash, True)
+        return self.sendRequest(
+            method='blockchain.transaction.get',
+            params=[txHash, True])
 
     def getCurrency(self, scripthash: str) -> int:
         '''
@@ -138,16 +172,17 @@ class ElectrumxApi():
         b'{"jsonrpc":"2.0","result":{"confirmed":18193623332178,"unconfirmed":0},"id":1656046285682}\n'
         '''
         result = self.sendRequest(
-            'blockchain.scripthash.get_balance',
-            scripthash)
+            method='blockchain.scripthash.get_balance',
+            params=[scripthash])
         return (result or {}).get('confirmed', 0) + (result or {}).get('unconfirmed', 0)
 
     def getBanner(self) -> dict:
-        return self.sendRequest('server.banner')
+        return self.sendRequest(method='server.banner')
 
     def getUnspentCurrency(self, scripthash: str) -> list:
         return self.sendRequest(
-            'blockchain.scripthash.listunspent', scripthash)
+            method='blockchain.scripthash.listunspent',
+            params=[scripthash])
 
     def getUnspentAssets(self, scripthash: str, targetAsset: str = 'SATORI') -> list:
         '''
@@ -159,20 +194,21 @@ class ElectrumxApi():
                 'height': 868584,
                 'asset': 'KINKAJOU/DUMMY',
                 'value': 100000000}],
-            'id': 1719672839478
+            'id': '1719672839478'
         }
         '''
         return self.sendRequest(
-            'blockchain.scripthash.listunspent',
-            scripthash,
-            targetAsset)
+            method='blockchain.scripthash.listunspent',
+            params=[scripthash, targetAsset])
 
     def getStats(self, targetAsset: str = 'SATORI'):
-        return self.sendRequest('blockchain.asset.get_meta', targetAsset)
+        return self.sendRequest(method='blockchain.asset.get_meta', params=[targetAsset])
 
     def getAssetBalanceForHolder(self, scripthash: str, throttle: int = 1):
         time.sleep(throttle)
-        return self.sendRequest('blockchain.scripthash.get_asset_balance', True, scripthash).get('confirmed', {}).get('SATORI', 0)
+        return self.sendRequest(
+            method='blockchain.scripthash.get_asset_balance',
+            params=[True, scripthash]).get('confirmed', {}).get('SATORI', 0)
 
     def getAssetHolders(self, targetAddress: Union[str, None] = None, targetAsset: str = 'SATORI') -> Union[Dict[str, int], bool]:
         addresses = {}
@@ -181,11 +217,8 @@ class ElectrumxApi():
         while last_addresses != addresses:
             last_addresses = addresses
             response = self.sendRequest(
-                'blockchain.asset.list_addresses_by_asset',
-                targetAsset,
-                False,
-                1000,
-                i)
+                method='blockchain.asset.list_addresses_by_asset',
+                params=[targetAsset, False, 1000, i])
             if targetAddress is not None and targetAddress in response.keys():
                 return {targetAddress: response[targetAddress]}
             addresses = {**addresses, **response}
@@ -196,4 +229,4 @@ class ElectrumxApi():
         return addresses
 
     def broadcast(self, tx: str) -> str:
-        return self.sendRequest('blockchain.transaction.broadcast', tx)
+        return self.sendRequest(method='blockchain.transaction.broadcast', params=[tx])

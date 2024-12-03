@@ -9,17 +9,22 @@ from satorilib.electrumx import ElectrumxConnection
 from satorilib.electrumx import ElectrumxApi
 
 class Subscription:
-    def __init__(self, method: str, *args, callback: Union[callable, None] = None):
+    def __init__(
+        self,
+        method: str,
+        params: list,
+        callback: Union[callable, None] = None
+    ):
         self.method = method
-        self.args = args
+        self.params = params
         self.shortLivedCallback = callback
 
     def __hash__(self):
-        return hash((self.method, self.args))
+        return hash((self.method, self.params))
 
     def __eq__(self, other):
         if isinstance(other, Subscription):
-            return self.method == other.method and self.args == other.args
+            return self.method == other.method and self.params == other.params
         return False
 
     def __call__(self, *args, **kwargs):
@@ -48,7 +53,7 @@ class Electrumx(ElectrumxConnection):
         self.api = ElectrumxApi(send=self.send, subscribe=self.subscribe)
         self.lock = threading.Lock()
         self.subscriptions: dict[Subscription, queue.Queue] = {}
-        self.responses = queue.Queue()
+        self.responses: dict[str, dict] = {}
         self.quiet = queue.Queue()
         self.listenerStop = threading.Event()
         self.pingerStop = threading.Event()
@@ -77,9 +82,11 @@ class Electrumx(ElectrumxConnection):
         self.pinger.start()
 
     def listen(self):
+
         def handleMultipleMessages(buffer: str):
             ''' split on the first newline to handle multiple messages '''
             return buffer.partition('\n')
+
         buffer = ''
         while not self.listenerStop.is_set():
             if not self.isConnected:
@@ -106,13 +113,13 @@ class Electrumx(ElectrumxConnection):
                             subscription = self.findSubscription(
                                 subscription=Subscription(
                                     method,
-                                    *r.get(
+                                    params=r.get(
                                         'params',
                                         ['scripthash', 'status'])[0]))
                             self.subscriptions[subscription].put(r)
                             subscription(r)
                         else:
-                            self.responses.put(r)
+                            self.responses[r.get('id', self._generateCallId())] = r
                     except json.decoder.JSONDecodeError as e:
                         logging.error((
                             f"JSONDecodeError: {e} in message: {message} "
@@ -129,8 +136,32 @@ class Electrumx(ElectrumxConnection):
     def listenForSubscriptions(self, method: str):
         return self.subscriptions[method].get()
 
-    def listenForResponse(self):
-        return self.responses.get(timeout=30)
+    def listenForResponse(self, callId: Union[str, None] = None) -> Union[dict, None]:
+        then = time.time()
+        while time.time() < then + 30:
+            response = self.responses.get(callId)
+            if response is not None:
+                del self.responses[callId]
+                self.cleanUpResponses()
+                return response
+            time.sleep(1)
+        return None
+
+    def cleanUpResponses(self):
+        '''
+        clear all stale responses since the key is a stringed time.time()
+        '''
+        currentTime = time.time()
+        stale = 30
+        keysToDelete = []
+        for key in self.responses.keys():
+            try:
+                if float(key) < currentTime - stale:
+                    keysToDelete.append(key)
+            except Exception as e:
+                logging.warning(f'error in cleanUpResponses {e}')
+        for key in keysToDelete:
+            del self.responses[key]
 
     def stayConnected(self):
         while not self.pingerStop.is_set():
@@ -156,7 +187,7 @@ class Electrumx(ElectrumxConnection):
             self.isConnected = False
             return False
         try:
-            response = self.send('server.ping')
+            response = self.api.ping()
             if response is None:
                 self.isConnected = False
                 return False
@@ -176,50 +207,56 @@ class Electrumx(ElectrumxConnection):
 
     def handshake(self):
         try:
-            method = 'server.version'
-            name = f'Satori Neuron {time.time()}'
-            assetApiVersion = '1.10'
-            self.handshaked = self.send(method, name, assetApiVersion)
+            self.handshaked = self.api.handshake()
+            print('handshaked', self.handshaked)
             self.lastHandshake = time.time()
             return True
         except Exception as e:
             logging.error(f'error in handshake initial {e}')
 
-    def _preparePayload(self, method: str, *args):
+    @staticmethod
+    def _generateCallId() -> str:
+        return str(time.time())
+
+    def _preparePayload(self, method: str, callId: str, params: list) -> bytes:
         return (
             json.dumps({
                 "jsonrpc": "2.0",
-                "id": int(time.time()*10000000),
+                "id": callId,
                 "method": method,
-                "params": args
+                "params": params
             }) + '\n'
         ).encode()
 
     def send(
         self,
         method: str,
-        *args,
+        params: list,
+        callId: Union[str, None] = None,
         sendOnly: bool = False,
-    ) -> Union[dict, list, None]:
-        payload = self._preparePayload(method, *args)
-        with self.lock:
-            self.connection.send(payload)
-            if sendOnly:
-                return None
-            return self.listenForResponse()
+    ) -> Union[dict, None]:
+        callId = callId or self._generateCallId()
+        payload = self._preparePayload(method, callId, params)
+        print('sending', payload)
+        self.connection.send(payload)
+        if sendOnly:
+            return None
+        x = self.listenForResponse(callId)
+        print('received', x)
+        return x
 
     def subscribe(
         self,
         method: str,
-        *args,
+        params: list,
         callback: Union[callable, None] = None,
     ):
         self.subscriptions[
-            Subscription(method, *args, callback=callback)
+            Subscription(method, params, callback=callback)
         ] = queue.Queue()
-        return self.send(method, *args)
+        return self.send(method, params)
 
     def resubscribe(self):
         if self.connected():
             for subscription in self.subscriptions.keys():
-                self.subscribe(subscription.method, *subscription.args)
+                self.subscribe(subscription.method, *subscription.params)

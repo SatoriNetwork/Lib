@@ -1,3 +1,3 @@
-stakeRequired: float = 8.0
+stakeRequired: float = 9.0
 poolFee: float = .5
 poolModifier: float = 16

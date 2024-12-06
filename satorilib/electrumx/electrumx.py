@@ -129,7 +129,7 @@ class Electrumx(ElectrumxConnection):
                             "error in _receive"))
                         self.quiet.put(time.time())
             except socket.timeout:
-                logging.warning("Socket timeout occurred during receive.")
+                logging.warning('no activity for 10 minutes, wallet going to sleep.')
                 self.quiet.put(time.time())
             # except Exception as e:
             #    logging.error(f"Socket error during receive: {str(e)}")

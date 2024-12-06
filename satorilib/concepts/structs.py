@@ -78,6 +78,10 @@ class StreamId:
         return (self.__source, self.__author, self.__stream, self.__target)
 
     @property
+    def cleanId(self):
+        return str((self.__source, self.__author, self.__stream, self.__target)).replace("'", '')
+
+    @property
     def idString(self):  # todo: make this .id and the .key a tuple
         return (
             (self.__source or "")

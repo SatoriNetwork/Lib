@@ -109,7 +109,9 @@ class Electrumx(ElectrumxConnection):
                         if method == 'blockchain.headers.subscribe':
                             subscription = self.findSubscription(
                                 subscription=Subscription(method))
-                            self.subscriptions[subscription].put(r)
+                            q = self.subscriptions.get(subscription)
+                            if isinstance(q, queue.Queue):
+                                q.put(r)
                             subscription(r)
                         if method == 'blockchain.scripthash.subscribe':
                             subscription = self.findSubscription(
@@ -118,7 +120,9 @@ class Electrumx(ElectrumxConnection):
                                     params=r.get(
                                         'params',
                                         ['scripthash', 'status'])[0]))
-                            self.subscriptions[subscription].put(r)
+                            q = self.subscriptions.get(subscription)
+                            if isinstance(q, queue.Queue):
+                                q.put(r)
                             subscription(r)
                         else:
                             self.responses[

@@ -19,8 +19,9 @@ wallet code has basically 4 typtes of functionality:
 '''
 # import unittest
 # from unittest.mock import MagicMock, patch
-# from satoriwallet.lib import connection
-# from satoriwallet import TxUtils, Validate
+# from satorilib.wallet.concepts import authenticate
+# from satorilib.wallet.utils.transaction import TxUtils
+# from satorilib.wallet.utils.validate import Validate
 # from satorilib.utils import system
 # from satorilib.disk.wallet import WalletApi
 # # from tests.api.wallet.wallet import Wallet, TransactionResult, TransactionFailure
@@ -48,10 +49,10 @@ wallet code has basically 4 typtes of functionality:
 #         self.address = ''
 
 #     def authPayload(self):
-#         return connection.authPayload()
+#         return authenticate.authPayload()
 
 #     def registerPayload(self):
-#         auth_payload = connection.authPayload()
+#         auth_payload = authenticate.authPayload()
 #         device_payload = system.devicePayload()
 #         return {**auth_payload, **device_payload}
 

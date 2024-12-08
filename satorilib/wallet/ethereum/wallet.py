@@ -3,7 +3,6 @@ from base64 import b64encode, b64decode
 from eth_keys import keys
 from eth_account import Account
 from eth_account.messages import encode_defunct
-from satorilib import logging
 from satorilib.disk.wallet import WalletApi
 
 

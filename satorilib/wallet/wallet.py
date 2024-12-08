@@ -1,22 +1,21 @@
 from typing import Union
 import os
-import pandas as pd
-import time
 import json
 import joblib
 import threading
 from base64 import b64encode, b64decode
 from random import randrange
 import mnemonic
-from satoriwallet.lib import connection
-from satoriwallet import TxUtils, Validate
+from satorilib.wallet.concepts import authenticate
+from satorilib.wallet.utils.transaction import TxUtils
+from satorilib.wallet.utils.validate import Validate
 from satorilib import logging
 from satorilib import config
 from satorilib.utils import system
 from satorilib.disk.utils import safetify
-from satoriwallet.lib.structs import TransactionStruct
 from satorilib.electrumx import Electrumx
-from satorilib.wallet.structs import Balance, TransactionResult, TransactionFailure
+from satorilib.wallet.concepts.balance import Balance
+from satorilib.wallet.concepts.transaction import TransactionResult, TransactionFailure, TransactionStruct
 
 
 class WalletBase():
@@ -628,14 +627,14 @@ class Wallet(WalletBase):
     '''
 
     def authPayload(self, asDict: bool = False, challenge: str = None) -> Union[str, dict]:
-        payload = connection.authPayload(self, challenge)
+        payload = authenticate.authPayload(self, challenge)
         if asDict:
             return payload
         return json.dumps(payload)
 
     def registerPayload(self, asDict: bool = False, challenge: str = None) -> Union[str, dict]:
         payload = {
-            **connection.authPayload(self, challenge),
+            **authenticate.authPayload(self, challenge),
             **system.devicePayload(asDict=True)}
         if asDict:
             return payload

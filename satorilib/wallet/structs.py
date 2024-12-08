@@ -4,7 +4,7 @@ from satoriwallet import TxUtils
 class Balance():
 
     @staticmethod
-    def empty(symbol) -> 'Balance':
+    def empty(symbol: str = '') -> 'Balance':
         return Balance(symbol=symbol, confirmed=0, unconfirmed=0)
 
     @staticmethod

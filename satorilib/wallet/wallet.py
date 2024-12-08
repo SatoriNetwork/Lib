@@ -22,15 +22,14 @@ from satorilib.wallet.structs import Balance, TransactionResult, TransactionFail
 class WalletBase():
 
     def __init__(self, entropy: Union[bytes, None] = None):
-        self._entropy: bytes = entropy
-        self._entropy = None
-        self._entropyStr = ''
+        self._entropy: Union[bytes, None] = entropy
+        self._entropyStr:str = ''
         self._privateKeyObj = None
-        self.privateKey = ''
-        self.words = ''
-        self.publicKey = None
-        self.address = None
-        self.scripthash = None
+        self.privateKey:str = ''
+        self.words:str  = ''
+        self.publicKey: str = ''
+        self.address: str = ''
+        self.scripthash: str = ''
 
     @property
     def symbol(self) -> str:
@@ -43,7 +42,7 @@ class WalletBase():
         self.privateKey = ''
         self.words = ''
 
-    def loadFromYaml(self, yaml: dict = None):
+    def loadFromYaml(self, yaml: Union[dict, None] = None):
         yaml = yaml or {}
         self._entropy = yaml.get('entropy')
         if isinstance(self._entropy, bytes):
@@ -51,17 +50,21 @@ class WalletBase():
         if isinstance(self._entropy, str):
             self._entropyStr = self._entropy
             self._entropy = b64decode(self._entropy)
-        self.words = yaml.get('words')
-        self.privateKey = yaml.get('privateKey')
-        self.publicKey = yaml.get('publicKey')
+        self.words = yaml.get('words', '')
+        self.privateKey = yaml.get('privateKey', '')
+        self.publicKey = yaml.get('publicKey', '')
         self.address = yaml.get(self.symbol, {}).get('address')
-        self.scripthash = yaml.get('scripthash')
+        self.scripthash = yaml.get('scripthash', '')
         self.generateObjects()
 
     def verify(self) -> bool:
+        if self._entropy is None:
+            return False
         _entropy = self._entropy
         _entropyStr = b64encode(_entropy).decode('utf-8')
         _privateKeyObj = self._generatePrivateKey()
+        if _privateKeyObj is None:
+            return False
         _addressObj = self._generateAddress(pub=_privateKeyObj.pub)
         words = self._generateWords()
         privateKey = str(_privateKeyObj)
@@ -87,6 +90,8 @@ class WalletBase():
         self._addressObj = self._generateAddress()
 
     def generate(self):
+        if self._privateKeyObj is None:
+            return False
         self.generateObjects()
         self.words = self.words or self._generateWords()
         self.privateKey = self.privateKey or str(self._privateKeyObj)
@@ -94,7 +99,7 @@ class WalletBase():
         self.address = self.address or str(self._addressObj)
         self.scripthash = self.scripthash or self._generateScripthash()
 
-    def _generateScripthash(self, forAddress: str = None):
+    def _generateScripthash(self, forAddress: Union[str, None] = None):
         # possible shortcut:
         # self.scripthash = '76a914' + [s for s in self._addressObj.to_scriptPubKey().raw_iter()][2][1].hex() + '88ac'
         from base58 import b58decode_check
@@ -106,12 +111,11 @@ class WalletBase():
         BYTES_TO_PUSH = b'14'
         OP_EQUALVERIFY = b'88'
         OP_CHECKSIG = b'ac'
-        def DATA_TO_PUSH(address): return hexlify(b58decode_check(address)[1:])
-
-        def sig_script_raw(address): return b''.join(
-            (OP_DUP, OP_HASH160, BYTES_TO_PUSH, DATA_TO_PUSH(address), OP_EQUALVERIFY, OP_CHECKSIG))
+        def dataToPush(address): return hexlify(b58decode_check(address)[1:])
+        def sigScriptRaw(address): return b''.join(
+            (OP_DUP, OP_HASH160, BYTES_TO_PUSH, dataToPush(address), OP_EQUALVERIFY, OP_CHECKSIG))
         def scripthash(address): return sha256(codecs.decode(
-            sig_script_raw(address), 'hex_codec')).digest()[::-1].hex()
+            sigScriptRaw(address), 'hex_codec')).digest()[::-1].hex()
         return scripthash(forAddress or self.address)
 
     @staticmethod
@@ -121,7 +125,7 @@ class WalletBase():
         return os.urandom(32)
 
     def _generateWords(self):
-        return mnemonic.Mnemonic('english').to_mnemonic(self._entropy)
+        return mnemonic.Mnemonic('english').to_mnemonic(self._entropy or b'')
 
     def _generatePrivateKey(self):
         ''' returns a private key object '''
@@ -136,7 +140,13 @@ class WalletBase():
 class Wallet(WalletBase):
 
     @staticmethod
-    def openSafely(supposedDict: dict, key: str, default: Union[str, int, dict, list] = None):
+    def openSafely(
+        supposedDict: Union[dict, None],
+        key: str,
+        default: Union[str, int, dict, list, None] = None,
+    ):
+        if not isinstance(supposedDict, dict):
+            return default
         try:
             return supposedDict.get(key, default)
         except Exception as e:
@@ -146,11 +156,11 @@ class Wallet(WalletBase):
     def __init__(
         self,
         walletPath: str,
-        cachePath: str = None,
+        cachePath: Union[str, None] = None,
         reserve: float = .25,
         isTestnet: bool = False,
-        password: str = None,
-        watchAssets: list[str] = None,
+        password: Union[str, None] = None,
+        watchAssets: Union[list[str], None] = None,
         skipSave: bool = False,
         pullFullTransactions: bool = True,
     ):
@@ -175,8 +185,8 @@ class Wallet(WalletBase):
         self.stats = {}
         self.alias = None
         self.banner = None
-        self.currency: Balance = None
-        self.balance: Balance = None
+        self.currency: Balance = Balance.empty('EVR')
+        self.balance: Balance = Balance.empty('SATORI')
         self.divisibility = 0
         self.transactionHistory: list[dict] = []
         # TransactionStruct(*v)... {txid: (raw, vinVoutsTxs)}
@@ -184,7 +194,7 @@ class Wallet(WalletBase):
         self.cache = {}
         self.transactions: list[TransactionStruct] = []
         self.assetTransactions = []
-        self.electrumx: Electrumx = None
+        self.electrumx: Electrumx = None # type: ignore
         self.unspentCurrency = None
         self.unspentAssets = None
         self.status = None
@@ -218,11 +228,11 @@ class Wallet(WalletBase):
 
     @property
     def publicKeyBytes(self) -> bytes:
-        return bytes.fromhex(self.publicKey)
+        return bytes.fromhex(self.publicKey or '')
 
     @property
     def isEncrypted(self) -> bool:
-        return ' ' not in self.words
+        return ' ' not in (self.words or '')
 
     @property
     def isDecrypted(self) -> bool:
@@ -235,7 +245,7 @@ class Wallet(WalletBase):
 
     ### Loading ################################################################
 
-    def walletFileExists(self, path: str = None):
+    def walletFileExists(self, path: Union[str, None] = None):
         return os.path.exists(path or self.walletPath)
 
     def cacheFileExists(self):
@@ -260,7 +270,7 @@ class Wallet(WalletBase):
         self.yaml = None
         super().close()
 
-    def open(self, password: str = None) -> None:
+    def open(self, password: Union[str, None] = None) -> None:
         self.password = password
         self.load()
 
@@ -296,7 +306,7 @@ class Wallet(WalletBase):
                 return content
         return content
 
-    def save(self, path: str = None) -> bool:
+    def save(self, path: Union[str, None] = None) -> bool:
         path = path or self.walletPath
         safetify(path)
         if self.walletFileExists(path):
@@ -332,7 +342,7 @@ class Wallet(WalletBase):
                     return joblib.load(cachePath)
                 return None
             except Exception as e:
-                logging.debug(f'Unable to load wallet cache, creating a new one: {e}')
+                logging.debug(f'unable to load wallet cache, creating a new one: {e}')
                 if os.path.isfile(cachePath):
                     os.remove(cachePath)
                 return None
@@ -354,6 +364,7 @@ class Wallet(WalletBase):
             return False
         except Exception as e:
             logging.error(f'issue loading transaction cache, {e}')
+            return False
 
     def saveCache(self):
         if self.skipSave:

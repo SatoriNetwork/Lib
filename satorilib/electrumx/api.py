@@ -72,7 +72,7 @@ class ElectrumxApi():
         self,
         scripthash: str,
         callback: Union[callable, None] = None
-    ) -> dict:
+    ) -> str:
         '''
         Subscribe to the scripthash and start listening for updates.
         Response:
@@ -94,7 +94,7 @@ class ElectrumxApi():
         return self.sendSubscriptionRequest(
             method='blockchain.scripthash.subscribe',
             params=[scripthash],
-            callback=callback) or {}
+            callback=callback) or ''
 
     def handshake(self) -> Union[dict, None]:
         '''

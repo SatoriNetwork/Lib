@@ -433,18 +433,17 @@ class Wallet(WalletBase):
         ''' gets data from the blockchain, saves to attributes '''
         if not self.preSend():
             return
-        logging.debug('pulling transactions from blockchain...')
         self.getStats()
+        self.getTransactionHistory()
         self.getBalances()
-        self.getUnspents()
-        #self.getUnspentTransactions()
-        #self.getUnspentSignatures()
 
     def getStats(self):
         self.stats = self.electrumx.api.getStats()
         self.divisibility = Wallet.openSafely(self.stats, 'divisions', 8)
         self.divisibility = self.divisibility if self.divisibility is not None else 8
         self.banner = self.electrumx.api.getBanner()
+
+    def getTransactionHistory(self):
         self.transactionHistory = self.electrumx.api.getTransactionHistory(
             scripthash=self.scripthash)
 
@@ -452,6 +451,12 @@ class Wallet(WalletBase):
         self.balances = self.electrumx.api.getBalances(scripthash=self.scripthash)
         self.currency = Balance.fromBalances('EVR', self.balances or {})
         self.balance = Balance.fromBalances('SATORI', self.balances or {})
+
+    def getReadyToSend(self):
+        self.getBalances()
+        self.getUnspents()
+        self.getUnspentTransactions(threaded=False)
+        self.getUnspentSignatures()
 
     def getUnspents(self):
         self.unspentCurrency = self.electrumx.api.getUnspentCurrency(scripthash=self.scripthash)

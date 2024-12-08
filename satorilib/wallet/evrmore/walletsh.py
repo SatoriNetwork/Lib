@@ -1,25 +1,23 @@
 from typing import Union
-from ravencoin import SelectParams
-from ravencoin.wallet import P2SHRavencoinAddress, CRavencoinAddress, CRavencoinSecret
-from ravencoin.core.scripteval import VerifyScript, SCRIPT_VERIFY_P2SH
-from ravencoin.core.script import CScript, OP_HASH160, OP_EQUAL, SignatureHash, SIGHASH_ALL
-from ravencoin.core import b2x, lx, COutPoint, CMutableTxOut, CMutableTxIn, CMutableTransaction, Hash160
-from ravencoin.core.scripteval import EvalScriptError
-from satoriwallet import ElectrumxAPI
-from satoriwallet import ravencoin
-from satoriwallet import TxUtils, AssetTransaction
-from satorilib import logging
-from satorilib.wallet.wallet import Wallet, TransactionFailure
+from evrmore import SelectParams
+from evrmore.wallet import P2SHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret
+from evrmore.core.scripteval import VerifyScript, SCRIPT_VERIFY_P2SH
+from evrmore.core.script import CScript, OP_HASH160, OP_EQUAL, SignatureHash, SIGHASH_ALL
+from evrmore.core import b2x, lx, COutPoint, CMutableTxOut, CMutableTxIn, CMutableTransaction, Hash160
+from evrmore.core.scripteval import EvalScriptError
+from satorilib.electrumx import Electrumx
+from satorilib.wallet.wallet import Wallet
+from satorilib.wallet.evrmore.sign import signMessage
+from satorilib.wallet.evrmore.verify import verify
 
-
-class RavencoinP2SHWallet(Wallet):
+class EvrmoreP2SHWallet(Wallet):
 
     def __init__(
         self,
         walletPath: str,
         temporary: bool = False,
         reserve: float = .1,
-        isTestnet: bool = True,
+        isTestnet: bool = False,
         password: Union[str, None] = None,
     ):
         super().__init__(
@@ -30,22 +28,22 @@ class RavencoinP2SHWallet(Wallet):
             password=password)
 
     def connect(self):
-        self.electrumx = ElectrumxAPI(
+        self.electrumx = Electrumx(
             chain=self.chain,
             address=self.address,
             scripthash=self.scripthash,
             servers=[
-                'moontree.com:50002',
-                '146.190.149.237:50002',
+                'moontree.com:50022',  # mainnet ssl evr
+                # '146.190.149.237:50022',  # mainnet ssl evr
             ])
 
     @property
     def symbol(self) -> str:
-        return 'rvn'
+        return 'evr'
 
     @property
     def chain(self) -> str:
-        return 'Ravencoin'
+        return 'Evrmore'
 
     @property
     def networkByte(self) -> bytes:
@@ -53,20 +51,20 @@ class RavencoinP2SHWallet(Wallet):
 
     @property
     def networkByteP2SH(self) -> bytes:
-        return b'\x7a'  # b'0x7a'
+        return (92).to_bytes(1, 'big')
 
     def _generatePrivateKey(self):
         SelectParams('mainnet')
-        return CRavencoinSecret.from_secret_bytes(self._entropy)
+        return CEvrmoreSecret.from_secret_bytes(self._entropy)
 
     def _generateAddress(self):
-        return P2SHRavencoinAddress.from_script(self._generateRedeemScript())
+        return P2SHEvrmoreAddress.from_script(self._generateRedeemScript())
 
     @staticmethod
     def generateAddress(redeemScript: Union[bytes, str]) -> str:
         if isinstance(redeemScript, str):
             redeemScript = bytes.fromhex(redeemScript)
-        return str(P2SHRavencoinAddress.from_script(redeemScript))
+        return str(P2SHEvrmoreAddress.from_script(redeemScript))
 
     def _generateRedeemScript(self):
         # Example redeem script for a 2-of-3 multisig
@@ -75,13 +73,13 @@ class RavencoinP2SHWallet(Wallet):
         return CScript([2] + publicKeys + [3, OP_CHECKMULTISIG])
 
     def _generateScriptPubKeyFromAddress(self, address: str):
-        return CRavencoinAddress(address).to_scriptPubKey()
+        return CEvrmoreAddress(address).to_scriptPubKey()
 
     def sign(self, message: str):
-        return ravencoin.signMessage(self._privateKeyObj, message)
+        return signMessage(self._privateKeyObj, message)
 
     def verify(self, message: str, sig: bytes, address: Union[str, None] = None):
-        return ravencoin.verify(address=address or self.address, message=message, signature=sig)
+        return verify(address=address or self.address, message=message, signature=sig)
 
     def _compileInputs(
         self,

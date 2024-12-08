@@ -4,9 +4,10 @@ import unittest
 from evrmore.wallet import CEvrmoreSecret, P2PKHEvrmoreAddress
 from evrmore.core import CMutableTxOut, CScript
 from evrmore.core.script import CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, OP_EVR_ASSET, OP_DROP
-from satorilib.wallet.evr import EvrmoreWallet
+from satorilib.wallet.evrmore.wallet import EvrmoreWallet
 from satorilib.wallet.wallet import  TransactionFailure
-from satoriwallet import TxUtils, AssetTransaction
+from satorilib.wallet.utils import TxUtils
+from satorilib.wallet.concepts.transaction import AssetTransaction
 from satorilib.disk.wallet import WalletApi
 
 class TestEvrmoreWallet(unittest.TestCase):

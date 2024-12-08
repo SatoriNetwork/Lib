@@ -1,7 +1,6 @@
 from typing import Union
 import json
 import pandas as pd
-import numpy as np
 import datetime as dt
 from functools import partial
 
@@ -602,20 +601,7 @@ class Observation:
         else:
             observationTime = j.get('time', now)
         observationHash = j.get('observationHash', j.get('hash', None))
-        # value = j.get('data', None)
-
-        data = j.get('data', [np.nan])
-        if isinstance(data, str):
-            try:
-                values = [float(data)]
-            except:
-                # values = [float(v.strip()) for v in data.split(',')]
-                values = list(map(ord, data))
-        elif not isinstance(data, list):
-            values = [data]
-        # value = np.asarray(value, dtype=np.float64)
-        observationTimes = [observationTime] * len(values)
-
+        value = j.get('data', None)
         target = None
         df = pd.DataFrame(
             {
@@ -638,7 +624,7 @@ class Observation:
             streamId=streamId,
             observationTime=observationTime,
             observationHash=observationHash,
-            value=str(values[-1]),
+            value=value,
             target=target,
             df=df,
         )

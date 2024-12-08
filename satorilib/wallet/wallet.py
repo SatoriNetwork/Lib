@@ -89,10 +89,10 @@ class WalletBase():
         self._addressObj = self._generateAddress()
 
     def generate(self):
-        if self._privateKeyObj is None:
-            return False
         self.generateObjects()
         self.words = self.words or self._generateWords()
+        if self._privateKeyObj is None:
+            return False
         self.privateKey = self.privateKey or str(self._privateKeyObj)
         self.publicKey = self.publicKey or self._privateKeyObj.pub.hex()
         self.address = self.address or str(self._addressObj)

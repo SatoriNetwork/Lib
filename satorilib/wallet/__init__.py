@@ -1,6 +1,8 @@
 from satorilib.wallet.wallet import Wallet
-from satorilib.wallet.evr import EvrmoreWallet
-from satorilib.wallet.rvn import RavencoinWallet
+from satorilib.wallet.evrmore import EvrmoreWallet
+from satorilib.wallet.ravencoin import RavencoinWallet
+from satorilib.wallet.utils.transaction import TxUtils
+from satorilib.wallet.utils.validate import Validate
 
 # not needed yet, just an example of return data from electrumx servers
 # def parseTx(txStruct):

@@ -1,5 +1,5 @@
 import time
-from satoriwallet import TxUtils
+from satorilib.wallet.utils.transaction import TxUtils
 
 class Balance():
 
@@ -83,24 +83,3 @@ class Balance():
         elif isinstance(other, (int, float)):
             return self.total != other
         return NotImplemented
-
-class TransactionResult():
-    def __init__(self, result: str = '', success: bool = False, tx: bytes = None, msg: str = '', reportedFeeSats: int = None):
-        self.result = result
-        self.success = success
-        self.tx = tx
-        self.msg = msg
-        self.reportedFeeSats = reportedFeeSats
-
-
-class TransactionFailure(Exception):
-    '''
-    unable to create a transaction for some reason
-    '''
-
-    def __init__(self, message='Transaction Failure', extra_data=None):
-        super().__init__(message)
-        self.extra_data = extra_data
-
-    def __str__(self):
-        return f"{self.__class__.__name__}: {self.args[0]} {self.extra_data or ''}"

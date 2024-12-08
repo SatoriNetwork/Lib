@@ -6,10 +6,13 @@ from evrmore.core.scripteval import VerifyScript, SCRIPT_VERIFY_P2SH
 from evrmore.core.script import CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, OP_EVR_ASSET, OP_DROP, OP_RETURN, SIGHASH_ANYONECANPAY
 from evrmore.core import b2x, lx, COutPoint, CMutableTxOut, CMutableTxIn, CMutableTransaction, Hash160
 from evrmore.core.scripteval import EvalScriptError
-from satoriwallet import evrmore
-from satoriwallet import TxUtils, AssetTransaction
 from satorilib.electrumx import Electrumx
-from satorilib.wallet.wallet import Wallet, TransactionFailure
+from satorilib.wallet.concepts.transaction import AssetTransaction, TransactionFailure
+from satorilib.wallet.utils.transaction import TxUtils
+from satorilib.wallet.wallet import Wallet
+from satorilib.wallet.evrmore.sign import signMessage
+from satorilib.wallet.evrmore.verify import verify
+
 
 class EvrmoreWallet(Wallet):
 
@@ -93,10 +96,10 @@ class EvrmoreWallet(Wallet):
     # signature ###############################################################
 
     def sign(self, message: str):
-        return evrmore.signMessage(self._privateKeyObj, message)
+        return signMessage(self._privateKeyObj, message)
 
     def verify(self, message: str, sig: bytes, address: Union[str, None] = None):
-        return evrmore.verify(
+        return verify(
             message=message,
             signature=sig,
             address=address or self.address)

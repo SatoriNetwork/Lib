@@ -2,7 +2,7 @@ import pandas as pd
 import hashlib
 import base64
 from typing import Union
-from satorilib.api.disk import Cache
+from satorilib.disk import Cache
 from satorilib.concepts import StreamId
 from satorineuron import config
 Cache.setConfig(config)
@@ -51,7 +51,7 @@ def cleanHashes(df: pd.DataFrame) -> tuple[bool, Union[pd.DataFrame, None]]:
     success is true if the first hash is the first value plus ''.
     if it is able to create a dataframe of all the other hashes from there and
     that dataframe is different than the input dataframe, it returns it. if it's
-    unable to make a new dataframe or the one it makes matches the input, it 
+    unable to make a new dataframe or the one it makes matches the input, it
     returns None.
     '''
     priorRowHash = ''
@@ -77,7 +77,7 @@ def cleanHashes(df: pd.DataFrame) -> tuple[bool, Union[pd.DataFrame, None]]:
 
 def verifyHashes(df: pd.DataFrame, priorRowHash: str = None) -> tuple[bool, Union[pd.DataFrame, None]]:
     '''
-    returns success flag and the first row as DataFrame that doesn't pass the 
+    returns success flag and the first row as DataFrame that doesn't pass the
     hash check or None
     priorRowHash isn't usually passed in because we do the verification on the
     entire dataframe, so by default the first priorRowHash is assumed to be an

@@ -4,9 +4,9 @@ from ravencoin.core.script import CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, O
 from ravencoin.core import b2x, lx, COIN, COutPoint, CMutableTxOut, CMutableTxIn, CMutableTransaction, Hash160
 from satorilib import logging
 from satorineuron import config
-from satorilib.api.disk import Disk
-from satorilib.api.wallet import RavencoinWallet
-from satorilib.api.wallet import EvrmoreWallet
+from satorilib.disk import Disk
+from satorilib.wallet import RavencoinWallet
+from satorilib.wallet import EvrmoreWallet
 Disk.setConfig(config)
 r = RavencoinWallet('/Satori/Neuron/wallet/wallet.yaml')
 r()

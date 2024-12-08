@@ -21,8 +21,8 @@ wallet code has basically 4 typtes of functionality:
 # from unittest.mock import MagicMock, patch
 # from satoriwallet.lib import connection
 # from satoriwallet import TxUtils, Validate
-# from satorilib.api import system
-# from satorilib.api.disk.wallet import WalletApi
+# from satorilib.utils import system
+# from satorilib.disk.wallet import WalletApi
 # # from tests.api.wallet.wallet import Wallet, TransactionResult, TransactionFailure
 
 # class TransactionResult:
@@ -93,11 +93,11 @@ wallet code has basically 4 typtes of functionality:
 #     def sendAllTransaction(self):
 #         # Placeholder for sendAllTransaction method
 #         return 'test_tx_hash'
-    
+
 #     def satoriTransaction(self, amount, address):
 #         # Placeholder for satoriTransaction method
 #         return 'test_tx_hash'
-    
+
 # class TestWallet(unittest.TestCase):
 
 #     def setUp(self):
@@ -110,14 +110,14 @@ wallet code has basically 4 typtes of functionality:
 #         self.assertEqual(result, {"test": "payload"})  # Changed from string to dict
 
 #     @patch('satoriwallet.lib.connection.authPayload')
-#     @patch('satorilib.api.system.devicePayload')
+#     @patch('satorilib.utils.system.devicePayload')
 #     def test_registerPayload(self, mock_devicePayload, mock_authPayload):
 #         mock_authPayload.return_value = {"auth": "payload"}
 #         mock_devicePayload.return_value = {"device": "payload"}
 #         result = self.wallet.registerPayload()
 #         self.assertEqual(result, {"auth": "payload", "device": "payload"})  # Changed from string to dict
 
-#     @patch('satorilib.api.disk.wallet.WalletApi.load')
+#     @patch('satorilib.disk.wallet.WalletApi.load')
 #     def test_loadRaw(self, mock_load):
 #         mock_load.return_value = {
 #             'entropy': 'test_entropy',
@@ -131,7 +131,7 @@ wallet code has basically 4 typtes of functionality:
 #         self.assertTrue(result)
 #         self.assertEqual(self.wallet._entropyStr, 'test_entropy')
 
-#     @patch('satorilib.api.disk.wallet.WalletApi.save')
+#     @patch('satorilib.disk.wallet.WalletApi.save')
 #     def test_save(self, mock_save):
 #         self.wallet._entropyStr = 'test_entropy'
 #         self.wallet.words = 'test words'

@@ -4,10 +4,10 @@ import unittest
 from evrmore.wallet import CEvrmoreSecret, P2PKHEvrmoreAddress
 from evrmore.core import CMutableTxOut, CScript
 from evrmore.core.script import CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, OP_EVR_ASSET, OP_DROP
-from satorilib.api.wallet.evr import EvrmoreWallet
-from satorilib.api.wallet.wallet import  TransactionFailure
+from satorilib.wallet.evr import EvrmoreWallet
+from satorilib.wallet.wallet import  TransactionFailure
 from satoriwallet import TxUtils, AssetTransaction
-from satorilib.api.disk.wallet import WalletApi
+from satorilib.disk.wallet import WalletApi
 
 class TestEvrmoreWallet(unittest.TestCase):
 
@@ -80,7 +80,7 @@ class TestEvrmoreWallet(unittest.TestCase):
         # Test static address generation
         result = self.wallet.generateAddress(self.wallet_values["publicKey"])
         self.assertEqual(result, self.wallet_values["address"])
-  
+
     def test_generateScriptPubKeyFromAddress(self):
         # Test script public key generation from address
         script_pubkey = self.wallet._generateScriptPubKeyFromAddress(self.wallet_values["address"])
@@ -94,7 +94,7 @@ class TestEvrmoreWallet(unittest.TestCase):
         self.assertEqual(script_ops[4], OP_CHECKSIG)
         # Verify the script starts with the expected OP_DUP and OP_HASH160 bytes
         self.assertTrue(bytes(script_pubkey).startswith(b'\x76\xa9\x14'))
-        
+
         # Verify the script ends with the expected OP_EQUALVERIFY and OP_CHECKSIG bytes
         self.assertTrue(bytes(script_pubkey).endswith(b'\x88\xac'))
 
@@ -130,7 +130,7 @@ class TestEvrmoreWallet(unittest.TestCase):
         self.assertIsInstance(result, CMutableTxOut)
         self.assertEqual(result.nValue, 0)
         self.assertIsInstance(result.scriptPubKey, CScript)
-        
+
         # Verify script structure
         script = result.scriptPubKey
         self.assertEqual(script[0], OP_DUP)

@@ -1,6 +1,6 @@
 
-from satorilib.api.disk import Cache  # Disk
-from satorilib.api.wallet import RavencoinWallet
+from satorilib.disk import Cache  # Disk
+from satorilib.wallet import RavencoinWallet
 from satorineuron import config
 Cache.setConfig(config)
 vault = RavencoinWallet(

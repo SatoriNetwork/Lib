@@ -785,7 +785,7 @@ class SatoriServerClient(object):
         useAuthorizedCall: bool = True,
     ) -> Union[bool, None]:
         ''' publish predictions '''
-        print('publishing')
+        #logging.info(f'publishing', color='blue')
         # if not isPrediction and self.topicTime.get(topic, 0) > time.time() - (Stream.minimumCadence*.95):
         #    return
         # if isPrediction and self.topicTime.get(topic, 0) > time.time() - 60*60:

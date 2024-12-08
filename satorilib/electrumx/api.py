@@ -75,6 +75,13 @@ class ElectrumxApi():
     ) -> dict:
         '''
         Subscribe to the scripthash and start listening for updates.
+        Response:
+        {
+            'jsonrpc': '2.0',
+            'result': '559e3b5969e29442f6430fe5ae1c3229926f575bdb652523c8ae32cd65572710',
+            'id': '1733607464.3823292'
+        }
+        Notification:
         {
             'jsonrpc': '2.0',
             'method': 'blockchain.scripthash.subscribe',

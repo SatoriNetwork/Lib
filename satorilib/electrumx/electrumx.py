@@ -13,11 +13,11 @@ class Subscription:
     def __init__(
         self,
         method: str,
-        params: list,
+        params: Union[list, None] = None,
         callback: Union[callable, None] = None
     ):
         self.method = method
-        self.params = params
+        self.params = params or []
         self.shortLivedCallback = callback
 
     def __hash__(self):
@@ -108,7 +108,7 @@ class Electrumx(ElectrumxConnection):
                         method = r.get('method', '')
                         if method == 'blockchain.headers.subscribe':
                             subscription = self.findSubscription(
-                                subscription=Subscription(method))
+                                subscription=Subscription(method, params=[]))
                             q = self.subscriptions.get(subscription)
                             if isinstance(q, queue.Queue):
                                 q.put(r)

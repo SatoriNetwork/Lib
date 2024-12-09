@@ -473,6 +473,7 @@ class Wallet(WalletBase):
         self.unspentCurrency = [
             x for x in self.unspentCurrency
             if x.get('asset') == None]
+        self.unspentAssets = []
         if 'SATORI' in self.watchAssets:
             # never used:
             #self.balanceOnChain = self.electrumx.api.getBalance(scripthash=self.scripthash)

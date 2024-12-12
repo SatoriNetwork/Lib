@@ -208,14 +208,15 @@ class Wallet(WalletBase):
     def __repr__(self):
         return (
             f'{self.chain}Wallet('
-            f'\n\tpublicKey: {self.publicKey},'
-            f'\n\tprivateKey: {self.privateKey},'
-            f'\n\twords: {self.words},'
-            f'\n\taddress: {self.address},'
-            f'\n\tscripthash: {self.scripthash},'
-            f'\n\tbalance: {self.balance},'
-            f'\n\tstats: {self.stats},'
-            f'\n\tbanner: {self.banner})')
+            f'\n  publicKey: {self.publicKey},'
+            f'\n  privateKey: {self.privateKey},'
+            f'\n  words: {self.words},'
+            f'\n  address: {self.address},'
+            f'\n  scripthash: {self.scripthash},'
+            f'\n  currency: {self.currency},'
+            f'\n  balance: {self.balance},'
+            f'\n  stats: {self.stats},'
+            f'\n  banner: {self.banner})')
 
     @property
     def chain(self) -> str:

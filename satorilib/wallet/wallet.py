@@ -199,7 +199,7 @@ class Wallet(WalletBase):
         self.status = None
         self.pullFullTransactions = pullFullTransactions
         self.load()
-        #self.loadCache()
+        self.loadCache()
 
     def __call__(self):
         self.get()
@@ -468,6 +468,7 @@ class Wallet(WalletBase):
         self.getUnspents()
         self.getUnspentTransactions(threaded=False)
         self.getUnspentSignatures()
+        self.saveCache()
 
     def getUnspents(self):
         self.unspentCurrency = self.electrumx.api.getUnspentCurrency(scripthash=self.scripthash)

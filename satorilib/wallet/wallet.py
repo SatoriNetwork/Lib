@@ -759,7 +759,9 @@ class Wallet(WalletBase):
 
     def _gatherOneCurrencyUnspent(self, atleastSats: int = 0, claimed: dict = None) -> tuple:
         claimed = claimed or {}
+        print(atleastSats, claimed.keys())
         for unspentCurrency in self.unspentCurrency:
+            print(unspentCurrency.get('value'), unspentCurrency.get('tx_hash'))
             if (
                 unspentCurrency.get('value') >= atleastSats and
                 unspentCurrency.get('tx_hash') not in claimed.keys()

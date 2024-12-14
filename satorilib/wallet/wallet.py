@@ -463,12 +463,14 @@ class Wallet(WalletBase):
         self.currency = Balance.fromBalances('EVR', self.balances or {})
         self.balance = Balance.fromBalances('SATORI', self.balances or {})
 
-    def getReadyToSend(self):
-        self.getBalances()
+    def getReadyToSend(self, balance: bool = True, save: bool = True):
+        if balance:
+            self.getBalances()
         self.getUnspents()
         self.getUnspentTransactions(threaded=False)
         self.getUnspentSignatures()
-        self.saveCache()
+        if save:
+            self.saveCache()
 
     def getUnspents(self):
         self.unspentCurrency = self.electrumx.api.getUnspentCurrency(scripthash=self.scripthash)

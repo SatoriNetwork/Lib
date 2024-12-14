@@ -6,14 +6,14 @@ import threading
 from base64 import b64encode, b64decode
 from random import randrange
 import mnemonic
-from satorilib.wallet.concepts import authenticate
-from satorilib.wallet.utils.transaction import TxUtils
-from satorilib.wallet.utils.validate import Validate
 from satorilib import logging
 from satorilib import config
 from satorilib.utils import system
 from satorilib.disk.utils import safetify
 from satorilib.electrumx import Electrumx
+from satorilib.wallet.concepts import authenticate
+from satorilib.wallet.utils.transaction import TxUtils
+from satorilib.wallet.utils.validate import Validate
 from satorilib.wallet.concepts.balance import Balance
 from satorilib.wallet.concepts.transaction import TransactionResult, TransactionFailure, TransactionStruct
 

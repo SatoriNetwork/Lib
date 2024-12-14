@@ -1504,7 +1504,7 @@ class Wallet(WalletBase):
         if not _verifyClaim():
             if bridgeTransaction:
                 raise TransactionFailure(
-                    f'claim mismatch, {tx.vout[-4]}, {tx.vout[-3]}')
+                    f'bridge claim mismatch, {tx.vout[-4]}, {tx.vout[-3]}')
             raise TransactionFailure(f'claim mismatch, {tx.vout[-2]}')
         if not _verifyClaimAddress():
             raise TransactionFailure('claim mismatch, _verifyClaimAddress')

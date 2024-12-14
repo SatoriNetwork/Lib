@@ -139,7 +139,7 @@ class EvrmoreWallet(Wallet):
                     AssetTransaction.satoriHex(self.symbol) +
                     TxUtils.padHexStringTo8Bytes(
                         TxUtils.intToLittleEndianHex(
-                            TxUtils.asSats(self.mundoFee)))))
+                            TxUtils.asSats(self.mundoFee))))):
                     if not x.startswith(bytes.fromhex(
                         AssetTransaction.satoriHex(self.symbol))):
                         logging.debug('failed to even validate mundo asset')

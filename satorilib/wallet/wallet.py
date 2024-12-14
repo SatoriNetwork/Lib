@@ -682,7 +682,6 @@ class Wallet(WalletBase):
             for uc in self.unspentCurrency:
                 if uc.get('scriptPubKey', None) is not None:
                     continue
-                logging.debug('uc', uc)
                 if len([tx for tx in self.transactions if tx.txid == uc['tx_hash']]) == 0:
                     new_transactions = {}  # Collect new transactions here
                     new_tranaction = self.appendTransaction(uc['tx_hash'])

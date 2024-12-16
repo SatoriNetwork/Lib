@@ -26,8 +26,8 @@ import time
 import json
 import requests
 from satorilib import logging
-from satorilib.api.time.time import timeToTimestamp
-from satorilib.api.wallet import Wallet
+from satorilib.utils.time import timeToTimestamp
+from satorilib.wallet import Wallet
 from satorilib.concepts.structs import Stream
 from satorilib.server.api import ProposalSchema, VoteSchema
 from satorilib.utils.json import sanitizeJson
@@ -257,6 +257,21 @@ class SatoriServerClient(object):
             endpoint=f'/simple_partial/broadcast/{network}/{feeSatsReserved}/{reportedFeeSats}/{walletId}',
             payload=tx)
 
+    def broadcastBridgeSimplePartial(
+        self,
+        tx: bytes,
+        feeSatsReserved: float,
+        reportedFeeSats: float,
+        walletId: float,
+        network: str
+    ):
+        ''' sends a satori partial transaction to the server '''
+        return self._makeUnauthenticatedCall(
+            function=requests.post,
+            url=self.sendingUrl,
+            endpoint=f'/simple/bridge/partial/broadcast/{network}/{feeSatsReserved}/{reportedFeeSats}/{walletId}',
+            payload=tx)
+
     def removeWalletAlias(self):
         ''' removes the wallet alias from the server '''
         return self._makeAuthenticatedCall(
@@ -350,7 +365,6 @@ class SatoriServerClient(object):
             function=requests.post,
             endpoint='/clear_vote_on/sanction/incremental',
             payload=json.dumps({'streamId': streamId})).text
-        
     
     def getObservations(self, streamId: str):
         return self._makeAuthenticatedCall(
@@ -434,40 +448,23 @@ class SatoriServerClient(object):
         self,
         signature: Union[str, bytes],
         pubkey: str,
-        address: str
+        address: str,
+        usingVault: bool = False,
     ) -> tuple[bool, str]:
         ''' just like mine to address but using the wallet '''
         try:
             if isinstance(signature, bytes):
                 signature = signature.decode()
-            js = json.dumps({
-                'signature': signature,
-                'pubkey': pubkey,
-                'address': address})
-            response = self._makeAuthenticatedCall(
-                function=requests.post,
-                endpoint='/mine/to/address',
-                payload=js)
-            return response.status_code < 400, response.text
-        except Exception as e:
-            logging.warning(
-                'unable to set reward address; try again Later.', e, color='yellow')
-            return False, ''
-
-    def mineToAddress(
-        self,
-        vaultSignature: Union[str, bytes],
-        vaultPubkey: str,
-        address: str
-    ) -> tuple[bool, str]:
-        ''' set reward address '''
-        try:
-            if isinstance(vaultSignature, bytes):
-                vaultSignature = vaultSignature.decode()
-            js = json.dumps({
-                'vaultSignature': vaultSignature,
-                'vaultPubkey': vaultPubkey,
-                'address': address})
+            if usingVault:
+                js = json.dumps({
+                    'vaultSignature': signature,
+                    'vaultPubkey': pubkey,
+                    'address': address})
+            else:
+                js = json.dumps({
+                    'signature': signature,
+                    'pubkey': pubkey,
+                    'address': address})
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/mine/to/address',
@@ -722,7 +719,10 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/stake/proxy/charity',
-                payload=json.dumps({'child': address, 'childId': childId}))
+                payload=json.dumps({
+                    'child': address,
+                    **({} if childId in [None, 0, '0'] else {'childId': childId})
+                }))
             return response.status_code < 400, response.text
         except Exception as e:
             logging.warning(
@@ -735,7 +735,10 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/stake/proxy/charity/not',
-                payload=json.dumps({'child': address, 'childId': childId}))
+                payload=json.dumps({
+                    'child': address,
+                    **({} if childId in [None, 0, '0'] else {'childId': childId})
+                }))
             return response.status_code < 400, response.text
         except Exception as e:
             logging.warning(
@@ -789,6 +792,7 @@ class SatoriServerClient(object):
         useAuthorizedCall: bool = True,
     ) -> Union[bool, None]:
         ''' publish predictions '''
+        #logging.info(f'publishing', color='blue')
         # if not isPrediction and self.topicTime.get(topic, 0) > time.time() - (Stream.minimumCadence*.95):
         #    return
         # if isPrediction and self.topicTime.get(topic, 0) > time.time() - 60*60:
@@ -832,6 +836,63 @@ class SatoriServerClient(object):
             return None
         return True
 
+    # def getProposalById(self, proposal_id: str) -> dict:
+    #    try:
+    #        response = self._makeUnauthenticatedCall(
+    #            function=requests.get,
+    #            endpoint=f'/proposals/get/{proposal_id}'  # Update endpoint path
+    #        )
+    #        if response.status_code == 200:
+    #            return response.json()
+    #        else:
+    #            logging.error(f"Failed to get proposal. Status code: {response.status_code}")
+    #            return None
+    #    except Exception as e:
+    #        logging.error(f"Error occurred while fetching proposal: {str(e)}")
+    #        return None
+
+    def getProposals(self):
+        """
+        Function to get all proposals by calling the API endpoint.
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/proposals/get/all'
+            )
+            if response.status_code == 200:
+                proposals = response.json()
+                return proposals
+            else:
+                logging.error(
+                    f"Failed to get proposals. Status code: {response.status_code}", color='red')
+                return []
+        except requests.RequestException as e:
+            logging.error(
+                f"Error occurred while fetching proposals: {str(e)}", color='red')
+            return []
+
+    def getApprovedProposals(self):
+        """
+        Function to get all approved proposals by calling the API endpoint.
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/proposals/get/approved'
+            )
+            if response.status_code == 200:
+                proposals = response.json()
+                return proposals
+            else:
+                logging.error(
+                    f"Failed to get approved proposals. Status code: {response.status_code}", color='red')
+                return []
+        except requests.RequestException as e:
+            logging.error(
+                f"Error occurred while fetching approved proposals: {str(e)}", color='red')
+            return []
+
     def submitProposal(self, proposal_data: dict) -> tuple[bool, dict]:
         '''submits proposal'''
         try:
@@ -865,53 +926,171 @@ class SatoriServerClient(object):
             logging.error(traceback.format_exc())
             return False, {"error": error_message}
 
-    def getProposals(self):
+    def getProposalById(self, proposal_id: str) -> dict:
         """
-        Function to get all proposals by calling the API endpoint.
+        Function to get a specific proposal by ID by calling the API endpoint.
         """
         try:
             response = self._makeUnauthenticatedCall(
                 function=requests.get,
-                endpoint='/proposals/get'
+                endpoint=f'/proposal/{proposal_id}'
             )
             if response.status_code == 200:
-                response_data = response.json()
-                # Use load to deserialize JSON data into Python objects
-                # proposals = ProposalSchema().load(response_data, many=True)
-                proposals = response_data  # Directly use the JSON response
-                return proposals
+                return response.json()['proposal']
             else:
                 logging.error(
-                    f"Failed to get proposals. Status code: {response.status_code}", color='red')
-                return []
+                    f"Failed to get proposal. Status code: {response.status_code}",
+                    extra={'color': 'red'}
+                )
+                return None
         except requests.RequestException as e:
             logging.error(
-                f"Error occurred while fetching proposals: {str(e)}", color='red')
-            return []
-        # except marshmallow.exceptions.ValidationError as e:
-        #     print(f"Error validating proposal data: {str(e)}")
-        #     return []
+                f"Error occurred while fetching proposal: {str(e)}",
+                extra={'color': 'red'}
+            )
+            return None
 
-    def getProposalVotes(self, proposal_id: str) -> dict:
-        """
-        Function to get all votes for a specific proposal by calling the API endpoint.
-        """
+    def getProposalVotes(self, proposal_id: str, format_type: str = None) -> dict:
+        '''Gets proposal votes with option for raw or processed format'''
         try:
+            endpoint = f'/proposal/votes/get/{proposal_id}'
+            if format_type:
+                endpoint += f'?format={format_type}'
+
             response = self._makeUnauthenticatedCall(
                 function=requests.get,
-                endpoint=f'/proposal/votes/get/{proposal_id}'
+                endpoint=endpoint
             )
 
             if response.status_code == 200:
                 return response.json()
             else:
-                logging.error(
-                    f"Failed to get proposal votes. Status code: {response.status_code}", color='red')
-                return {}
-        except requests.RequestException as e:
-            logging.error(
-                f"Error occurred while fetching proposal votes: {str(e)}", color='red')
-            return {}
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return {'status': 'error', 'message': error_message}
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
+
+    def getExpiredProposals(self) -> dict:
+        """
+        Fetches expired proposals
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/proposals/expired'
+            )
+            if response.status_code == 200:
+                return {'status': 'success', 'proposals': response.json()}
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return {'status': 'error', 'message': error_message}
+        except Exception as e:
+            error_message = f"Error in getExpiredProposals: {str(e)}"
+            return {'status': 'error', 'message': error_message}
+
+    def isApprovedAdmin(self, address: str) -> bool:
+        """Check if a wallet address has admin rights"""
+        if address not in {
+            "ES48mkqM5wMjoaZZLyezfrMXowWuhZ8u66",
+            "Efnsr27fc276Wp7hbAqZ5uo7Rn4ybrUqmi",
+            "EQGB7cBW3HvafARDoYsgceJS2W7ZhKe3b6",
+            "EHkDUkADkYnUY1cjCa5Lgc9qxLTMUQEBQm",
+        }:
+            return False
+        response = self._makeUnauthenticatedCall(
+            function=requests.get,
+            endpoint='/proposals/admin')
+        if response.status_code == 200:
+            return address in response.json()
+        return False
+
+    def getUnapprovedProposals(self, address: str = None) -> dict:
+        """Get unapproved proposals only if user has admin rights"""
+        try:
+            if not self.isApprovedAdmin(address):
+                return {
+                    'status': 'error',
+                    'message': 'Unauthorized access'
+                }
+
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/proposals/unapproved'
+            )
+
+            if response.status_code == 200:
+                return {
+                    'status': 'success',
+                    'proposals': response.json()
+                }
+            else:
+                return {
+                    'status': 'error',
+                    'message': 'Failed to fetch unapproved proposals'
+                }
+
+        except Exception as e:
+            logging.error(f"Error in getUnapprovedProposals: {str(e)}")
+            return {
+                'status': 'error',
+                'message': str(e)
+            }
+
+    def approveProposal(self, address: str, proposal_id: int) -> tuple[bool, dict]:
+        """Approve a proposal only if user has admin rights"""
+        try:
+            if not self.isApprovedAdmin(address):
+                return False, {'error': 'Unauthorized access'}
+
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint=f'/proposals/approve/{proposal_id}'
+            )
+
+            if response.status_code == 200:
+                return True, response.json()
+            else:
+                return False, {'error': f"Failed to approve proposal: {response.text}"}
+
+        except Exception as e:
+            return False, {'error': str(e)}
+
+    def disapproveProposal(self, address: str, proposal_id: int) -> tuple[bool, dict]:
+        """Disapprove a proposal only if user has admin rights"""
+        try:
+            if not self.isApprovedAdmin(address):
+                return False, {'error': 'Unauthorized access'}
+
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint=f'/proposals/disapprove/{proposal_id}'
+            )
+
+            if response.status_code == 200:
+                return True, response.json()
+            else:
+                return False, {'error': f"Failed to disapprove proposal: {response.text}"}
+
+        except Exception as e:
+            return False, {'error': str(e)}
+
+    def getActiveProposals(self) -> dict:
+        """
+        Fetches active proposals
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/proposals/active'
+            )
+            if response.status_code == 200:
+                return {'status': 'success', 'proposals': response.json()}
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return {'status': 'error', 'message': error_message}
+        except Exception as e:
+            error_message = f"Error in getActiveProposals: {str(e)}"
+            return {'status': 'error', 'message': error_message}
 
     def submitProposalVote(self, proposal_id: int, vote: str) -> tuple[bool, dict]:
         """

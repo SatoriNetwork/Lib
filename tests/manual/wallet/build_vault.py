@@ -1,8 +1,8 @@
-from satorilib.api.disk.wallet import WalletApi
+from satorilib.disk.wallet import WalletApi
 from satorilib import secret
 from satorineuron import config
-from satorilib.api.wallet import EvrmoreWallet
-from satorilib.api.disk import Cache  # Disk
+from satorilib.wallet import EvrmoreWallet
+from satorilib.disk import Cache  # Disk
 Cache.setConfig(config)
 self = EvrmoreWallet('/Satori/Neuron/wallet/wallet.yaml')
 content = {

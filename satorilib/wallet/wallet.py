@@ -6,14 +6,14 @@ import threading
 from base64 import b64encode, b64decode
 from random import randrange
 import mnemonic
-from satorilib.wallet.concepts import authenticate
-from satorilib.wallet.utils.transaction import TxUtils
-from satorilib.wallet.utils.validate import Validate
 from satorilib import logging
 from satorilib import config
 from satorilib.utils import system
 from satorilib.disk.utils import safetify
 from satorilib.electrumx import Electrumx
+from satorilib.wallet.concepts import authenticate
+from satorilib.wallet.utils.transaction import TxUtils
+from satorilib.wallet.utils.validate import Validate
 from satorilib.wallet.concepts.balance import Balance
 from satorilib.wallet.concepts.transaction import TransactionResult, TransactionFailure, TransactionStruct
 
@@ -199,7 +199,7 @@ class Wallet(WalletBase):
         self.status = None
         self.pullFullTransactions = pullFullTransactions
         self.load()
-        #self.loadCache()
+        self.loadCache()
 
     def __call__(self):
         self.get()
@@ -208,14 +208,15 @@ class Wallet(WalletBase):
     def __repr__(self):
         return (
             f'{self.chain}Wallet('
-            f'\n\tpublicKey: {self.publicKey},'
-            f'\n\tprivateKey: {self.privateKey},'
-            f'\n\twords: {self.words},'
-            f'\n\taddress: {self.address},'
-            f'\n\tscripthash: {self.scripthash},'
-            f'\n\tbalance: {self.balance},'
-            f'\n\tstats: {self.stats},'
-            f'\n\tbanner: {self.banner})')
+            f'\n  publicKey: {self.publicKey},'
+            f'\n  privateKey: {self.privateKey},'
+            f'\n  words: {self.words},'
+            f'\n  address: {self.address},'
+            f'\n  scripthash: {self.scripthash},'
+            f'\n  currency: {self.currency},'
+            f'\n  balance: {self.balance},'
+            f'\n  stats: {self.stats},'
+            f'\n  banner: {self.banner})')
 
     @property
     def chain(self) -> str:
@@ -462,11 +463,14 @@ class Wallet(WalletBase):
         self.currency = Balance.fromBalances('EVR', self.balances or {})
         self.balance = Balance.fromBalances('SATORI', self.balances or {})
 
-    def getReadyToSend(self):
-        self.getBalances()
+    def getReadyToSend(self, balance: bool = True, save: bool = True):
+        if balance:
+            self.getBalances()
         self.getUnspents()
         self.getUnspentTransactions(threaded=False)
         self.getUnspentSignatures()
+        if save:
+            self.saveCache()
 
     def getUnspents(self):
         self.unspentCurrency = self.electrumx.api.getUnspentCurrency(scripthash=self.scripthash)
@@ -678,7 +682,6 @@ class Wallet(WalletBase):
             for uc in self.unspentCurrency:
                 if uc.get('scriptPubKey', None) is not None:
                     continue
-                logging.debug('uc', uc)
                 if len([tx for tx in self.transactions if tx.txid == uc['tx_hash']]) == 0:
                     new_transactions = {}  # Collect new transactions here
                     new_tranaction = self.appendTransaction(uc['tx_hash'])
@@ -1348,10 +1351,10 @@ class Wallet(WalletBase):
         changeAddress: str = None,
     ) -> tuple[str, int]:
         '''
-        if people do not have a balance of rvn, they can still send satori.
+        if people do not have a balance of evr, they can still send satori.
         they have to pay the fee in satori. So this function produces a partial
         transaction that can be sent to the server and the rest of the network
-        to be completed. he who completes the transaction will pay the rvn fee
+        to be completed. he who completes the transaction will pay the evr fee
         and collect the satori fee. we will probably broadcast as a json object.
 
         Because the Sighash_single is too complex this simple version was
@@ -1361,13 +1364,13 @@ class Wallet(WalletBase):
         SIGHASH_ANYONECANPAY | SIGHASH_ALL
 
         dealing with the limitations of this signature we need to provide all
-        outputs on our end, includeing the rvn fee output. so that needs to be
-        an input to this function. Which means we have to call the server ask it
-        to reserve an input for us and ask it how much that input is going to
-        be, then include the Raven output change back to the server. Then when
-        the server gets this transaction it will have to inspect it to verify
-        that the last output is the raven fee change and that the second to last
-        output is the Satori fee for itself.
+        outputs on our end, including the evr fee change output. so that needs
+        to be an input to this function. Which means we have to call the server
+        ask it to reserve an input for us and ask it how much that input is
+        going to be, then include the evr output change back to the server. Then
+        when the server gets this transaction it will have to inspect it to
+        verify that the last output is the evr fee change and that the second to
+        last output is the Satori fee for itself.
         '''
         if completerAddress is None or changeAddress is None or feeSatsReserved == 0:
             raise TransactionFailure('need completer details')
@@ -1489,41 +1492,35 @@ class Wallet(WalletBase):
                     return changeAddress == self.hash160ToAddress(x)
             return False
 
-        logging.debug('completer')
         completerAddress = completerAddress or self.address
         logging.debug('completer', completerAddress)
         changeAddress = changeAddress or self.address
-        logging.debug('completer', changeAddress)
+        logging.debug('change', changeAddress)
         tx = self._deserialize(serialTx)
-        logging.debug('completer', tx)
         if not _verifyFee():
             raise TransactionFailure(
                 f'fee mismatch, {reportedFeeSats}, {feeSatsReserved}')
         if not _verifyClaim():
             if bridgeTransaction:
                 raise TransactionFailure(
-                    f'claim mismatch, {tx.vout[-4]}, {tx.vout[-3]}')
+                    f'bridge claim mismatch, {tx.vout[-4]}, {tx.vout[-3]}')
             raise TransactionFailure(f'claim mismatch, {tx.vout[-2]}')
         if not _verifyClaimAddress():
             raise TransactionFailure('claim mismatch, _verifyClaimAddress')
         if not _verifyChangeAddress():
             raise TransactionFailure('claim mismatch, _verifyChangeAddress')
         # add rvn fee input
-        logging.debug('completer1')
         gatheredCurrencyUnspent = self._gatherReservedCurrencyUnspent(
             exactSats=feeSatsReserved)
-        logging.debug('completer', gatheredCurrencyUnspent)
+        logging.debug('gathered', gatheredCurrencyUnspent)
         if gatheredCurrencyUnspent is None:
             raise TransactionFailure(f'unable to find sats {feeSatsReserved}')
-        logging.debug('completer2')
         txins, txinScripts = self._compileInputs(
             gatheredCurrencyUnspents=[gatheredCurrencyUnspent])
-        logging.debug('completer3')
         tx = self._createPartialCompleterSimple(
             tx=tx,
             txins=txins,
             txinScripts=txinScripts)
-        logging.debug('completer4')
         return self._broadcast(self._txToHex(tx))
 
     def sendAllTransaction(self, address: str) -> str:

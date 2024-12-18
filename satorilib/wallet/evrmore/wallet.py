@@ -6,6 +6,7 @@ from evrmore.core.scripteval import VerifyScript, SCRIPT_VERIFY_P2SH
 from evrmore.core.script import CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, OP_EVR_ASSET, OP_DROP, OP_RETURN, SIGHASH_ANYONECANPAY
 from evrmore.core import b2x, lx, COutPoint, CMutableTxOut, CMutableTxIn, CMutableTransaction, Hash160
 from evrmore.core.scripteval import EvalScriptError
+from satorilib import logging
 from satorilib.electrumx import Electrumx
 from satorilib.wallet.concepts.transaction import AssetTransaction, TransactionFailure
 from satorilib.wallet.utils.transaction import TxUtils
@@ -134,11 +135,18 @@ class EvrmoreWallet(Wallet):
                 # doesn't padd with 0s at the end
                 # b'rvnt\x06SATORI\x00\xe1\xf5\x05'
                 # b'rvnt\x06SATORI\x00\xe1\xf5\x05\x00\x00\x00\x00'
-                return x.startswith(bytes.fromhex(
+                if not x.startswith(bytes.fromhex(
                     AssetTransaction.satoriHex(self.symbol) +
                     TxUtils.padHexStringTo8Bytes(
                         TxUtils.intToLittleEndianHex(
-                            TxUtils.asSats(self.mundoFee)))))
+                            TxUtils.asSats(self.mundoFee))))):
+                    if not x.startswith(bytes.fromhex(
+                        AssetTransaction.satoriHex(self.symbol))):
+                        logging.debug('failed to even validate mundo asset')
+                    else:
+                        logging.debug('validated asset, failed valid amount')
+                    return False
+                return True
             if x == OP_EVR_ASSET:
                 nextOne = True
         return False

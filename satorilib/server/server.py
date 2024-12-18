@@ -365,24 +365,12 @@ class SatoriServerClient(object):
             function=requests.post,
             endpoint='/clear_vote_on/sanction/incremental',
             payload=json.dumps({'streamId': streamId})).text
-        
     
     def getObservations(self, streamId: str):
         return self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/observations/list',
             payload=json.dumps({'streamId': streamId})).text
-
-    def getObservations(self, streamId: str):
-        return self._makeAuthenticatedCall(
-            function=requests.post,
-            endpoint='/observations/list',
-            payload=json.dumps({'streamId': streamId})).text
-
-    def getPredictionsObservations(self):
-        return self._makeAuthenticatedCall(
-            function=requests.get,
-            endpoint='/predictions/observations/list').text
 
     def submitMaifestVote(self, wallet: Wallet, votes: dict[str, int]):
         # todo authenticate the vault instead
@@ -404,6 +392,12 @@ class SatoriServerClient(object):
             function=requests.Get,
             endpoint='/clear_votes_on/sanction',
             useWallet=wallet).text
+        
+    def poolParticipants(self, vaultAddress: str):
+        return self._makeAuthenticatedCall(
+            function=requests.post,
+            endpoint='/pool/participants',
+            payload=json.dumps({'vaultAddress': vaultAddress})).text
 
     def pinDepinStream(self, stream: dict = None) -> tuple[bool, str]:
         ''' removes a stream from the server '''
@@ -700,6 +694,12 @@ class SatoriServerClient(object):
             logging.warning(
                 'unable to stakeProxyRequest due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
+        
+    def poolAddressRemove(self, lend_id: str):
+        return self._makeAuthenticatedCall(
+            function=requests.post,
+            endpoint='/stake/lend/address/remove',
+            payload=json.dumps({'lend_id': lend_id})).text
 
     def stakeProxyChildren(self) -> tuple[bool, dict]:
         ''' removes a stream from the server '''

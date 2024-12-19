@@ -16,7 +16,7 @@ from satorilib.disk.utils import safetify
 from satorilib.electrumx import Electrumx
 from satorilib.wallet.concepts.balance import Balance
 from satorilib.wallet.concepts.transaction import TransactionResult, TransactionFailure, TransactionStruct
-
+from evrmore.wallet import CEvrmoreSecret, CEvrmoreAddress
 
 class WalletBase():
 
@@ -128,13 +128,14 @@ class WalletBase():
 
     def _generatePrivateKey(self):
         ''' returns a private key object '''
+        return CEvrmoreSecret.from_secret_bytes(self._entropy)
 
     def _generateAddress(self, pub=None):
         ''' returns an address object '''
+        # return CEvrmoreAddress.from_pubkey(pub)
 
     def _generateScriptPubKeyFromAddress(self, address: str):
         ''' returns CScript object from address '''
-
 
 class Wallet(WalletBase):
 

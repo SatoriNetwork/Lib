@@ -34,12 +34,17 @@ class EvrmoreWallet(Wallet):
         'electrum1-mainnet.evrmorecoin.org:50001',
         'electrum2-mainnet.evrmorecoin.org:50001',
         #'135.181.212.189:50001', #WilQSL
-        #'evr-electrum.wutup.io:50001', #WilQSL
+        #'evr-electrum.wutup.io:50001', #Kasvot Växt
     ]
 
     @staticmethod
-    def createElectrumxConnection(hostPort: str = None, persistent: bool = False) -> Electrumx:
-        hostPort = hostPort or random.choice(EvrmoreWallet.electrumxServers)
+    def createElectrumxConnection(
+        persistent: bool = False,
+        hostPort: str = None,
+        hostPorts: list[str] = None
+    ) -> Electrumx:
+        hostPort = hostPort or random.choice(
+            hostPorts or EvrmoreWallet.electrumxServers)
         return Electrumx(
             persistent=persistent,
             host=hostPort.split(':')[0],

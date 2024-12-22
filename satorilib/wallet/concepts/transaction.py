@@ -1,8 +1,13 @@
 from typing import Union
 from satorilib.wallet.ethereum.valid_eth import isValidEthereumAddress
-
+from satorilib.utils.dict import MultiKeyDict
 
 class TransactionStruct():
+
+    @staticmethod
+    def asSats(amount: float) -> int:
+        COIN = 100000000
+        return int(amount * COIN)
 
     def __init__(self, raw: dict, vinVoutsTxids: list[str], vinVoutsTxs: list[dict] = None):
         self.raw = raw
@@ -29,31 +34,33 @@ class TransactionStruct():
     def export(self) -> tuple[dict, list[str]]:
         return self.raw, self.vinVoutsTxids, self.vinVoutsTxs
 
-    def getTxid(self, raw):
+    def getTxid(self, raw: dict):
         return raw.get('txid', 'unknown txid')
 
-    def getHeight(self, raw):
+    def getHeight(self, raw: dict):
         return raw.get('height', 'unknown height')
 
-    def getConfirmations(self, raw):
+    def getConfirmations(self, raw: dict):
         return raw.get('confirmations', 'unknown confirmations')
 
-    def getSent(self, raw):
-        sent = {}
+    def getSent(self, raw: dict):
+        sent = MultiKeyDict()
         for vout in raw.get('vout', []):
             if 'asset' in vout:
                 name = vout.get('asset', {}).get('name', 'unknown asset')
-                amount = float(vout.get('asset', {}).get('amount', 0))
+                address = vout.get('scriptPubKey', {}).get('addresses', [''])[0]
+                sats = float(vout.get('asset', {}).get('amount', 0))
             else:
                 name = 'EVR'
-                amount = float(vout.get('value', 0))
-            if name in sent:
-                sent[name] = sent[name] + amount
+                address = vout.get('scriptPubKey', {}).get('addresses', [''])[0]
+                sats = TxUtils.asSats(vout.get('value', 0))
+            if (name, address) in sent:
+                sent[name, address] = sent[name, address] + sats
             else:
-                sent[name] = amount
+                sent[name, address] = sats
         return sent
 
-    def getReceived(self, raw, vinVoutsTxs):
+    def getReceived(self, raw: dict, vinVoutsTxs: list[dict]):
         received = {}
         for vin in raw.get('vin', []):
             position = vin.get('vout', None)
@@ -74,10 +81,10 @@ class TransactionStruct():
                             received[name] = amount
         return received
 
-    def getAsset(self, raw):
+    def getAsset(self, raw: dict):
         return raw.get('txid', 'not implemented')
 
-    def getMemo(self, raw) -> Union[str, None]:
+    def getMemo(self, raw: dict) -> Union[str, None]:
         '''
         vout: {
             'value': 0.0,

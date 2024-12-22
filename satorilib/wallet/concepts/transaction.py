@@ -53,7 +53,7 @@ class TransactionStruct():
             else:
                 name = 'EVR'
                 address = vout.get('scriptPubKey', {}).get('addresses', [''])[0]
-                sats = TxUtils.asSats(vout.get('value', 0))
+                sats = TransactionStruct.asSats(vout.get('value', 0))
             if (name, address) in sent:
                 sent[name, address] = sent[name, address] + sats
             else:

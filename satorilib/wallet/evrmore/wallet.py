@@ -23,7 +23,7 @@ class EvrmoreWallet(Wallet):
         '146.190.38.120:50002',
         'electrum1-mainnet.evrmorecoin.org:50002',
         'electrum2-mainnet.evrmorecoin.org:50002',
-        '135.181.212.189:50002', #WilQSL
+        '1-electrum.satorinet.ie:50002', #WilQSL
         'evr-electrum.wutup.io:50002', #Kasvot Växt
     ]
 

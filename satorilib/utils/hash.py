@@ -184,3 +184,44 @@ class PasswordHash():
             PasswordHash.hash(
                 PasswordHash.toString(
                     PasswordHash.hash(password))))
+
+
+'''dart version
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
+
+class PasswordHash {
+  static List<int> hash(
+    String password, {
+    String? salt,
+    int iterations = 100000,
+  }) {
+    final usedSalt = salt ?? '${password}sha256';
+    final pbkdf2 = Pbkdf2(
+      macAlgorithm: Hmac.sha256(),
+      iterations: iterations,
+      bits: 256,
+    );
+
+    return pbkdf2.deriveKey(
+      secretKey: SecretKey(utf8.encode(password)),
+      nonce: utf8.encode(usedSalt),
+    );
+  }
+
+  static String toString(List<int> hashBytes) {
+    return hex.encode(hashBytes);
+  }
+
+  static bool verify(dynamic password, dynamic target) {
+    return target == password;
+  }
+
+  static String generateTarget(String password) {
+    final firstHash = hash(password);
+    final firstHashString = toString(firstHash);
+    final secondHash = hash(firstHashString);
+    return toString(secondHash);
+  }
+}
+'''

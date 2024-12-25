@@ -1,3 +1,4 @@
+''' an exercise '''
 import joblib
 import numpy as np
 
@@ -133,128 +134,36 @@ class ObfuscationNetwork:
             strings.append(string)
             string = self.predict(string)
         return strings
+
 def test():
     nn = ObfuscationNetwork(data=["hello", "world", "test!"], hidden_size=128)
     nn.train(max_epochs=None)
     nn.view("hello", n=5)
+    # in order to obfuscate, you need a layer of training which similar
+    # variations of these to chaotic outputs. exponentially increasing trainning
     model = ObfuscationNetwork([
-        'MIGH',
-        'AgEA',
-        'MBMG',
-        'ByqG',
-        'SM49',
-        'AgEG',
-        'CCqG',
-        'SM49',
-        'AwEH',
-        'BG0w',
-        'awIB',
-        'AQQg',
-        'zG0Y',
-        'RoLv',
-        'e4ma',
-        'OyRi',
-        'Y0dZ',
-        'fs35',
-        'bDrh',
-        'v5Sk',
-        'UbZg',
-        'FHK9',
-        'AFWh',
-        'RANC',
-        'AAS0',
-        'JHmy',
-        'M/VD',
-        'RrnD',
-        'WLtr',
-        '/naS',
-        'iIC6',
-        'xt9y',
-        '3ARY',
-        'Et/6',
-        'UpgL',
-        'eAbX',
-        'GRKT',
-        'fyIF',
-        'SmVZ',
-        'ej9i',
-        '8ogk',
-        'chx7',
-        'S1Ms',
-        '77sr',
-        '2Tpx',
-        'Czlb'])
+        'MIGHAgEA',
+        'MBMGByqG',
+        'SM49AgEG',
+        'CCqGSM49',
+        'AwEHBG0w',
+        'awIBAQQg',
+        'zG0YRoLv',
+        'e4maOyRi',
+        'Y0dZfs35',
+        'bDrhv5Sk',
+        'UbZgFHK9',
+        'AFWhRANC',
+        'AAS0JHmy',
+        'M/VDRrnD',
+        'WLtr/naS',
+        'iIC6xt9y',
+        '3ARYEt/6',
+        'UpgLeAbX',
+        'GRKTfyIF',
+        'SmVZej9i',
+        '8ogkchx7',
+        'S1Ms77sr',
+        '2TpxCzlb'])
     model.train(max_epochs=None)
-    model.view('MIGH', n=50)
-
-    #model = ObfuscationNetwork([
-    #    'MIGHAgEA',
-    #    'MBMGByqG',
-    #    'SM49AgEG',
-    #    'CCqGSM49',
-    #    'AwEHBG0w',
-    #    'awIBAQQg',
-    #    'zG0YRoLv',
-    #    'e4maOyRi',
-    #    'Y0dZfs35',
-    #    'bDrhv5Sk',
-    #    'UbZgFHK9',
-    #    'AFWhRANC',
-    #    'AAS0JHmy',
-    #    'M/VDRrnD',
-    #    'WLtr/naS',
-    #    'iIC6xt9y',
-    #    '3ARYEt/6',
-    #    'UpgLeAbX',
-    #    'GRKTfyIF',
-    #    'SmVZej9i',
-    #    '8ogkchx7',
-    #    'S1Ms77sr',
-    #    '2TpxCzlb'])
-    #model.train(max_epochs=None)
-    #print(model.view('MIGHAgEA', n=25))
-
-    model = ObfuscationNetwork([
-        'MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgzG0YRoLve4maOyRi',
-        'Y0dZfs35bDrhv5SkUbZgFHK9AFWhRANCAAS0JHmyM/VDRrnDWLtr/naSiIC6xt9y',
-        '3ARYEt/6UpgLeAbXGRKTfyIFSmVZej9i8ogkchx7S1Ms77sr2TpxCzlb        ',
-        'ValueError: matmul: Input operand 1 has a mismatch in its core d',
-        'imension 0, with gufunc signature (n?,k),(k,m?)->(n?,m?) (size 6',
-        '4 is different from 8)File "/Satori/Lib/satorilib/experimental/o',
-        'bfuscated.py", line 134, in view z1 = x @ self.model["W1"] + sel',
-        ])
-    model.train(max_epochs=None)
-    print(model.view('MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgzG0YRoLve4maOyRi', n=25))
-
-    #
-    #
-    #d = generateOverfiTrainedNN([
-    #'this',
-    #'is a',
-    #'test',
-    #'to s',
-    #'ee w',
-    #'hat ',
-    #'happ',
-    #'ens.',
-    #],
-    #max_epochs=50000000000000000000000000000000,
-    #)
-    #d['predict']('xyza')
-    #d['predict']('abcd')
-    #d['predict']('flea')
-    #d['predict']('fsjl')
-    #d['predict']('flfe')
-    #d['predict']('ouet')
-    #d['predict']('bv;x')
-    #d['predict']('e;vl')
-    #d['predict']('were')
-    #d['predict']('this')
-    #d['predict']('is a')
-    #d['predict']('test')
-    #d['predict']('to s')
-    #d['predict']('ee w')
-    #d['predict']('hat ')
-    #d['predict']('happ')
-    #d['predict']('ens.')
-    #
+    print(model.view('MIGHAgEA', n=25))

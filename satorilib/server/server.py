@@ -1143,7 +1143,7 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/pool/worker/reward/set',
-                payload=json.dumps({"rewardPercentage": rewardPercentage}))
+                payload=json.dumps({"rewardPercentage": float(rewardPercentage)}))
             if response.status_code == 200:
                 return True, response.text
             else:

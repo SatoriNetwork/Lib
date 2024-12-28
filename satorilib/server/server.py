@@ -365,7 +365,7 @@ class SatoriServerClient(object):
             function=requests.post,
             endpoint='/clear_vote_on/sanction/incremental',
             payload=json.dumps({'streamId': streamId})).text
-    
+
     def getObservations(self, streamId: str):
         return self._makeAuthenticatedCall(
             function=requests.post,
@@ -392,7 +392,7 @@ class SatoriServerClient(object):
             function=requests.Get,
             endpoint='/clear_votes_on/sanction',
             useWallet=wallet).text
-        
+
     def poolParticipants(self, vaultAddress: str):
         return self._makeAuthenticatedCall(
             function=requests.post,
@@ -694,7 +694,7 @@ class SatoriServerClient(object):
             logging.warning(
                 'unable to stakeProxyRequest due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
-        
+
     def poolAddressRemove(self, lend_id: str):
         return self._makeAuthenticatedCall(
             function=requests.post,
@@ -1130,5 +1130,76 @@ class SatoriServerClient(object):
                 error_message = f"Server returned status code {response.status_code}: {response.text}"
                 return False, {"error": error_message}
         except Exception as e:
-            error_message = f"Error in submitProposalVote: {str(e)}"
+            error_message = f"Error in poolAccepting: {str(e)}"
+            return False, {"error": error_message}
+
+    ## untested ##
+
+    def setPoolWorkerReward(self, rewardPercentage: float) -> tuple[bool, dict]:
+        """
+        Function to set the pool status to accepting or not accepting
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/pool/worker/reward/set',
+                payload=json.dumps({"rewardPercentage": rewardPercentage}))
+            if response.status_code == 200:
+                return True, response.text
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in poolAcceptingWorkers: {str(e)}"
+            return False, {"error": error_message}
+
+    def getPoolWorkerReward(self, address: str) -> tuple[bool, dict]:
+        """
+        Function to set the pool status to accepting or not accepting
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint=f'/pool/worker/reward/get/{address}')
+            if response.status_code == 200:
+                return True, response.text
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in poolAcceptingWorkers: {str(e)}"
+            return False, {"error": error_message}
+
+    def setMiningMode(self, status: bool) -> tuple[bool, dict]:
+        """
+        Function to set the worker mining mode
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/worker/mining/mode/enable' if status else '/worker/mining/mode/disable')
+            if response.status_code == 200:
+                return True, response.text
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in setMiningMode: {str(e)}"
+            return False, {"error": error_message}
+
+    def getMiningMode(self, address) -> tuple[bool, dict]:
+        """
+        Function to set the worker mining mode
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint=f'/worker/mining/mode/get/{address}')
+            if response.status_code == 200:
+                return True, response.text
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in setMiningMode: {str(e)}"
             return False, {"error": error_message}

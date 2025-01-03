@@ -948,7 +948,7 @@ class Wallet(WalletBase):
 
     # for server
 
-    def satoriDistribution(self, amountByAddress: dict[str: float], memo: str) -> str:
+    def satoriDistribution(self, amountByAddress: dict[str: float], memo: str=None) -> str:
         ''' creates a transaction with multiple SATORI asset recipients '''
         if len(amountByAddress) == 0 or len(amountByAddress) > 1000:
             raise TransactionFailure('too many or too few recipients')
@@ -967,6 +967,9 @@ class Wallet(WalletBase):
             satsByAddress[address] = TxUtils.roundSatsDownToDivisibility(
                 sats=TxUtils.asSats(amount),
                 divisibility=self.divisibility)
+        memoCount = 0
+        if memo is not None:
+            memoCount = 1
         satoriSats = sum(satsByAddress.values())
         (
             gatheredSatoriUnspents,
@@ -975,7 +978,7 @@ class Wallet(WalletBase):
             gatheredCurrencyUnspents,
             gatheredCurrencySats) = self._gatherCurrencyUnspents(
                 inputCount=len(gatheredSatoriUnspents),
-                outputCount=len(satsByAddress) + 3)
+                outputCount=len(satsByAddress) + 2 + memoCount)
         txins, txinScripts = self._compileInputs(
             gatheredCurrencyUnspents=gatheredCurrencyUnspents,
             gatheredSatoriUnspents=gatheredSatoriUnspents)
@@ -986,8 +989,10 @@ class Wallet(WalletBase):
         currencyChangeOut = self._compileCurrencyChangeOutput(
             gatheredCurrencySats=gatheredCurrencySats,
             inputCount=len(txins),
-            outputCount=len(satsByAddress) + 3)  # satoriChange, currencyChange, memo
-        memoOut = self._compileMemoOutput(memo)
+            outputCount=len(satsByAddress) + 2 + memoCount)  # satoriChange, currencyChange, memo
+        memoOut = None
+        if memo is not None:
+            memoOut = self._compileMemoOutput(memo)
         tx = self._createTransaction(
             txins=txins,
             txinScripts=txinScripts,

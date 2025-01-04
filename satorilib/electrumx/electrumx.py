@@ -140,8 +140,9 @@ class Electrumx(ElectrumxConnection):
             #    self.quiet.put(time.time())
             #    self.isConnected = False
 
-    def listenForSubscriptions(self, method: str):
-        return self.subscriptions[method].get()
+    def listenForSubscriptions(self, method: str, params: list) -> dict:
+        return self.subscriptions[Subscription(method, params)].get()
+
 
     def listenForResponse(self, callId: Union[str, None] = None) -> Union[dict, None]:
         then = time.time()

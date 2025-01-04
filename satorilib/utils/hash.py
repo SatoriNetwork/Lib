@@ -71,7 +71,7 @@ def verifyRoot(df: pd.DataFrame) -> bool:
 
 def verifyHashes(df: pd.DataFrame, priorRowHash: str = None) -> tuple[bool, Union[pd.DataFrame, None]]:
     '''
-    returns success flag and the first row as DataFrame that doesn't pass the 
+    returns success flag and the first row as DataFrame that doesn't pass the
     hash check or None
     priorRowHash isn't usually passed in because we do the verification on the
     entire dataframe, so by default the first priorRowHash is assumed to be an
@@ -91,7 +91,7 @@ def verifyHashes(df: pd.DataFrame, priorRowHash: str = None) -> tuple[bool, Unio
 
 def verifyHashesReturnError(df: pd.DataFrame, priorRowHash: str = None) -> tuple[bool, Union[pd.DataFrame, None]]:
     '''
-    returns success flag and the first row as DataFrame that doesn't pass the 
+    returns success flag and the first row as DataFrame that doesn't pass the
     hash check or None
     priorRowHash isn't usually passed in because we do the verification on the
     entire dataframe, so by default the first priorRowHash is assumed to be an
@@ -129,7 +129,7 @@ def cleanHashes(df: pd.DataFrame) -> tuple[bool, Union[pd.DataFrame, None]]:
     success is true if the first hash is the first value plus ''.
     if it is able to create a dataframe of all the other hashes from there and
     that dataframe is different than the input dataframe, it returns it. if it's
-    unable to make a new dataframe or the one it makes matches the input, it 
+    unable to make a new dataframe or the one it makes matches the input, it
     returns None.
     '''
     priorRowHash = ''
@@ -154,3 +154,74 @@ def cleanHashes(df: pd.DataFrame) -> tuple[bool, Union[pd.DataFrame, None]]:
 
 # cleanHashes(pd.DataFrame({'value':[1,2,3,4,5,6], 'hash':['ce8efc6eeb9fc30b','e2cc1a4e70bdba14','42359a663f6c3e30','6278827c73894e0c','c7a6682880ee6f8d','d607268c4f2e75ed']}, index=[0,1,2,3,4,9,5]))
 # cleanHashes(pd.DataFrame({'value':[1,2,3,4,5,9,6], 'hash':['ce8efc6eeb9fc30b','e2cc1a4e70bdba14','42359a663f6c3e30','6278827c73894e0c','c7a6682880ee6f8d','erroneous row','d607268c4f2e75ed']}, index=[0,1,2,3,4,9,5]))
+
+class PasswordHash():
+
+    @staticmethod
+    def hash(
+        password:str,
+        salt: Union[str, None]= None,
+        iterations: int = 100000
+    ) -> bytes:
+        import hashlib
+        return hashlib.pbkdf2_hmac(
+            'sha256',
+            password.encode(),
+            (salt or f'{password}sha256').encode(),
+            iterations)
+
+    @staticmethod
+    def toString(hash:bytes) -> str:
+        return hash.hex()
+
+    @staticmethod
+    def verify(password:Union[bytes,str], target:Union[bytes,str]) -> bool:
+        return target == password
+
+    @staticmethod
+    def generateTarget(password: str) -> bool:
+        return PasswordHash.toString(
+            PasswordHash.hash(
+                PasswordHash.toString(
+                    PasswordHash.hash(password))))
+
+
+'''dart version
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
+
+class PasswordHash {
+  static List<int> hash(
+    String password, {
+    String? salt,
+    int iterations = 100000,
+  }) {
+    final usedSalt = salt ?? '${password}sha256';
+    final pbkdf2 = Pbkdf2(
+      macAlgorithm: Hmac.sha256(),
+      iterations: iterations,
+      bits: 256,
+    );
+
+    return pbkdf2.deriveKey(
+      secretKey: SecretKey(utf8.encode(password)),
+      nonce: utf8.encode(usedSalt),
+    );
+  }
+
+  static String toString(List<int> hashBytes) {
+    return hex.encode(hashBytes);
+  }
+
+  static bool verify(dynamic password, dynamic target) {
+    return target == password;
+  }
+
+  static String generateTarget(String password) {
+    final firstHash = hash(password);
+    final firstHashString = toString(firstHash);
+    final secondHash = hash(firstHashString);
+    return toString(secondHash);
+  }
+}
+'''

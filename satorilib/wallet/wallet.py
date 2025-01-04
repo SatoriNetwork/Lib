@@ -172,8 +172,9 @@ class Wallet(WalletBase):
         self.mundoFee = 0.0001
         # at $100 SATORI this is 5 dollars (for eth gas fee)
         self.bridgeFee: float = 0.05
-        self.bridgeAddress: str = 'E...'  # TODO finish
-        self.burnAddress: str = 'ExxxxxxxxxxSatoriBridgeBurnAddress'  # valid?
+        self.bridgeAddress: str = 'EUqCW1WmT6a9Y6RBVhsxY1k4S135RPWCy7'  # TODO finish
+        #self.burnAddress: str = 'ExxxxxxxxxxSatoriBridgeBurnAddress'  # valid?
+        self.burnAddress: str = 'EL1BS6HmwY1KoeqBokKjUMcWbWsn5kamGv'
         self.isTestnet = isTestnet
         self.password = password
         self.walletPath = walletPath

@@ -749,7 +749,7 @@ class Wallet(WalletBase):
         for txRef in self.transactionHistory:
             txRef['tx_hash']
 
-    def _checkSatoriValue(self, output: 'CMutableTxOut') -> bool:
+    def _checkSatoriValue(self, output: 'CMutableTxOut', amount: float) -> bool:
         '''
         returns true if the output is a satori output of self.mundoFee
         '''
@@ -1473,11 +1473,20 @@ class Wallet(WalletBase):
         def _verifyClaim():
             if bridgeTransaction:
                 # [mundoFeeOut, bridgeFeeOut, currencyChangeOut, memoOut]
+                bridgePaid = False
+                mundoPaid = False
                 for x in tx.vout:
-                    logging.info(self._checkSatoriValue(x))
-                return self._checkSatoriValue(tx.vout[-4]) and self._checkSatoriValue(tx.vout[-3])
+                    if self._checkSatoriValue(x, self.bridgeFee):
+                        bridgePaid = True
+                    if self._checkSatoriValue(x, self.mundoFee):
+                        mundoPaid = True
+                return bridgePaid and mundoPaid
             # [mundoFeeOut, currencyChangeOut]
-            return self._checkSatoriValue(tx.vout[-2])
+            mundoPaid = False
+            for x in tx.vout:
+                if self._checkSatoriValue(x, self.mundoFee):
+                    mundoPaid = True
+            return mundoPaid
 
         def _verifyClaimAddress():
             ''' verify the claim output goes to completerAddress '''

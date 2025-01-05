@@ -90,7 +90,7 @@ class RavencoinWallet(Wallet):
     def verify(self, message: str, sig: bytes, address: Union[str, None] = None):
         return verify(address=address or self.address, message=message, signature=sig)
 
-    def _checkSatoriValue(self, output: CMutableTxOut) -> bool:
+    def _checkSatoriValue(self, output: CMutableTxOut, amount: float) -> bool:
         '''
         returns true if the output is a satori output of self.mundoFee
         '''
@@ -104,7 +104,7 @@ class RavencoinWallet(Wallet):
                     AssetTransaction.satoriHex(self.symbol) +
                     TxUtils.padHexStringTo8Bytes(
                         TxUtils.intToLittleEndianHex(
-                            TxUtils.asSats(self.mundoFee)))))
+                            TxUtils.asSats(amount)))))
             if x == OP_RVN_ASSET:
                 nextOne = True
         return False

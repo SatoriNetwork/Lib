@@ -134,7 +134,7 @@ class EvrmoreWallet(Wallet):
 
     # transaction creation ####################################################
 
-    def _checkSatoriValue(self, output: CMutableTxOut) -> bool:
+    def _checkSatoriValue(self, output: CMutableTxOut, amount: float) -> bool:
         '''
         returns true if the output is a satori output of self.mundoFee
         '''
@@ -148,7 +148,7 @@ class EvrmoreWallet(Wallet):
                     AssetTransaction.satoriHex(self.symbol) +
                     TxUtils.padHexStringTo8Bytes(
                         TxUtils.intToLittleEndianHex(
-                            TxUtils.asSats(self.mundoFee))))):
+                            TxUtils.asSats(amount))))):
                     if not x.startswith(bytes.fromhex(
                         AssetTransaction.satoriHex(self.symbol))):
                         logging.debug('failed to even validate mundo asset')

@@ -1473,6 +1473,8 @@ class Wallet(WalletBase):
         def _verifyClaim():
             if bridgeTransaction:
                 # [mundoFeeOut, bridgeFeeOut, currencyChangeOut, memoOut]
+                for x in tx.vout:
+                    logging.info(self._checkSatoriValue(x))
                 return self._checkSatoriValue(tx.vout[-4]) and self._checkSatoriValue(tx.vout[-3])
             # [mundoFeeOut, currencyChangeOut]
             return self._checkSatoriValue(tx.vout[-2])

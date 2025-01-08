@@ -1339,7 +1339,7 @@ class Wallet(WalletBase):
         # logging.debug('satoriChangeOut', satoriChangeOut, color='magenta')
         # logging.debug('mundoFeeOut', mundoFeeOut, color='magenta')
         # logging.debug('currencyChangeOut', currencyChangeOut, color='magenta')
-        memoOut = self._compileMemoOutput(ethAddress)
+        memoOut = self._compileMemoOutput(f'ethereum:{ethAddress}')
         tx = self._createPartialOriginatorSimple(
             txins=txins,
             txinScripts=txinScripts,
@@ -1851,35 +1851,27 @@ class Wallet(WalletBase):
         #    raise TransactionFailure(
         #        'Satori Bridge Transaction bad params: need completer details')
         if amount <= 0:
-            print('b')
             raise TransactionFailure(
                 'Satori Bridge Transaction bad params: amount <= 0')
         if amount > 100:
-            print('c')
             raise TransactionFailure(
                 'Satori Bridge Transaction bad params: amount > 100')
         if not Validate.ethAddress(ethAddress):
-            print('d')
             raise TransactionFailure(
                 'Satori Bridge Transaction bad params: eth address')
         try:
-            print('e')
             if isinstance(amount, Decimal):
                 amount = float(amount)
             if self.balance.amount < amount + self.bridgeFee:
-                print('f')
                 raise TransactionFailure(
                     f'Satori Bridge Transaction bad params: balance too low to pay for bridgeFee {self.balance.amount} < {amount} + {self.bridgeFee}')
-            print('g')
             if self.currency < self.reserve:
-                print('self.currency', self.currency, 'self.reserve', self.reserve)
                 # if we have to make a partial we need more data so we need
                 # to return, telling them we need more data, asking for more
                 # information, and then if we get more data we can do this:
                 # logging.debug('k', color='magenta')
                 if feeSatsReserved == 0 or completerAddress is None:
                     # logging.debug('l', color='magenta')
-                    print('feeSatsReserved', feeSatsReserved, 'completerAddress', completerAddress)
                     return TransactionResult(
                         result='try again',
                         success=True,
@@ -1891,7 +1883,6 @@ class Wallet(WalletBase):
                     feeSatsReserved=feeSatsReserved,
                     completerAddress=completerAddress,
                     changeAddress=changeAddress)
-                print('result', result)
                 # logging.debug('n', color='magenta')
                 if result is None:
                     # logging.debug('o', color='magenta')
@@ -1907,18 +1898,11 @@ class Wallet(WalletBase):
                     reportedFeeSats=result[1],
                     msg='send transaction requires fee.')
             # logging.debug('q', color='magenta')
-            # validate ethAddress
-            if not Validate.ethAddress(ethAddress):
-                return TransactionResult(
-                    result=None,
-                    success=True,
-                    tx=None,
-                    msg='invalid eth address.')
             result = self.satoriDistribution(
                 amountByAddress={
                     self.bridgeAddress: self.bridgeFee,
                     self.burnAddress: amount},
-                memo=ethAddress)
+                memo=f'ethereum:{ethAddress}')
             # logging.debug('r', result,  color='magenta')
             if result is None:
                 # logging.debug('s', color='magenta')

@@ -1,4 +1,4 @@
-''' python-evrmorelib not updated yet to support this, commenting out for now so we don't get import errors
+""" python-evrmorelib not updated yet to support this, commenting out for now so we don't get import errors
 import json
 import logging
 from typing import List, Tuple, Union
@@ -70,7 +70,7 @@ class EvrmoreP2SHWallet(WalletBase):
         # return CEvrmoreAddress.from_pubkey(pub)
 
     def generate_multi_party_p2sh_address(self, public_keys: List[bytes], required_signatures: int) -> Tuple[P2SHEvrmoreAddress, CScript]:
-        """Generates a multi-party P2SH address."""
+        '''Generates a multi-party P2SH address.'''
         try:
             assert len(public_keys) >= required_signatures, "Number of public keys must be >= required signatures."
 
@@ -92,7 +92,7 @@ class EvrmoreP2SHWallet(WalletBase):
 
 
     def generate_single_party_p2sh_address(self, num_keys: int = 3, required_signatures: int = 2) -> Tuple[P2SHEvrmoreAddress, CScript]:
-        """Generates a single-party P2SH address using internal private keys."""
+        '''Generates a single-party P2SH address using internal private keys.'''
         try:
             self.private_keys = [self._generatePrivateKey() for _ in range(num_keys)]
             self.public_keys = [key.pub for key in self.private_keys]
@@ -110,7 +110,7 @@ class EvrmoreP2SHWallet(WalletBase):
             return None, None
 
     def sign_transaction(self, tx: CMultiSigTransaction, private_keys: List[CEvrmoreSecret]) -> CMultiSigTransaction:
-        """Signs a transaction with multiple signatures."""
+        '''Signs a transaction with multiple signatures.'''
         try:
             if not self.redeem_script:
                 raise ValueError("Cannot sign transaction. Redeem script is not set.")
@@ -123,7 +123,7 @@ class EvrmoreP2SHWallet(WalletBase):
             return None
 
     def create_unsigned_transaction(self, txid: str, vout_index: int, amount: int, recipient_address: str) -> CMultiSigTransaction:
-        """
+        '''
         Creates an unsigned transaction to send funds from a P2SH address to a recipient address.
 
         Parameters:
@@ -135,7 +135,7 @@ class EvrmoreP2SHWallet(WalletBase):
 
         Returns:
         - CMultiSigTransaction: The unsigned transaction.
-        """
+        '''
         try:
             # Create the input (vin) referencing the UTXO
             outpoint = COutPoint(lx(txid), vout_index)
@@ -160,7 +160,7 @@ class EvrmoreP2SHWallet(WalletBase):
 
 
     def broadcast_transaction(self, signed_tx: CMultiSigTransaction) -> str:
-        """
+        '''
         Broadcasts a signed transaction to the Evrmore network using Electrumx.
 
         Parameters:
@@ -168,7 +168,7 @@ class EvrmoreP2SHWallet(WalletBase):
 
         Returns:
         - str: The transaction ID if successfully broadcasted.
-        """
+        '''
         try:
             if not self.electrumx:
                 raise ValueError("Electrumx connection is not established.")
@@ -190,7 +190,7 @@ class EvrmoreP2SHWallet(WalletBase):
             return ""
 
     def add_public_key(self, public_key: bytes) -> None:
-        """Adds a public key to the wallet's list of known public keys."""
+        '''Adds a public key to the wallet's list of known public keys.'''
         if public_key not in self.public_keys:
             self.public_keys.append(public_key)
-'''
+"""

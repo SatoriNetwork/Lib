@@ -119,18 +119,63 @@ class TransactionStruct():
             return None
         return self.bytesMemo().decode('utf-8')
 
-    def ethMemo(self, valid_eth_address: Union[None, callable]) -> Union[str, None]:
+    def ethMemo(self) -> Union[str, None]:
         if self.memo == None:
             return None
-        address = f'0x{self.memo}'
-        # Validate Ethereum address
-        if not callable(valid_eth_address):
-            return address
+        strMemo = self.strMemo()
+        if strMemo.startswith('ethereum:') and isValidEthereumAddress(strMemo.replace('ethereum:', '')):
+            address = strMemo.replace('ethereum:', '')
+        elif strMemo.startswith('0x'):
+            address = strMemo
+        else:
+            address = f'0x{strMemo}'
         if isValidEthereumAddress(address):
             return address
         return None
 
+    @staticmethod
+    def chainAddressFromMemo(strMemo:str) -> Union[dict, None]:
+        if strMemo == None:
+            return None
+        if ':' in strMemo and len(strMemo.split(':')[1]) > 1:
+            return {strMemo.split(':')[0]:strMemo.split(':')[1]}
+        return None
 
+    @staticmethod
+    def validChainNames() -> Union[dict, None]:
+        '''
+        here we semantically encode chains with 16-bits. if only the first 11
+        bits are used, we are defining the category itself, using the count
+        portion we define the specific chain of that category, likewise, if all
+        the count bits are used, we are not defining a specific chain, but an
+        undefined chain in that category because there's no room left for it.
+        0. Permissionless
+        1. Permissioned
+        2. UTXO-based
+        3. Account-based
+        4. Proof of Work
+        5. Proof of Stake
+        6. DAG based
+        7. Smart Contract Support
+        8. EVM Compatible
+        9. Layer 1
+        10. Native Privacy
+        11. count
+        12. count
+        13. count
+        14. count
+        15. count
+        '''
+        return {
+            'ethereum': 0b1001010111000001,
+            'evrmore': 0b1010100001000001,
+            #'bitcoin',
+            #'base',
+            #'arbitrum',
+            #'polygon',
+            #'ravencoin',
+            #'satori',
+        }
 
 class TransactionResult():
     def __init__(

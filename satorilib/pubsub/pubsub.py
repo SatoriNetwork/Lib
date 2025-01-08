@@ -82,8 +82,8 @@ class SatoriPubSubConn(object):
             # pubsub server went down
             if 'Forbidden' in str(e):
                 exit()
-            logging.error(
-                e, f'\ndropped {"publishing" if self.router is None else "subscribing"} {self.url}, retrying in 60 seconds...', print=True)
+            #logging.error(
+            #    e, f'\ndropped {"publishing" if self.router is None else "subscribing"} {self.url}, retrying in 60 seconds...', print=True)
             if isinstance(self.onDisconnect, Callable):
                 self.onDisconnect()
             time.sleep(60)
@@ -110,8 +110,8 @@ class SatoriPubSubConn(object):
             except Exception as e:
                 # except WebSocketConnectionClosedException as e:
                 # except ConnectionResetError:
-                logging.error(
-                    e, f'\nfailed while listening {self.url}, reconnecting in 60 seconds...', print=True)
+                #logging.error(
+                #    e, f'\nfailed while listening {self.url}, reconnecting in 60 seconds...', print=True)
                 time.sleep(60)
                 break
 

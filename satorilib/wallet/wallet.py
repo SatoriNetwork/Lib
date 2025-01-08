@@ -136,7 +136,6 @@ class WalletBase():
     def _generateScriptPubKeyFromAddress(self, address: str):
         ''' returns CScript object from address '''
 
-
 class Wallet(WalletBase):
 
     @staticmethod
@@ -749,7 +748,7 @@ class Wallet(WalletBase):
         for txRef in self.transactionHistory:
             txRef['tx_hash']
 
-    def _checkSatoriValue(self, output: 'CMutableTxOut', amount: float) -> bool:
+    def _checkSatoriValue(self, output: 'CMutableTxOut', amount: float=None) -> bool:
         '''
         returns true if the output is a satori output of self.mundoFee
         '''
@@ -1339,7 +1338,7 @@ class Wallet(WalletBase):
         # logging.debug('satoriChangeOut', satoriChangeOut, color='magenta')
         # logging.debug('mundoFeeOut', mundoFeeOut, color='magenta')
         # logging.debug('currencyChangeOut', currencyChangeOut, color='magenta')
-        memoOut = self._compileMemoOutput(ethAddress)
+        memoOut = self._compileMemoOutput(f'ethereum:{ethAddress}')
         tx = self._createPartialOriginatorSimple(
             txins=txins,
             txinScripts=txinScripts,
@@ -1863,11 +1862,9 @@ class Wallet(WalletBase):
             raise TransactionFailure(
                 'Satori Bridge Transaction bad params: eth address')
         try:
-            print('e')
             if isinstance(amount, Decimal):
                 amount = float(amount)
             if self.balance.amount < amount + self.bridgeFee:
-                print('f')
                 raise TransactionFailure(
                     f'Satori Bridge Transaction bad params: balance too low to pay for bridgeFee {self.balance.amount} < {amount} + {self.bridgeFee}')
             print('g')
@@ -1907,18 +1904,11 @@ class Wallet(WalletBase):
                     reportedFeeSats=result[1],
                     msg='send transaction requires fee.')
             # logging.debug('q', color='magenta')
-            # validate ethAddress
-            if not Validate.ethAddress(ethAddress):
-                return TransactionResult(
-                    result=None,
-                    success=True,
-                    tx=None,
-                    msg='invalid eth address.')
             result = self.satoriDistribution(
                 amountByAddress={
                     self.bridgeAddress: self.bridgeFee,
                     self.burnAddress: amount},
-                memo=ethAddress)
+                memo=f'ethereum:{ethAddress}')
             # logging.debug('r', result,  color='magenta')
             if result is None:
                 # logging.debug('s', color='magenta')

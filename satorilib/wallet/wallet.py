@@ -6,6 +6,7 @@ import threading
 from base64 import b64encode, b64decode
 from random import randrange
 import mnemonic
+from decimal import Decimal
 from satorilib import logging
 from satorilib import config
 from satorilib.utils import system
@@ -172,8 +173,9 @@ class Wallet(WalletBase):
         self.mundoFee = 0.0001
         # at $100 SATORI this is 5 dollars (for eth gas fee)
         self.bridgeFee: float = 0.05
-        self.bridgeAddress: str = 'E...'  # TODO finish
-        self.burnAddress: str = 'ExxxxxxxxxxSatoriBridgeBurnAddress'  # valid?
+        self.bridgeAddress: str = 'EUqCW1WmT6a9Y6RBVhsxY1k4S135RPWCy7'  # TODO finish
+        #self.burnAddress: str = 'ExxxxxxxxxxSatoriBridgeBurnAddress'  # valid?
+        self.burnAddress: str = 'EL1BS6HmwY1KoeqBokKjUMcWbWsn5kamGv'
         self.isTestnet = isTestnet
         self.password = password
         self.walletPath = walletPath
@@ -747,7 +749,7 @@ class Wallet(WalletBase):
         for txRef in self.transactionHistory:
             txRef['tx_hash']
 
-    def _checkSatoriValue(self, output: 'CMutableTxOut') -> bool:
+    def _checkSatoriValue(self, output: 'CMutableTxOut', amount: float) -> bool:
         '''
         returns true if the output is a satori output of self.mundoFee
         '''
@@ -1287,7 +1289,9 @@ class Wallet(WalletBase):
         if not Validate.ethAddress(ethAddress):
             raise TransactionFailure(
                 'Satori Bridge Transaction bad params: eth address')
-        if self.balance.amount >= amount + self.bridgeFee + self.mundoFee:
+        if isinstance(amount, Decimal):
+            amount = float(amount)
+        if self.balance.amount < amount + self.bridgeFee + self.mundoFee:
             raise TransactionFailure(
                 f'Satori Bridge Transaction bad params: balance too low to pay for bridgeFee {self.balance.amount} < {amount} + {self.bridgeFee} + {self.mundoFee}')
         if pullFeeFromAmount:
@@ -1469,9 +1473,20 @@ class Wallet(WalletBase):
         def _verifyClaim():
             if bridgeTransaction:
                 # [mundoFeeOut, bridgeFeeOut, currencyChangeOut, memoOut]
-                return self._checkSatoriValue(tx.vout[-4]) and self._checkSatoriValue(tx.vout[-3])
+                bridgePaid = False
+                mundoPaid = False
+                for x in tx.vout:
+                    if self._checkSatoriValue(x, self.bridgeFee):
+                        bridgePaid = True
+                    if self._checkSatoriValue(x, self.mundoFee):
+                        mundoPaid = True
+                return bridgePaid and mundoPaid
             # [mundoFeeOut, currencyChangeOut]
-            return self._checkSatoriValue(tx.vout[-2])
+            mundoPaid = False
+            for x in tx.vout:
+                if self._checkSatoriValue(x, self.mundoFee):
+                    mundoPaid = True
+            return mundoPaid
 
         def _verifyClaimAddress():
             ''' verify the claim output goes to completerAddress '''
@@ -1831,29 +1846,40 @@ class Wallet(WalletBase):
         changeAddress: str = None,
         feeSatsReserved: int = 0
     ) -> TransactionResult:
-        if completerAddress is None or changeAddress is None or feeSatsReserved == 0:
-            raise TransactionFailure(
-                'Satori Bridge Transaction bad params: need completer details')
+        #if completerAddress is None or changeAddress is None or feeSatsReserved == 0:
+        #    print('a')
+        #    raise TransactionFailure(
+        #        'Satori Bridge Transaction bad params: need completer details')
         if amount <= 0:
+            print('b')
             raise TransactionFailure(
                 'Satori Bridge Transaction bad params: amount <= 0')
         if amount > 100:
+            print('c')
             raise TransactionFailure(
                 'Satori Bridge Transaction bad params: amount > 100')
         if not Validate.ethAddress(ethAddress):
+            print('d')
             raise TransactionFailure(
                 'Satori Bridge Transaction bad params: eth address')
         try:
-            if self.balance.amount >= amount + self.bridgeFee:
+            print('e')
+            if isinstance(amount, Decimal):
+                amount = float(amount)
+            if self.balance.amount < amount + self.bridgeFee:
+                print('f')
                 raise TransactionFailure(
                     f'Satori Bridge Transaction bad params: balance too low to pay for bridgeFee {self.balance.amount} < {amount} + {self.bridgeFee}')
+            print('g')
             if self.currency < self.reserve:
+                print('self.currency', self.currency, 'self.reserve', self.reserve)
                 # if we have to make a partial we need more data so we need
                 # to return, telling them we need more data, asking for more
                 # information, and then if we get more data we can do this:
                 # logging.debug('k', color='magenta')
                 if feeSatsReserved == 0 or completerAddress is None:
                     # logging.debug('l', color='magenta')
+                    print('feeSatsReserved', feeSatsReserved, 'completerAddress', completerAddress)
                     return TransactionResult(
                         result='try again',
                         success=True,
@@ -1865,6 +1891,7 @@ class Wallet(WalletBase):
                     feeSatsReserved=feeSatsReserved,
                     completerAddress=completerAddress,
                     changeAddress=changeAddress)
+                print('result', result)
                 # logging.debug('n', color='magenta')
                 if result is None:
                     # logging.debug('o', color='magenta')

@@ -128,7 +128,7 @@ class WalletBase():
 
     def _generatePrivateKey(self):
         ''' returns a private key object '''
-        return CEvrmoreSecret.from_secret_bytes(self._entropy)
+        return CEvrmoreSecret.from_secret_bytes(os.urandom(32))
 
     def _generateAddress(self, pub=None):
         ''' returns an address object '''

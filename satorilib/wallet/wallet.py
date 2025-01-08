@@ -17,7 +17,7 @@ from satorilib.wallet.utils.transaction import TxUtils
 from satorilib.wallet.utils.validate import Validate
 from satorilib.wallet.concepts.balance import Balance
 from satorilib.wallet.concepts.transaction import TransactionResult, TransactionFailure, TransactionStruct
-from evrmore.wallet import CEvrmoreSecret, CEvrmoreAddress
+
 
 class WalletBase():
 
@@ -129,11 +129,9 @@ class WalletBase():
 
     def _generatePrivateKey(self):
         ''' returns a private key object '''
-        return CEvrmoreSecret.from_secret_bytes(os.urandom(32))
 
     def _generateAddress(self, pub=None):
         ''' returns an address object '''
-        # return CEvrmoreAddress.from_pubkey(pub)
 
     def _generateScriptPubKeyFromAddress(self, address: str):
         ''' returns CScript object from address '''

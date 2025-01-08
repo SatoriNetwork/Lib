@@ -1,10 +1,10 @@
 import logging
 from evrmore.wallet import CEvrmoreSecret, CEvrmoreAddress
-from satorilib.wallet.evrmore.walletsh import EvrmoreP2SHWallet
+#from satorilib.wallet.evrmore.walletsh import EvrmoreP2SHWallet
 from satorilib.wallet import wallet
 
 # Initialize the wallet instance with the correct number of signatures
-wallet = EvrmoreP2SHWallet(wallet_path="test_wallet.dat", is_testnet=False)
+#wallet = EvrmoreP2SHWallet(wallet_path="test_wallet.dat", is_testnet=False)
 
 # Restore previously saved private keys
 private_keys = [

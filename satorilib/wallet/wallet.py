@@ -749,7 +749,7 @@ class Wallet(WalletBase):
         for txRef in self.transactionHistory:
             txRef['tx_hash']
 
-    def _checkSatoriValue(self, output: 'CMutableTxOut', amount: float) -> bool:
+    def _checkSatoriValue(self, output: 'CMutableTxOut', amount: float=None) -> bool:
         '''
         returns true if the output is a satori output of self.mundoFee
         '''

@@ -68,9 +68,9 @@ class RavencoinWallet(Wallet):
     def satoriOriginalTxHash(self) -> str:
         return 'a015f44b866565c832022cab0dec94ce0b8e568dbe7c88dce179f9616f7db7e3'
 
-    def _generatePrivateKey(self):
+    def _generatePrivateKey(self, compressed: bool = True):
         SelectParams('mainnet')
-        return CRavencoinSecret.from_secret_bytes(self._entropy)
+        return CRavencoinSecret.from_secret_bytes(self._entropy, compressed=compressed)
 
     def _generateAddress(self):
         return P2PKHRavencoinAddress.from_pubkey(self._privateKeyObj.pub)

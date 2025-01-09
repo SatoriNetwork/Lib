@@ -1,4 +1,3 @@
-""" python-evrmorelib not updated yet to support this, commenting out for now so we don't get import errors
 import json
 import logging
 from typing import List, Tuple, Union
@@ -6,13 +5,13 @@ from base64 import b64encode, b64decode
 import os
 import random
 from evrmore.wallet import CEvrmoreAddress, CEvrmoreSecret
-from satorilib.electrumx import Electrumx
 from evrmore.core.script import CreateMultisigRedeemScript
 from evrmore.wallet import P2SHEvrmoreAddress
 from evrmore.wallet import CEvrmoreSecret, CEvrmoreAddress
 from evrmore.core import CMutableTransaction, CMutableTxOut, CMutableTxIn, COutPoint, lx, CScript
 from evrmore.core.transaction import CMultiSigTransaction
 from evrmore.core.script import OP_HASH160, OP_EQUAL, OP_CHECKMULTISIG, OP_CHECKSIG
+from satorilib.electrumx import Electrumx
 from satorilib.wallet.wallet import WalletBase  # Import WalletBase
 
 class EvrmoreP2SHWallet(WalletBase):
@@ -61,9 +60,9 @@ class EvrmoreP2SHWallet(WalletBase):
         self.generateObjects()
 
 
-    def _generatePrivateKey(self):
+    def _generatePrivateKey(self, compressed: bool = True):
         ''' returns a private key object '''
-        return CEvrmoreSecret.from_secret_bytes(os.urandom(32))
+        return CEvrmoreSecret.from_secret_bytes(os.urandom(32), compressed=compressed)
 
     def _generateAddress(self, pub=None):
         ''' returns an address object '''
@@ -193,4 +192,3 @@ class EvrmoreP2SHWallet(WalletBase):
         '''Adds a public key to the wallet's list of known public keys.'''
         if public_key not in self.public_keys:
             self.public_keys.append(public_key)
-"""

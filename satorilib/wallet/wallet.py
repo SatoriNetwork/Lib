@@ -127,7 +127,7 @@ class WalletBase():
     def _generateWords(self):
         return mnemonic.Mnemonic('english').to_mnemonic(self._entropy or b'')
 
-    def _generatePrivateKey(self):
+    def _generatePrivateKey(self, compressed: bool = True):
         ''' returns a private key object '''
 
     def _generateAddress(self, pub=None):
@@ -135,6 +135,11 @@ class WalletBase():
 
     def _generateScriptPubKeyFromAddress(self, address: str):
         ''' returns CScript object from address '''
+
+    def _generateUncompressedPubkey(self):
+        ''' returns a private key object '''
+        return self._generatePrivateKey(compressed=False).pub.hex()
+
 
 class Wallet(WalletBase):
 

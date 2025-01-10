@@ -39,6 +39,38 @@ class TxUtils():
         return txSizeInBytes * feeRate
 
     @staticmethod
+    def satsToWei(sats: int) -> int:
+        """
+        Converts Evrmore satoshis to Ethereum wei.
+        Parameters:
+            sats (int): The amount in Evrmore satoshis (1 BTC = 10^8 satoshis).
+        Returns:
+            int: The equivalent amount in Ethereum wei (1 ETH = 10^18 wei).
+        # Example Usage
+        sats = 100_000  # 0.001 BTC in satoshis
+        wei = sats_to_eth_wei(sats)
+        print(f"{sats} satoshis = {wei} wei")
+        """
+        # Scale by 10^(18 - 8) = 10^10 to match Ethereum's 18-decimal precision
+        return int(sats * (10 ** 10))
+
+    @staticmethod
+    def weiToSats(wei: int) -> int:
+        """
+        Converts Ethereum wei to Evrmore satoshis.
+        Parameters:
+            wei (int): The amount in Ethereum wei (1 ETH = 10^18 wei).
+        Returns:
+            int: The equivalent amount in Evrmore satoshis (1 BTC = 10^8 satoshis).
+        # Example Usage
+        wei = 1_000_000_000_000_000  # 0.001 ETH in wei
+        sats = wei_to_sats(wei)
+        print(f"{wei} wei = {sats} satoshis")
+        """
+        # Scale down by 10^(18 - 8) = 10^10 to match Evrmore's 8-decimal precision
+        return int(wei // (10 ** 10))
+
+    @staticmethod
     def asSats(amount: float) -> int:
         from evrmore.core import COIN
         return int(amount * COIN)

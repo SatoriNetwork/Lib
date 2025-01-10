@@ -658,26 +658,14 @@ class SatoriServerClient(object):
             return False
         return False
 
-    def betaStatus(self) -> tuple[bool, dict]:
-        ''' removes a stream from the server '''
-        try:
-            response = self._makeAuthenticatedCall(
-                function=requests.get,
-                endpoint='/beta/status')
-            return response.status_code < 400, response.json()
-        except Exception as e:
-            logging.warning(
-                'unable to get beta status due to connection timeout; try again Later.', e, color='yellow')
-            return False, {}
-
-    def betaClaim(self, ethAddress: str) -> tuple[bool, dict]:
+    def setEthAddress(self, ethAddress: str) -> tuple[bool, dict]:
         ''' removes a stream from the server '''
         try:
             response = self._makeAuthenticatedCall(
                 function=requests.post,
-                endpoint='/beta/claim',
+                endpoint='/set/eth/address',
                 payload=json.dumps({'ethAddress': ethAddress}))
-            return response.status_code < 400,  response.json()
+            return response.status_code < 400, response.json()
         except Exception as e:
             logging.warning(
                 'unable to claim beta due to connection timeout; try again Later.', e, color='yellow')

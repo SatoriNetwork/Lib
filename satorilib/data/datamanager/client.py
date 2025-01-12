@@ -76,7 +76,7 @@ class DataClient:
         return str(time.time())
 
     async def handleMessage(self, message: Message) -> None:
-        if message.isSubscription:
+        if message.isSubscription or (hasattr(message, 'sub') and message.sub):
             if self.server is not None:
                 self.server.notifySubscribers(message)
             subscription = self.findSubscription(
@@ -207,7 +207,7 @@ class DataClient:
         peerAddr: Tuple[str, int],
         table_uuid: str = None,
         method: str = "initiate-connection",
-        sub: 
+        sub: bool = False,
         data: pd.DataFrame = None,
         replace: bool = False,
         fromDate: str = None,
@@ -247,7 +247,7 @@ class DataClient:
             {
                 "method": method,
                 "id": id,
-                "sub": sub
+                "sub": sub,
                 "params": {
                     "table_uuid": table_uuid,
                     "replace": replace,
@@ -257,6 +257,8 @@ class DataClient:
                 "data": data,
             }
         )
+        if sub:
+            return await self.subscribe(peerAddr, request)
         return await self.send(peerAddr, request)
 
     async def _getStreamData(self, table_uuid: str) -> pd.DataFrame:
@@ -308,10 +310,3 @@ class DataClient:
                 f"Error getting last record before timestamp for stream {table_uuid}: {e}"
             )
 
-
-# async def main():
-#     peer2 = DataClient(db_path="./client", db_name="client.db")
-#     await peer2.sendRequest(("localhost", 24602))
-
-# if __name__ == "__main__":
-#     asyncio.run(main())

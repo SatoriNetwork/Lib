@@ -1254,6 +1254,7 @@ class Wallet(WalletBase):
         self,
         amount: int,
         ethAddress: str,
+        chain: str='base',
         pullFeeFromAmount: bool = False,
         feeSatsReserved: int = 0,
         completerAddress: str = None,
@@ -1343,7 +1344,7 @@ class Wallet(WalletBase):
         # logging.debug('satoriChangeOut', satoriChangeOut, color='magenta')
         # logging.debug('mundoFeeOut', mundoFeeOut, color='magenta')
         # logging.debug('currencyChangeOut', currencyChangeOut, color='magenta')
-        memoOut = self._compileMemoOutput(f'ethereum:{ethAddress}')
+        memoOut = self._compileMemoOutput(f'{chain}:{ethAddress}')
         tx = self._createPartialOriginatorSimple(
             txins=txins,
             txinScripts=txinScripts,
@@ -1846,6 +1847,7 @@ class Wallet(WalletBase):
         self,
         amount: float,
         ethAddress: str,
+        chain: str = 'base',
         completerAddress: str = None,
         changeAddress: str = None,
         feeSatsReserved: int = 0
@@ -1906,7 +1908,7 @@ class Wallet(WalletBase):
                 amountByAddress={
                     self.bridgeAddress: self.bridgeFee,
                     self.burnAddress: amount},
-                memo=f'ethereum:{ethAddress}')
+                memo=f'{chain}:{ethAddress}')
             # logging.debug('r', result,  color='magenta')
             if result is None:
                 # logging.debug('s', color='magenta')

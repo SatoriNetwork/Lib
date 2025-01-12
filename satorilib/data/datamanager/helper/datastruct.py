@@ -7,19 +7,19 @@ class Subscription:
     def __init__(
         self,
         method: str,
-        params: Union[list, None] = None,
+        tableuuid: Union[list, None] = None,
         callback: Union[callable, None] = None
     ):
         self.method = method
-        self.params = params or []
+        self.tableuuid = tableuuid
         self.shortLivedCallback = callback
 
     def __hash__(self):
-        return hash((self.method, tuple(self.params)))
+        return hash((self.method, self.tableuuid))
 
     def __eq__(self, other):
         if isinstance(other, Subscription):
-            return self.method == other.method and self.params == other.params
+            return self.method == other.method and self.tableuuid == other.tableuuid
         return False
 
     def __call__(self, *args, **kwargs):

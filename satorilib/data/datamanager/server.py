@@ -104,7 +104,7 @@ class DataServer:
         #self.notifySubscribers(request)
 
         # func(status, id, msg) -> dict{}
-        def _create_response( status: str, message: str, data: Optional[str] = None) -> Dict:
+        def _createResponse( status: str, message: str, data: Optional[str] = None) -> Dict:
             response = {
                 "status": status,
                 "id": request.id,
@@ -113,76 +113,77 @@ class DataServer:
                 "params": {
                 "table_uuid": request.table_uuid,
                 },
-                "sub": request.sub if hasattr(request, 'sub') else False
+                "sub": request.sub
             }
             if data is not None:
                 response["data"] = data
             return response
+        
         if request.isSubscription and request.table_uuid is not None:
             self.connectedClients[peerAddr].add_subcription(request.table_uuid)
-            return _create_response("success", f"Subscribed to {request.table_uuid}")
+            return _createResponse("success", f"Subscribed to {request.table_uuid}")
         
         elif request.method == 'initiate-connection':
-            return _create_response("success", "Connection established")
-
+            return _createResponse("success", "Connection established")
+        
         if request.table_uuid is None:
-            return _create_response("error", "Missing table_uuid parameter")
+            return _createResponse("error", "Missing table_uuid parameter")
 
         if request.method == 'stream_data':
             df = await self._getStreamData(request.table_uuid)
             if df is None:
-                return _create_response("error", f"No data found for stream {request.table_uuid}")
-            return _create_response("success", f" data found for stream {request.table_uuid}", df.to_json(orient='split')) 
+                return _createResponse("error", f"No data found for stream {request.table_uuid}")
+            return _createResponse("success", f" data found for stream {request.table_uuid}", df.to_json(orient='split')) 
 
         elif request.method == 'data-in-range':
             if not request.fromDate or not request.toDate:
-                return _create_response("error", "Missing from_date or to_date parameter")  
+                return _createResponse("error", "Missing from_date or to_date parameter")  
             
             df = await self._getStreamDataByDateRange(
                 request.table_uuid, request.fromDate, request.toDate
             )
             if df is None:
-                return _create_response("error", f"No data found for stream {request.table_uuid} in specified date range")
+                return _createResponse("error", f"No data found for stream {request.table_uuid} in specified date range")
 
             if 'ts' in df.columns:
                 df['ts'] = df['ts'].astype(str)
-            return _create_response("success", f" data found for stream {request.table_uuid} in specified date range",df.to_json(orient='split'))
+            return _createResponse("success", f" data found for stream {request.table_uuid} in specified date range",df.to_json(orient='split'))
 
         elif request.method == 'record-at-or-before':
             try:
                 if request.data is None:
-                    return _create_response("error", "No timestamp data provided")
+                    return _createResponse("error", "No timestamp data provided")
                 timestamp_df = pd.read_json(StringIO(request.data), orient='split')
                 timestamp = timestamp_df['ts'].iloc[0]
                 df = await self._getLastRecordBeforeTimestamp(
                     request.table_uuid, timestamp
                 )
                 if df is None:
-                    return _create_response("error", f"No records found before timestamp for stream {request.table_uuid}")
+                    return _createResponse("error", f"No records found before timestamp for stream {request.table_uuid}")
 
                 if 'ts' in df.columns:
                     df['ts'] = df['ts'].astype(str)
-                return _create_response("success", f" records found before timestamp for stream {request.table_uuid}",df.to_json(orient='split'))
+                return _createResponse("success", f" records found before timestamp for stream {request.table_uuid}",df.to_json(orient='split'))
             except Exception as e:
-                return _create_response("error", f"Error processing timestamp request: {str(e)}") 
+                return _createResponse("error", f"Error processing timestamp request: {str(e)}") 
 
         elif request.method == 'insert':
             try:
                 if request.data is None:
-                    return _create_response("error", "No data provided for insert operation")
+                    return _createResponse("error", "No data provided for insert operation")
                 data = pd.read_json(StringIO(request.data), orient='split')
                 if request.replace:
                     self.db.deleteTable(request.table_uuid)
                     self.db.createTable(request.table_uuid)
                 success = self.db._dataframeToDatabase(request.table_uuid, data)
                 updated_df = await self._getStreamData(request.table_uuid)
-                return _create_response("success" if success else "error", (
+                return _createResponse("success" if success else "error", (
                         f"Data {'replaced' if request.replace else 'merged'} successfully"
                         if success
                         else "Failed to insert data"
                     ))
             except Exception as e:
-                return _create_response("error", f"Error inserting data: {str(e)}")
+                return _createResponse("error", f"Error inserting data: {str(e)}")
             
         elif request.method == 'delete':
             try:
@@ -191,14 +192,14 @@ class DataServer:
                     timestamps = data['ts'].tolist()
                     for ts in timestamps:
                         self.db.editTable('delete', request.table_uuid, timestamp=ts)
-                    return _create_response("success", "Delete operation completed")
+                    return _createResponse("success", "Delete operation completed")
                 else:
                     self.db.deleteTable(request.table_uuid)
-                    return _create_response("success", f"Table {request.table_uuid} deleted")
+                    return _createResponse("success", f"Table {request.table_uuid} deleted")
             except Exception as e:
-                return _create_response("error", f"Error deleting data: {str(e)}")
+                return _createResponse("error", f"Error deleting data: {str(e)}")
         else:
-            return _create_response("error", f"Unknown request type: {request.method}")
+            return _createResponse("error", f"Unknown request type: {request.method}")
     
 
     async def _getStreamData(self, table_uuid: str) -> pd.DataFrame:

@@ -31,7 +31,7 @@ class DataClient:
         self.responses: dict[str, Message] = {}
         self.db = SqliteDatabase(db_path, db_name)
 
-    async def connectToPeer(self, peerHost: str, peerPort: int) -> bool:
+    async def connectToPeer(self, peerHost: str, peerPort: int):
         """Connect to another peer"""
         uri = f"ws://{peerHost}:{peerPort}"
         try:
@@ -43,10 +43,8 @@ class DataClient:
                 self.listenToPeer(self.connectedServers[(peerHost, peerPort)])
             )
             debug(f"Connected to peer at {uri}", print=True)
-            return True
         except Exception as e:
             error(f"Failed to connect to peer at {uri}: {e}")
-            return False
 
     async def listenToPeer(self, peer: ConnectedPeer):
         """Listen for messages from a connected peer"""
@@ -76,18 +74,17 @@ class DataClient:
         return str(time.time())
 
     async def handleMessage(self, message: Message) -> None:
-        if message.isSubscription or (hasattr(message, 'sub') and message.sub):
+        if message.isSubscription:
             if self.server is not None:
                 self.server.notifySubscribers(message)
             subscription = self.findSubscription(
-                subscription=Subscription(message.method, params=[])
+                subscription=Subscription(message.method, message.table_uuid)
             )
-            q = self.subscriptions.get(
-                subscription
-            )  # when we ask for a subscription we save.
+            q = self.subscriptions.get(subscription)
             if isinstance(q, queue.Queue):
                 q.put(message)
             subscription(message)
+            info("Subscribed to : ", message.table_uuid)
         elif message.isResponse:
             self.responses[message.id] = message
 
@@ -105,7 +102,7 @@ class DataClient:
                 self.cleanUpResponses()
                 return response
             # time.sleep(1)
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.1)
         return None
 
     def cleanUpResponses(self):
@@ -124,8 +121,7 @@ class DataClient:
         for key in keysToDelete:
             del self.responses[key]
 
-    # todo add all
-    async def handleResponse(self, response: Message) -> None:
+    def handleResponse(self, response: Message) -> None:
         if response.status == "success" and response.data is not None:
             try:
                 df = pd.read_json(StringIO(response.data), orient='split')
@@ -151,18 +147,11 @@ class DataClient:
 
     async def connect(
         self,
-        peerAddr: Tuple[str, int],
-        request: Message,
+        peerAddr: Tuple[str, int]
     ) -> Dict:
         if peerAddr not in self.connectedServers:
             peerHost, peerPort = peerAddr
-            success = await self.connectToPeer(peerHost, peerPort)
-            if not success:
-                return {
-                    "status": "error",
-                    "id": request.id,
-                    "message": "Failed to connect to peer",
-                }
+            await self.connectToPeer(peerHost, peerPort)
 
     async def send(
         self,
@@ -172,14 +161,16 @@ class DataClient:
     ) -> Dict:
         """Send a request to a specific peer"""
 
-        debug(request.id, print=True)
-        await self.connect(peerAddr, request)
-        msg = request.to_json()
+        # debug(request.to_dict(), print=True)
+        await self.connect(peerAddr)
         try:
-            await self.connectedServers[peerAddr].websocket.send(msg)
+            await self.connectedServers[peerAddr].websocket.send(request.to_json())
             if sendOnly:
                 return None
-            return await self.listenForResponse(request.id)
+            response = await self.listenForResponse(request.id)
+            debug(response, print=True)
+            self.handleResponse(response)
+            return response
         except Exception as e:
             error(f"Error sending request to peer: {e}")
             return {"status": "error", "message": str(e)}
@@ -190,16 +181,37 @@ class DataClient:
     #        for subscription in self.subscriptions.keys():
     #            self.subscribe(subscription.method, *subscription.params)
 
-    # Refactor: could be made to look like sendRequest creating method from passed in details:
     async def subscribe(
         self,
         peerAddr: Tuple[str, int],
-        request: Message,
+        table_uuid: str,
+        method: str = "subscribe",
         callback: Union[callable, None] = None,
-    ):
-        self.subscriptions[
-            Subscription(request.method, request.params, callback=callback)
-        ] = queue.Queue()
+        data: pd.DataFrame = None,
+        replace: bool = False,
+        fromDate: str = None,
+        toDate: str = None,
+    ) -> Dict:
+        """
+        Creates a subscription for a given method and table_uuid with an optional callback.
+        """
+        id = self._generateCallId()
+        subscription = Subscription(method, table_uuid, callback=callback)
+        self.subscriptions[subscription] = queue.Queue()
+        request = Message(
+            {
+                "method": method,
+                "id": id,
+                "sub": True,
+                "params": {
+                    "table_uuid": table_uuid,
+                    "replace": replace,
+                    "from_ts": fromDate,
+                    "to_ts": toDate,
+                },
+                "data": data,
+            }
+        )
         return await self.send(peerAddr, request)
 
     async def sendRequest(
@@ -207,21 +219,20 @@ class DataClient:
         peerAddr: Tuple[str, int],
         table_uuid: str = None,
         method: str = "initiate-connection",
-        sub: bool = False,
         data: pd.DataFrame = None,
         replace: bool = False,
         fromDate: str = None,
         toDate: str = None,
     ) -> Dict:
 
-        # from datetime import datetime
-        # idStr: str = str(
-        #     generateUUID({'method': method, 'currentTime': datetime.now()})
-        # )
         id = self._generateCallId()
 
         if method == "initiate-connection":
             request = Message({"method": method, "id": id})
+
+        elif method == "subscribe":
+            request = Message({"method": method, "id": id, "message": f"Subscibe to {table_uuid}"})
+        
         elif method == "data-in-range" and data is not None:
             if 'from_ts' in data.columns and 'to_ts' in data.columns:
                 fromDate = data['from_ts'].iloc[0]
@@ -247,7 +258,6 @@ class DataClient:
             {
                 "method": method,
                 "id": id,
-                "sub": sub,
                 "params": {
                     "table_uuid": table_uuid,
                     "replace": replace,
@@ -257,8 +267,6 @@ class DataClient:
                 "data": data,
             }
         )
-        if sub:
-            return await self.subscribe(peerAddr, request)
         return await self.send(peerAddr, request)
 
     async def _getStreamData(self, table_uuid: str) -> pd.DataFrame:
@@ -309,4 +317,3 @@ class DataClient:
             error(
                 f"Error getting last record before timestamp for stream {table_uuid}: {e}"
             )
-

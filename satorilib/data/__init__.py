@@ -1,2 +1,1 @@
-''' the data service '''
-from .data import DataService
+from datamanager import DataClient, DataServer

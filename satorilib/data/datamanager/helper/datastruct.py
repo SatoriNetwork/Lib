@@ -117,7 +117,7 @@ class Message:
         return self.message.get('status')
 
     @property
-    def sub(self) -> str:
+    def sub(self) -> bool:
         """Get the sub"""
         return self.message.get('sub')
 

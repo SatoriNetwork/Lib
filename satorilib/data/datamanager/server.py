@@ -1,26 +1,3 @@
-'''
-
-refactor and test
----
-create a server - rendezvous server
---- 
-integrate with neuron-dataClient
-integrate with engine-dataClient
----
-subsume all logic currently used in engine for managing data on disk
----
-make sure it's all working together
----
-p2p - get histories (just request history of data)
-p2p - replace pubsub servers (start using subscriptions)
----
-relay if necessary?
----
-
-
-
-'''
-
 import asyncio
 import websockets
 import json
@@ -32,6 +9,7 @@ from satorilib.logging import INFO, setup, debug, info, warning, error
 from satorilib.sqlite import SqliteDatabase
 from satorilib.utils import generateUUID
 from satorilib.data.datamanager.helper import Message, ConnectedPeer, Subscription
+
 
 class DataServer:
     def __init__(
@@ -46,8 +24,6 @@ class DataServer:
         self.port = port
         self.server = None
         self.connectedClients: Dict[Tuple[str, int], ConnectedPeer] = {}
-        # an optimization
-        # self.subscriptions: Dict[int, ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
         self.responses: dict[str, dict] = {}
         self.db = SqliteDatabase(db_path, db_name)
@@ -74,8 +50,8 @@ class DataServer:
                     await self.connectedClients[peerAddr].websocket.send(
                         json.dumps(response)
                     )
-                    # await websocket.send(json.dumps(response))
-                    debug("Response sent", print=True)
+                    debug("response b4 sending", response,print=True)
+                    # debug("Response sent", print=True)
                 except json.JSONDecodeError:
                     await websocket.send(
                         json.dumps(
@@ -92,9 +68,8 @@ class DataServer:
                         )
                     )
         except websockets.exceptions.ConnectionClosed:
-            print(f"Connection closed with {peerAddr}")
+            error(f"Connection closed with {peerAddr}")
         finally:
-            # Remove disconnected peer
             for key, cp in list(self.connectedClients.items()):
                 if cp.websocket == websocket:
                     del self.connectedClients[key]
@@ -125,53 +100,52 @@ class DataServer:
         websocket: websockets.WebSocketServerProtocol,
         message: str,
     ) -> Dict:
-        # can make a function which can reduce the redundancy
         request: Message = Message(json.loads(message))
-
-        # TODO: need and endpoint to notify subscribers
+        # TODO: need an endpoint to notify subscribers
         # neuron-dataClient, raw data -> dataClient --ws-> datamanager.dataServer
-        #self.notifySubscribers(request) 
+        #self.notifySubscribers(request)
 
-        if request.endpoint == 'subscribe' and request.table_uuid is not None:
+        # func(status, id, msg) -> dict{}
+        if request.isSubscription and request.table_uuid is not None:
             self.connectedClients[peerAddr].add_subcription(request.table_uuid)
             return {
                 "status": "success",
-                "magic": request.magic,
+                "id": request.id,
                 "message": f"Subscribed to {request.table_uuid}",
             }
-        elif request.endpoint == 'initiate-connection':
+        elif request.method == 'initiate-connection':
             return {
                 "status": "Success",
-                "magic": request.magic,
+                "id": request.id,
                 "message": "Connection established",
             }
 
         if request.table_uuid is None:
             return {
                 "status": "error",
-                "magic": request.magic,
+                "id": request.id,
                 "message": "Missing table_uuid parameter",
             }
 
-        if request.endpoint == 'stream_data':
+        if request.method == 'stream_data':
             df = await self._getStreamData(request.table_uuid)
             if df is None:
                 return {
                     "status": "error",
-                    "magic": request.magic,
+                    "id": request.id,
                     "message": f"No data found for stream {request.table_uuid}",
                 }
             return {
                 "status": "success",
-                "magic": request.magic,
+                "id": request.id,
                 "data": df.to_json(orient='split'),
             }
 
-        elif request.endpoint == 'data-in-range':
+        elif request.method == 'data-in-range':
             if not request.fromDate or not request.toDate:
                 return {
                     "status": "error",
-                    "magic": request.magic,
+                    "id": request.id,
                     "message": "Missing from_date or to_date parameter",
                 }
 
@@ -181,7 +155,7 @@ class DataServer:
             if df is None:
                 return {
                     "status": "error",
-                    "magic": request.magic,
+                    "id": request.id,
                     "message": f"No data found for stream {request.table_uuid} in specified date range",
                 }
 
@@ -189,11 +163,11 @@ class DataServer:
                 df['ts'] = df['ts'].astype(str)
             return {
                 "status": "success",
-                "magic": request.magic,
+                "id": request.id,
                 "data": df.to_json(orient='split'),
             }
 
-        elif request.endpoint == 'record-at-or-before':
+        elif request.method == 'record-at-or-before':
             try:
                 if request.data is None:
                     return {"status": "error", "message": "No timestamp data provided"}
@@ -205,7 +179,7 @@ class DataServer:
                 if df is None:
                     return {
                         "status": "error",
-                        "magic": request.magic,
+                        "id": request.id,
                         "message": f"No records found before timestamp for stream {request.table_uuid}",
                     }
 
@@ -213,22 +187,22 @@ class DataServer:
                     df['ts'] = df['ts'].astype(str)
                 return {
                     "status": "success",
-                    "magic": request.magic,
+                    "id": request.id,
                     "data": df.to_json(orient='split'),
                 }
             except Exception as e:
                 return {
                     "status": "error",
-                    "magic": request.magic,
+                    "id": request.id,
                     "message": f"Error processing timestamp request: {str(e)}",
                 }
 
-        elif request.endpoint == 'insert':
+        elif request.method == 'insert':
             try:
                 if request.data is None:
                     return {
                         "status": "error",
-                        "magic": request.magic,
+                        "id": request.id,
                         "message": "No data provided for insert operation",
                     }
                 data = pd.read_json(StringIO(request.data), orient='split')
@@ -239,7 +213,7 @@ class DataServer:
                 updated_df = await self._getStreamData(request.table_uuid)
                 return {
                     "status": "success" if success else "error",
-                    "magic": request.magic,
+                    "id": request.id,
                     "message": (
                         f"Data {'replaced' if request.replace else 'merged'} successfully"
                         if success
@@ -250,11 +224,11 @@ class DataServer:
             except Exception as e:
                 return {
                     "status": "error",
-                    "magic": request.magic,
+                    "id": request.id,
                     "message": f"Error inserting data: {str(e)}",
                 }
 
-        elif request.endpoint == 'delete':
+        elif request.method == 'delete':
             try:
                 if request.data is not None:
                     data = pd.read_json(StringIO(request.data), orient='split')
@@ -263,82 +237,28 @@ class DataServer:
                         self.db.editTable('delete', request.table_uuid, timestamp=ts)
                     return {
                         "status": "success",
-                        "magic": request.magic,
+                        "id": request.id,
                         "message": "Delete operation completed",
                     }
                 else:
                     self.db.deleteTable(request.table_uuid)
                     return {
                         "status": "success",
-                        "magic": request.magic,
+                        "id": request.id,
                         "message": f"Table {request.table_uuid} deleted",
                     }
             except Exception as e:
                 return {
                     "status": "error",
-                    "magic": request.magic,
+                    "id": request.id,
                     "message": f"Error deleting data: {str(e)}",
                 }
         else:
             return {
                 "status": "error",
-                "magic": request.magic,
-                "message": f"Unknown request type: {request.endpoint}",
+                "id": request.id,
+                "message": f"Unknown request type: {request.method}",
             }
-
-    async def sendRequest(
-        self,
-        peer_addr: Tuple[str, int],
-        table_uuid: str = None,
-        endpoint: str = "stream_data",
-        data: pd.DataFrame = None,
-        replace: bool = False,
-        fromDate: str = None,
-        toDate: str = None,
-    ) -> Dict:
-        
-        from datetime import datetime
-        magicStr: str = str(
-            generateUUID({'endpoint': endpoint, 'currentTime': datetime.now()})
-        )
-
-        if endpoint == "initiate-connection":
-            request = Message({"endpoint": endpoint, "magic": magicStr})
-        elif endpoint == "data-in-range" and data is not None:
-            if 'from_ts' in data.columns and 'to_ts' in data.columns:
-                fromDate = data['from_ts'].iloc[0]
-                toDate = data['to_ts'].iloc[0]
-            else:
-                raise ValueError(
-                    "DataFrame must contain 'from_ts' and 'to_ts' columns for date range queries"
-                )
-        elif endpoint == "record-at-or-before":
-            if data is None:
-                raise ValueError(
-                    "DataFrame with timestamp is required for last record before requests"
-                )
-            if 'ts' not in data.columns:
-                raise ValueError(
-                    "DataFrame must contain 'ts' column for last record before requests"
-                )
-
-        if data is not None:
-            data = data.to_json(orient='split')
-
-        request = Message(
-            {
-                "endpoint": endpoint,
-                "magic": magicStr,
-                "params": {
-                    "table_uuid": table_uuid,
-                    "replace": replace,
-                    "from_ts": fromDate,
-                    "to_ts": toDate,
-                },
-                "data": data,
-            }
-        )
-        return await self.sendPeer(peer_addr, request)
     
 
     async def _getStreamData(self, table_uuid: str) -> pd.DataFrame:
@@ -390,18 +310,6 @@ class DataServer:
                 f"Error getting last record before timestamp for stream {table_uuid}: {e}"
             )
 
-    # todo : is there need of this?
-    # @staticmethod
-    # def _get_sqlite_type(dtype):
-    #     """Convert pandas dtype to SQLite type"""
-    #     if "int" in str(dtype):
-    #         return "INTEGER"
-    #     elif "float" in str(dtype):
-    #         return "REAL"
-    #     elif "datetime" in str(dtype):
-    #         return "TIMESTAMP"
-    #     else:
-    #         return "TEXT"
 
 
 async def main():

@@ -9,18 +9,18 @@ from io import StringIO
 from satorilib.logging import INFO, setup, debug, info, warning, error
 from satorilib.sqlite import SqliteDatabase
 from satorilib.utils import generateUUID
-from satorilib.data import DataServer 
+from satorilib.data.datamanager.server import DataServer
 from satorilib.data.datamanager.helper import Message, ConnectedPeer, Subscription
 
 
 class DataClient:
     def __init__(
         self,
-        host: str,
-        port: int,
+        host: str = None,
+        port: int = None,
         db_path: str = "../../data",
         db_name: str = "data.db",
-        server: Union[DataServer, None] = None #import
+        server: Union[DataServer, None] = None,
     ):
 
         self.host = host
@@ -39,19 +39,20 @@ class DataClient:
             self.connectedServers[(peerHost, peerPort)] = ConnectedPeer(
                 (peerHost, peerPort), websocket
             )
-            asyncio.create_task(self.listenToPeer(self.connectedServers[(peerHost, peerPort)]))
+            asyncio.create_task(
+                self.listenToPeer(self.connectedServers[(peerHost, peerPort)])
+            )
             debug(f"Connected to peer at {uri}", print=True)
             return True
         except Exception as e:
             error(f"Failed to connect to peer at {uri}: {e}")
             return False
 
-
     async def listenToPeer(self, peer: ConnectedPeer):
         """Listen for messages from a connected peer"""
 
         def handleMultipleMessages(buffer: str):
-            ''' split on the first newline to handle multiple messages '''
+            '''split on the first newline to handle multiple messages'''
             return buffer.partition('\n')
 
         async def listen():
@@ -63,7 +64,7 @@ class DataClient:
 
         while not peer.stop.is_set():
             await listen()
- 
+
     def findSubscription(self, subscription: Subscription) -> Subscription:
         for s in self.subscriptions.keys():
             if s == subscription:
@@ -76,22 +77,26 @@ class DataClient:
 
     async def handleMessage(self, message: Message) -> None:
         if message.isSubscription:
-            if self.server is not None: 
+            if self.server is not None:
                 self.server.notifySubscribers(message)
             subscription = self.findSubscription(
-                subscription=Subscription(message.method, params=[]))
-            q = self.subscriptions.get(subscription) # when we ask for a subscription we save.
+                subscription=Subscription(message.method, params=[])
+            )
+            q = self.subscriptions.get(
+                subscription
+            )  # when we ask for a subscription we save.
             if isinstance(q, queue.Queue):
                 q.put(message)
             subscription(message)
         elif message.isResponse:
-            self.responses[
-                message.get('id', self._generateCallId())] = message
+            self.responses[message.id] = message
 
     def listenForSubscriptions(self, method: str, params: list) -> dict:
         return self.subscriptions[Subscription(method, params)].get()
 
-    def listenForResponse(self, callId: Union[str, None] = None) -> Union[dict, None]:
+    async def listenForResponse(
+        self, callId: Union[str, None] = None
+    ) -> Union[dict, None]:
         then = time.time()
         while time.time() < then + 30:
             response = self.responses.get(callId)
@@ -99,7 +104,8 @@ class DataClient:
                 del self.responses[callId]
                 self.cleanUpResponses()
                 return response
-            time.sleep(1)
+            # time.sleep(1)
+            await asyncio.sleep(1)
         return None
 
     def cleanUpResponses(self):
@@ -152,30 +158,34 @@ class DataClient:
             peerHost, peerPort = peerAddr
             success = await self.connectToPeer(peerHost, peerPort)
             if not success:
-                return {"status": "error", "id": request.id, "message": "Failed to connect to peer"}
+                return {
+                    "status": "error",
+                    "id": request.id,
+                    "message": "Failed to connect to peer",
+                }
 
     async def send(
-        self, 
-        peerAddr: Tuple[str, int], 
-        request: Message, 
+        self,
+        peerAddr: Tuple[str, int],
+        request: Message,
         sendOnly: bool = False,
     ) -> Dict:
         """Send a request to a specific peer"""
-        if request.id is None:
-            request.id = self._generateCallId()
-        self.connect(peerAddr, request)
+
+        debug(request.id, print=True)
+        await self.connect(peerAddr, request)
         msg = request.to_json()
         try:
             await self.connectedServers[peerAddr].websocket.send(msg)
             if sendOnly:
                 return None
-            return self.listenForResponse(request.id)
+            return await self.listenForResponse(request.id)
         except Exception as e:
             error(f"Error sending request to peer: {e}")
             return {"status": "error", "message": str(e)}
-    
+
     # should we need this?
-    #def resubscribe(self):
+    # def resubscribe(self):
     #    if self.connected():
     #        for subscription in self.subscriptions.keys():
     #            self.subscribe(subscription.method, *subscription.params)
@@ -183,8 +193,8 @@ class DataClient:
     # Refactor: could be made to look like sendRequest creating method from passed in details:
     async def subscribe(
         self,
-        peerAddr: Tuple[str, int], 
-        request: Message, 
+        peerAddr: Tuple[str, int],
+        request: Message,
         callback: Union[callable, None] = None,
     ):
         self.subscriptions[
@@ -194,22 +204,24 @@ class DataClient:
 
     async def sendRequest(
         self,
-        peer_addr: Tuple[str, int],
+        peerAddr: Tuple[str, int],
         table_uuid: str = None,
-        method: str = "stream_data",
+        method: str = "initiate-connection",
+        sub: 
         data: pd.DataFrame = None,
         replace: bool = False,
         fromDate: str = None,
         toDate: str = None,
     ) -> Dict:
-        
-        from datetime import datetime
-        idStr: str = str(
-            generateUUID({'method': method, 'currentTime': datetime.now()})
-        )
+
+        # from datetime import datetime
+        # idStr: str = str(
+        #     generateUUID({'method': method, 'currentTime': datetime.now()})
+        # )
+        id = self._generateCallId()
 
         if method == "initiate-connection":
-            request = Message({"method": method, "id": idStr})
+            request = Message({"method": method, "id": id})
         elif method == "data-in-range" and data is not None:
             if 'from_ts' in data.columns and 'to_ts' in data.columns:
                 fromDate = data['from_ts'].iloc[0]
@@ -234,7 +246,8 @@ class DataClient:
         request = Message(
             {
                 "method": method,
-                "id": idStr,
+                "id": id,
+                "sub": sub
                 "params": {
                     "table_uuid": table_uuid,
                     "replace": replace,
@@ -244,8 +257,7 @@ class DataClient:
                 "data": data,
             }
         )
-        return await self.send(peer_addr, request)
-    
+        return await self.send(peerAddr, request)
 
     async def _getStreamData(self, table_uuid: str) -> pd.DataFrame:
         """Get data for a specific stream directly from SQLite database"""
@@ -297,10 +309,9 @@ class DataClient:
             )
 
 
-async def main():
-    peer1 = DataClient("0.0.0.0", 8080)
-    await peer1.start_server()
-    await asyncio.Future() 
+# async def main():
+#     peer2 = DataClient(db_path="./client", db_name="client.db")
+#     await peer2.sendRequest(("localhost", 24602))
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# if __name__ == "__main__":
+#     asyncio.run(main())

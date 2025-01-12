@@ -1,1 +1,1 @@
-from datamanager import DataClient, DataServer
+from satorilib.data.datamanager import DataClient, DataServer

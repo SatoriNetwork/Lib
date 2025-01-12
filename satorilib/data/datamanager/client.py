@@ -145,10 +145,7 @@ class DataClient:
             self.disconnect(connectedPeer)
         info("Disconnected from all peers and stopped server")
 
-    async def connect(
-        self,
-        peerAddr: Tuple[str, int]
-    ) -> Dict:
+    async def connect(self, peerAddr: Tuple[str, int]) -> Dict:
         if peerAddr not in self.connectedServers:
             peerHost, peerPort = peerAddr
             await self.connectToPeer(peerHost, peerPort)
@@ -229,10 +226,14 @@ class DataClient:
 
         if method == "initiate-connection":
             request = Message({"method": method, "id": id})
-
+        elif method == "notify-subscribers":
+            request = Message(
+                {"method": method, "id": id, "params": {"table_uuid": table_uuid}}
+            )
         elif method == "subscribe":
-            request = Message({"method": method, "id": id, "message": f"Subscibe to {table_uuid}"})
-        
+            request = Message(
+                {"method": method, "id": id, "message": f"Subscibe to {table_uuid}"}
+            )
         elif method == "data-in-range" and data is not None:
             if 'from_ts' in data.columns and 'to_ts' in data.columns:
                 fromDate = data['from_ts'].iloc[0]

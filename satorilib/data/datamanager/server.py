@@ -41,7 +41,7 @@ class DataServer:
         peerAddr: Tuple[str, int] = websocket.remote_address
         debug(f"New connection from {peerAddr}")
         self.connectedClients[peerAddr] = self.connectedClients.get(peerAddr, ConnectedPeer(peerAddr, websocket))
-        debug("Connected peers:", self.connectedClients)
+        debug("Connected peers:", self.connectedClients, print=True)
         try:
             async for message in websocket:
                 debug(f"Received request: {message}", print=True)
@@ -122,7 +122,9 @@ class DataServer:
         if request.isSubscription and request.table_uuid is not None:
             self.connectedClients[peerAddr].add_subcription(request.table_uuid)
             return _createResponse("success", f"Subscribed to {request.table_uuid}")
-        
+        elif request.method == 'notify-subscribers':
+            await self.notifySubscribers(request) # TODO : define what should be mentioned for notifying subscribers
+            return _createResponse("success", "Subscribers Notified")
         elif request.method == 'initiate-connection':
             return _createResponse("success", "Connection established")
         
@@ -176,7 +178,6 @@ class DataServer:
                     self.db.deleteTable(request.table_uuid)
                     self.db.createTable(request.table_uuid)
                 success = self.db._dataframeToDatabase(request.table_uuid, data)
-                updated_df = await self._getStreamData(request.table_uuid)
                 return _createResponse("success" if success else "error", (
                         f"Data {'replaced' if request.replace else 'merged'} successfully"
                         if success

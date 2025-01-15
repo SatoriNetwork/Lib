@@ -8,6 +8,18 @@ class TxUtils():
     ''' utility methods for transactions '''
 
     @staticmethod
+    def txhexToTxid(txhex:str) -> str:
+        # Decode the hex string into bytes
+        raw = bytes.fromhex(txhex)
+        # Perform double SHA-256 hash
+        hash1 = hashlib.sha256(raw).digest()
+        hash2 = hashlib.sha256(hash1).digest()
+        # Convert to little-endian format for the txid
+        txid = hash2[::-1].hex()
+        return txid
+
+
+    @staticmethod
     def estimatedFee(inputCount: int = 0, outputCount: int = 0, feeRate: int = 150000) -> int:
         '''
         0.00150000 rvn per item as simple over-estimate

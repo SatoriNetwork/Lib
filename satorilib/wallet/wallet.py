@@ -185,11 +185,11 @@ class Wallet(WalletBase):
         self.watchAssets = ['SATORI'] if watchAssets is None else watchAssets
         # at $100 SATORI this is 1 penny (for evr tx fee)
         self.mundoFee = 0.0001
-        # at $100 SATORI this is 5 dollars (for eth gas fee)
-        self.bridgeFee: float = 0.05
+        # at $100 SATORI this is 1 dollar (for risk and gas fees), by BurnBridge
+        self.bridgeFee: float = 0.01
         self.bridgeAddress: str = 'EUqCW1WmT6a9Y6RBVhsxY1k4S135RPWCy7'  # TODO finish
-        #self.burnAddress: str = 'ExxxxxxxxxxSatoriBridgeBurnAddress'  # valid?
-        self.burnAddress: str = 'EL1BS6HmwY1KoeqBokKjUMcWbWsn5kamGv'
+        self.burnAddress: str = 'EXBurnMintXXXXXXXXXXXXXXXXXXXbdK5E'  # real
+        #self.burnAddress: str = 'EL1BS6HmwY1KoeqBokKjUMcWbWsn5kamGv' # testing
         self.isTestnet = isTestnet
         self.password = password
         self.walletPath = walletPath

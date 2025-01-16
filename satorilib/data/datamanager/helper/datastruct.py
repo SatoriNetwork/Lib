@@ -147,6 +147,11 @@ class Message:
         return self.params.get('to_ts')
 
     @property
+    def subscriptionList(self) -> bool:
+        """ server will indicate with True or False """
+        return self.message.get('subscription-list')
+
+    @property
     def data(self) -> any:
         """Get the data"""
         return self.message.get('data')
@@ -165,3 +170,4 @@ class Message:
     def isResponse(self) -> bool:
         """ server will indicate with True or False """
         return not self.isSubscription
+    

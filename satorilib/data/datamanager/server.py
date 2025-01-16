@@ -99,12 +99,8 @@ class DataServer:
         message: str,
     ) -> Dict:
         request: Message = Message(json.loads(message))
-        # TODO: need an endpoint to notify subscribers
-        # neuron-dataClient, raw data -> dataClient --ws-> datamanager.dataServer
-        #self.notifySubscribers(request)
 
-        # func(status, id, msg) -> dict{}
-        def _createResponse( status: str, message: str, data: Optional[str] = None) -> Dict:
+        def _createResponse( status: str, message: str, data: Optional[str] = None, subscription_list: list=None) -> Dict:
             response = {
                 "status": status,
                 "id": request.id,
@@ -117,13 +113,15 @@ class DataServer:
             }
             if data is not None:
                 response["data"] = data
+            if subscription_list is not None:
+                response["subscription-list"] = subscription_list
             return response
         
         if request.isSubscription and request.table_uuid is not None:
             self.connectedClients[peerAddr].add_subcription(request.table_uuid)
             return _createResponse("success", f"Subscribed to {request.table_uuid}")
         elif request.method == 'subscription-suggestions':
-            return _createResponse("success", "Subscription suggestions processed successfully.", list)
+            return _createResponse("success", "Subscription suggestions processed successfully.", subscription_list=list)
         elif request.method == 'notify-subscribers':
             await self.notifySubscribers(request) # TODO : define what should be mentioned for notifying subscribers
             return _createResponse("success", "Subscribers Notified", request.data)

@@ -3,7 +3,7 @@
 ---
 refactor and test
 ---
-create endpoint for the DataManager's DataClient to notify the DataManager's DataServer that it is it's special DataCleint and needs to know what to subscribe to when it's 
+create endpoint for the DataManager's DataClient to notify the DataManager's DataServer that it is it's special DataClient and needs to know what to subscribe to when it's ( Done )
 ---
 create a server - rendezvous server
 ---

@@ -80,6 +80,13 @@ class DataClient:
             subscription = self.findSubscription(
                 subscription=Subscription(message.method, message.table_uuid)
             )
+            if message.data is not None:
+                try:
+                    df = pd.read_json(StringIO(message.data), orient='split')
+                    # self.db._dataframeToDatabase(message.table_uuid, df)
+                    debug(f"Received and stored subscription data for {message.table_uuid}")
+                except Exception as e:
+                    error(f"Error processing subscription data: {e}")
             q = self.subscriptions.get(subscription)
             if isinstance(q, queue.Queue):
                 q.put(message)
@@ -227,6 +234,10 @@ class DataClient:
         if method == "initiate-connection":
             request = Message({"method": method, "id": id})
         # TODO: might need to change this endpoint to be something more like "save this data (and of course pass it on to any subscribers of this data)"
+        elif method == "subscription-suggestions":
+            request = Message(
+                {"method": method, "id": id}
+            )
         elif method == "notify-subscribers":
             request = Message(
                 {"method": method, "id": id, "params": {"table_uuid": table_uuid}, "data": data}

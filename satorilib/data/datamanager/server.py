@@ -122,9 +122,11 @@ class DataServer:
         if request.isSubscription and request.table_uuid is not None:
             self.connectedClients[peerAddr].add_subcription(request.table_uuid)
             return _createResponse("success", f"Subscribed to {request.table_uuid}")
+        elif request.method == 'subscription-suggestions':
+            return _createResponse("success", "Subscription suggestions processed successfully.", list)
         elif request.method == 'notify-subscribers':
             await self.notifySubscribers(request) # TODO : define what should be mentioned for notifying subscribers
-            return _createResponse("success", "Subscribers Notified")
+            return _createResponse("success", "Subscribers Notified", request.data)
         elif request.method == 'initiate-connection':
             return _createResponse("success", "Connection established")
         

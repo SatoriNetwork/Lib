@@ -226,9 +226,10 @@ class DataClient:
 
         if method == "initiate-connection":
             request = Message({"method": method, "id": id})
+        # TODO: might need to change this endpoint to be something more like "save this data (and of course pass it on to any subscribers of this data)"
         elif method == "notify-subscribers":
             request = Message(
-                {"method": method, "id": id, "params": {"table_uuid": table_uuid}}
+                {"method": method, "id": id, "params": {"table_uuid": table_uuid}, "data": data}
             )
         elif method == "subscribe":
             request = Message(

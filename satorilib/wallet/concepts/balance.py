@@ -45,9 +45,9 @@ class Balance():
     def __lt__(self, other):
         if isinstance(other, Balance):
             return self.total < other.total
-        elif isinstance(other, int):  # Handle comparison with numbers
+        elif isinstance(other, int):  # Handle comparison to presumed Sats
             return self.total < other
-        elif isinstance(other, float):  # Handle comparison with numbers
+        elif isinstance(other, float):  # Handle comparison to presumed Amounts
             return self.amount < other
         return NotImplemented
 

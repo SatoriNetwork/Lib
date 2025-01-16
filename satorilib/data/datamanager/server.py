@@ -29,12 +29,12 @@ class DataServer:
         self.db = SqliteDatabase(db_path, db_name)
         self.db.importFromDataFolder()  # can be disabled if new rows are added to the Database and new rows recieved are inside the database
 
-    async def start_server(self):
+    async def startServer(self):
         """Start the WebSocket server"""
         self.server = await websockets.serve(
             self.handleConnection, self.host, self.port
         )
-        print(f"Server started on ws://{self.host}:{self.port}")
+        info(f"Server started on ws://{self.host}:{self.port}")
 
     async def handleConnection(self, websocket: websockets.WebSocketServerProtocol):
         """Handle incoming connections and messages"""
@@ -256,7 +256,7 @@ class DataServer:
 
 async def main():
     peer1 = DataServer("0.0.0.0", 8080)
-    await peer1.start_server()
+    await peer1.startServer()
     await asyncio.Future()  
 
 if __name__ == "__main__":

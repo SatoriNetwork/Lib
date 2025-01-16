@@ -1931,14 +1931,14 @@ class Wallet(WalletBase):
         if isinstance(amount, Decimal):
             amount = float(amount)
         if amount <= 0:
-            return False, False, f'Satori Bridge Transaction bad params: unable to send amount: {amount}'
-        if amount > self.balance:
-            return False, False, 'Satori Bridge Transaction bad params: amount > balance '
+            return False, False, f'Satori Transaction bad params: unable to send amount: {amount}'
+        if amount > self.balance.amount:
+            return False, False, f'Satori Transaction bad params: {amount} > {self.balance.amount} '
         if not Validate.address(address, self.symbol):
-            return False, False, f'Satori Bridge Transaction bad params: eth address: {address}'
+            return False, False, f'Satori Transaction bad params: address: {address}'
         if self.currency < self.reserve:
-            #if amount > self.balance + self.mundoFee:
-            #    return False, False, 'not enough for mundo transaction'
+            if amount > self.balance.amount + self.mundoFee:
+                return False, False, f'Satori Transaction bad params: not enough for transaction fees: {amount} > {self.balance.amount} + {self.mundoFee}'
             return False, True, 'currency < reserve'
         return True, False, ''
 

@@ -16,15 +16,10 @@ from satorilib.data.datamanager.helper import Message, ConnectedPeer, Subscripti
 class DataClient:
     def __init__(
         self,
-        host: str = None,
-        port: int = None,
         db_path: str = "../../data",
         db_name: str = "data.db",
         server: Union[DataServer, None] = None,
     ):
-
-        self.host = host
-        self.port = port
         self.server = server
         self.connectedServers: Dict[Tuple[str, int], ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
@@ -56,6 +51,8 @@ class DataClient:
         async def listen():
             try:
                 response = Message(json.loads(await peer.websocket.recv()))
+                debug("response", print=True)
+                debug(response.to_dict(), print=True)
                 await self.handleMessage(response)
             except websockets.exceptions.ConnectionClosed:
                 self.disconnect(peer)
@@ -73,7 +70,7 @@ class DataClient:
     def _generateCallId() -> str:
         return str(time.time())
 
-    async def handleMessage(self, message: Message) -> None:
+    async def handleMessage(self, message: Message):
         if message.isSubscription:
             if self.server is not None:
                 self.server.notifySubscribers(message)

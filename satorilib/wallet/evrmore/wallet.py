@@ -215,15 +215,6 @@ class EvrmoreWallet(Wallet):
     def _compileSatoriOutputs(self, satsByAddress: dict[str, int] = None) -> list:
         txouts = []
         for address, sats in satsByAddress.items():
-            #if address.startswith('e'):
-            #    script_pubkey = P2SHEvrmoreAddress(address).to_scriptPubKey()
-            #if address.startswith('E'):
-            #    script_pubkey = P2PKHEvrmoreAddress(address).to_scriptPubKey()
-            #    script_pubkey = CScript([
-            #        OP_HASH160,
-            #        TxUtils.addressToH160Bytes(address),
-            #        OP_EQUALVERIFY,
-            #        OP_CHECKSIG])
             txout = CMutableTxOut(
                 0,
                 CScript([
@@ -234,17 +225,6 @@ class EvrmoreWallet(Wallet):
                         TxUtils.padHexStringTo8Bytes(
                             TxUtils.intToLittleEndianHex(sats))),
                     OP_DROP]))
-            #txout = CMutableTxOut(
-            #    0,
-            #    CScript([
-            #        OP_DUP, OP_HASH160,
-            #        TxUtils.addressToH160Bytes(address),
-            #        OP_EQUALVERIFY, OP_CHECKSIG, OP_EVR_ASSET,
-            #        bytes.fromhex(
-            #            AssetTransaction.satoriHex(self.symbol) +
-            #            TxUtils.padHexStringTo8Bytes(
-            #                TxUtils.intToLittleEndianHex(sats))),
-            #        OP_DROP]))
             txouts.append(txout)
         return txouts
 
@@ -264,9 +244,6 @@ class EvrmoreWallet(Wallet):
             return CMutableTxOut(
                 0,
                 CScript([
-                    #OP_DUP, OP_HASH160,
-                    #TxUtils.addressToH160Bytes(self.address),
-                    #OP_EQUALVERIFY, OP_CHECKSIG,
                     *CEvrmoreAddress(self.address).to_scriptPubKey(),
                     OP_EVR_ASSET,
                     bytes.fromhex(

@@ -51,8 +51,6 @@ class DataClient:
         async def listen():
             try:
                 response = Message(json.loads(await peer.websocket.recv()))
-                debug("response", print=True)
-                debug(response.to_dict(), print=True)
                 await self.handleMessage(response)
             except websockets.exceptions.ConnectionClosed:
                 self.disconnect(peer)
@@ -70,7 +68,7 @@ class DataClient:
     def _generateCallId() -> str:
         return str(time.time())
 
-    async def handleMessage(self, message: Message):
+    async def handleMessage(self, message: Message) -> None:
         if message.isSubscription:
             if self.server is not None:
                 self.server.notifySubscribers(message)
@@ -169,7 +167,7 @@ class DataClient:
             if sendOnly:
                 return None
             response = await self.listenForResponse(request.id)
-            debug(response, print=True)
+            # debug(response, print=True)
             self.handleResponse(response)
             return response
         except Exception as e:

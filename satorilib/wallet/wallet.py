@@ -188,7 +188,7 @@ class Wallet(WalletBase):
         # at $100 SATORI this is 1 dollar (for risk and gas fees), by BurnBridge
         self.bridgeFee: float = 0.01
         self.bridgeAddress: str = 'EUqCW1WmT6a9Y6RBVhsxY1k4S135RPWCy7'  # TODO finish
-        self.burnAddress: str = 'EXBurnMintXXXXXXXXXXXXXXXXXXXbdK5E'  # real
+        self.burnAddress: str = TxUtils.evrBurnMintAddressMain #'EXBurnMintXXXXXXXXXXXXXXXXXXXbdK5E'  # real
         #self.burnAddress: str = 'EL1BS6HmwY1KoeqBokKjUMcWbWsn5kamGv' # testing
         self.isTestnet = isTestnet
         self.password = password

@@ -1,7 +1,7 @@
 from typing import Union
 import random
 from evrmore import SelectParams
-from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret
+from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret, P2SHEvrmoreAddress
 from evrmore.core.scripteval import VerifyScript, SCRIPT_VERIFY_P2SH
 from evrmore.core.script import CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, OP_EVR_ASSET, OP_DROP, OP_RETURN, SIGHASH_ANYONECANPAY
 from evrmore.core import b2x, lx, COutPoint, CMutableTxOut, CMutableTxIn, CMutableTransaction, Hash160
@@ -13,6 +13,7 @@ from satorilib.wallet.utils.transaction import TxUtils
 from satorilib.wallet.wallet import Wallet
 from satorilib.wallet.evrmore.sign import signMessage
 from satorilib.wallet.evrmore.verify import verify
+
 
 
 class EvrmoreWallet(Wallet):
@@ -214,17 +215,36 @@ class EvrmoreWallet(Wallet):
     def _compileSatoriOutputs(self, satsByAddress: dict[str, int] = None) -> list:
         txouts = []
         for address, sats in satsByAddress.items():
+            #if address.startswith('e'):
+            #    script_pubkey = P2SHEvrmoreAddress(address).to_scriptPubKey()
+            #if address.startswith('E'):
+            #    script_pubkey = P2PKHEvrmoreAddress(address).to_scriptPubKey()
+            #    script_pubkey = CScript([
+            #        OP_HASH160,
+            #        TxUtils.addressToH160Bytes(address),
+            #        OP_EQUALVERIFY,
+            #        OP_CHECKSIG])
             txout = CMutableTxOut(
                 0,
                 CScript([
-                    OP_DUP, OP_HASH160,
-                    TxUtils.addressToH160Bytes(address),
-                    OP_EQUALVERIFY, OP_CHECKSIG, OP_EVR_ASSET,
+                    *CEvrmoreAddress(address).to_scriptPubKey(),
+                    OP_EVR_ASSET,
                     bytes.fromhex(
                         AssetTransaction.satoriHex(self.symbol) +
                         TxUtils.padHexStringTo8Bytes(
                             TxUtils.intToLittleEndianHex(sats))),
                     OP_DROP]))
+            #txout = CMutableTxOut(
+            #    0,
+            #    CScript([
+            #        OP_DUP, OP_HASH160,
+            #        TxUtils.addressToH160Bytes(address),
+            #        OP_EQUALVERIFY, OP_CHECKSIG, OP_EVR_ASSET,
+            #        bytes.fromhex(
+            #            AssetTransaction.satoriHex(self.symbol) +
+            #            TxUtils.padHexStringTo8Bytes(
+            #                TxUtils.intToLittleEndianHex(sats))),
+            #        OP_DROP]))
             txouts.append(txout)
         return txouts
 
@@ -244,9 +264,11 @@ class EvrmoreWallet(Wallet):
             return CMutableTxOut(
                 0,
                 CScript([
-                    OP_DUP, OP_HASH160,
-                    TxUtils.addressToH160Bytes(self.address),
-                    OP_EQUALVERIFY, OP_CHECKSIG, OP_EVR_ASSET,
+                    #OP_DUP, OP_HASH160,
+                    #TxUtils.addressToH160Bytes(self.address),
+                    #OP_EQUALVERIFY, OP_CHECKSIG,
+                    *CEvrmoreAddress(self.address).to_scriptPubKey(),
+                    OP_EVR_ASSET,
                     bytes.fromhex(
                         AssetTransaction.satoriHex(self.symbol) +
                         TxUtils.padHexStringTo8Bytes(
@@ -272,6 +294,7 @@ class EvrmoreWallet(Wallet):
             txout = CMutableTxOut(
                 currencyChange,
                 scriptPubKey or self._addressObj.to_scriptPubKey())
+            # use *CEvrmoreAddress(self.address).to_scriptPubKey()? # supports P2SH automatically
             if returnSats:
                 return txout, currencyChange
             return txout

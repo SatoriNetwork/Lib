@@ -7,6 +7,9 @@ import base58
 class TxUtils():
     ''' utility methods for transactions '''
 
+    evrBurnMintAddressMain: str = 'EXBurnMintXXXXXXXXXXXXXXXXXXXbdK5E'
+    evrBurnMintAddressTest: str = 'n1BurnMintXXXXXXXXXXXXXXXXXXbVTQiY'
+
     @staticmethod
     def txhexToTxid(txhex:str) -> str:
         # Decode the hex string into bytes
@@ -17,7 +20,6 @@ class TxUtils():
         # Convert to little-endian format for the txid
         txid = hash2[::-1].hex()
         return txid
-
 
     @staticmethod
     def estimatedFee(inputCount: int = 0, outputCount: int = 0, feeRate: int = 150000) -> int:

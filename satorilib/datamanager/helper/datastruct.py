@@ -36,7 +36,31 @@ class Subscription:
         if self.shortLivedCallback is None:
             return None
         return self.shortLivedCallback(*args, **kwargs)
-    
+
+class Publication:
+    def __init__(
+        self,
+        method: str,
+        tableuuid: Union[list, None] = None,
+        callback: Union[callable, None] = None
+    ):
+        self.method = method
+        self.tableuuid = tableuuid
+        self.shortLivedCallback = callback
+
+    def __hash__(self):
+        return hash((self.method, self.tableuuid))
+
+    def __eq__(self, other):
+        if isinstance(other, Subscription):
+            return self.method == other.method and self.tableuuid == other.tableuuid
+        return False
+
+    def __call__(self, *args, **kwargs):
+       
+        if self.shortLivedCallback is None:
+            return None
+        return self.shortLivedCallback(*args, **kwargs)
 
 class ConnectedPeer:
 

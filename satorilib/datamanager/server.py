@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional, Union, Tuple, Set
 from io import StringIO
 from satorilib.logging import INFO, setup, debug, info, warning, error
 from satorilib.sqlite import SqliteDatabase
-from satorilib.datamanager.helper import Message, ConnectedPeer, Subscription
+from satorilib.datamanager.helper import Message, ConnectedPeer, Subscription, Publication
 
 
 class DataServer:
@@ -24,6 +24,8 @@ class DataServer:
         self.server = None
         self.connectedClients: Dict[Tuple[str, int], ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
+        self.Publications: dict[Publication, queue.Queue] = {}
+        self.responses: dict[str, Message] = {}
         self.responses: dict[str, dict] = {}
         self.db = SqliteDatabase(db_path, db_name)
         self.db.importFromDataFolder()  # can be disabled if new rows are added to the Database and new rows recieved are inside the database
@@ -126,6 +128,31 @@ class DataServer:
             return _createResponse("success", "Subscribers Notified", request.data)
         elif request.method == 'initiate-connection':
             return _createResponse("success", "Connection established")
+        elif request.method == 'subscribers-list':
+            if request.data:
+                try:
+                    sub_list = json.loads(request.data) if isinstance(request.data, str) else request.data
+                    for sub_data in sub_list:
+                        subscription = Subscription(request.method, request.table_uuid)
+                        self.subscriptions[subscription] = queue.Queue()
+                        debug(f"Stored subscription: {subscription}, Data: {sub_data}")
+                    return _createResponse("success", f"Stored {len(sub_list)} subscriptions", request.data)
+                except Exception as e:
+                    error(f"Error storing subscriptions: {e}")
+                    return _createResponse("error", "Failed to store subscriptions")
+
+        elif request.method == 'publishers-list':
+            if request.data:
+                try:
+                    pub_list = json.loads(request.data) if isinstance(request.data, str) else request.data
+                    for pub_data in pub_list:
+                        publication = Publication(request.method, request.table_uuid)
+                        self.Publications[publication] = queue.Queue()
+                        debug(f"Stored publication: {publication}, Data: {pub_data}")
+                    return _createResponse("success", f"Stored {len(pub_list)} publications", request.data)
+                except Exception as e:
+                    error(f"Error storing publications: {e}")
+                    return _createResponse("error", "Failed to store publications")
         
         if request.table_uuid is None:
             return _createResponse("error", "Missing table_uuid parameter")

@@ -8,8 +8,7 @@ from typing import Dict, Any, Optional, Union, Tuple, Set
 from io import StringIO
 from satorilib.logging import INFO, setup, debug, info, warning, error
 from satorilib.datamanager.server import DataServer
-from satorilib.datamanager.helper import Message, ConnectedPeer, Subscription
-
+from satorilib.datamanager.helper import Message, ConnectedPeer, Subscription, Publication
 
 class DataClient:
     def __init__(
@@ -19,6 +18,7 @@ class DataClient:
         self.otherServers = otherServer
         self.connectedServer: Dict[Tuple[str, int], ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
+        self.Publications: dict[Publication, queue.Queue] = {}
         self.responses: dict[str, Message] = {}
 
     async def connectToServer(self, peerHost: str, peerPort: int):
@@ -81,6 +81,7 @@ class DataClient:
             if isinstance(q, queue.Queue):
                 q.put(message)
             subscription(message)
+            debug("Current subscriptions:", self.subscriptions)
             info("Subscribed to : ", message.table_uuid)
         elif message.isResponse:
             self.responses[message.id] = message
@@ -221,7 +222,14 @@ class DataClient:
             request = Message(
                 {"method": method, "id": id}
             )
-        # TODO : make an endpoint for publishing observation
+        elif method == "publishers-list":
+            request = Message(
+                {"method": method, "id": id, "params": {"table_uuid": table_uuid}, "data": data}
+            )
+        elif method == "subscribers-list":
+            request = Message(
+                {"method": method, "id": id, "params": {"table_uuid": table_uuid}, "data": data}
+            )
         elif method == "notify-subscribers":
             request = Message(
                 {"method": method, "id": id, "params": {"table_uuid": table_uuid}, "data": data}

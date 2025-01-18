@@ -664,7 +664,7 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/set/eth/address',
-                payload=json.dumps({'ethAddress': ethAddress}))
+                payload=json.dumps({'ethaddress': ethAddress}))
             return response.status_code < 400, response.json()
         except Exception as e:
             logging.warning(

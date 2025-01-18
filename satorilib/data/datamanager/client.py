@@ -16,26 +16,23 @@ from satorilib.data.datamanager.helper import Message, ConnectedPeer, Subscripti
 class DataClient:
     def __init__(
         self,
-        db_path: str = "../../data",
-        db_name: str = "data.db",
-        server: Union[DataServer, None] = None,
+        otherServer: Union[DataServer, None] = None,
     ):
-        self.server = server
-        self.connectedServers: Dict[Tuple[str, int], ConnectedPeer] = {}
+        self.otherServers = otherServer
+        self.connectedServer: Dict[Tuple[str, int], ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
         self.responses: dict[str, Message] = {}
-        self.db = SqliteDatabase(db_path, db_name)
 
-    async def connectToPeer(self, peerHost: str, peerPort: int):
-        """Connect to another peer"""
+    async def connectToServer(self, peerHost: str, peerPort: int):
+        """Connect to our own Server"""
         uri = f"ws://{peerHost}:{peerPort}"
         try:
             websocket = await websockets.connect(uri)
-            self.connectedServers[(peerHost, peerPort)] = ConnectedPeer(
+            self.connectedServer[(peerHost, peerPort)] = ConnectedPeer(
                 (peerHost, peerPort), websocket
             )
             asyncio.create_task(
-                self.listenToPeer(self.connectedServers[(peerHost, peerPort)])
+                self.listenToPeer(self.connectedServer[(peerHost, peerPort)])
             )
             debug(f"Connected to peer at {uri}", print=True)
         except Exception as e:
@@ -70,16 +67,16 @@ class DataClient:
 
     async def handleMessage(self, message: Message) -> None:
         if message.isSubscription:
-            if self.server is not None:
-                self.server.notifySubscribers(message)
+            if self.otherServers is not None:
+                self.otherServers.notifySubscribers(message)
             subscription = self.findSubscription(
                 subscription=Subscription(message.method, message.table_uuid)
             )
             if message.data is not None:
                 try:
                     df = pd.read_json(StringIO(message.data), orient='split')
-                    # self.db._dataframeToDatabase(message.table_uuid, df)
-                    debug(f"Received and stored subscription data for {message.table_uuid}")
+                    # TODO : send observation to server to save in database
+                    debug(f"Received and send subscription data to Data Manager for {message.table_uuid}")
                 except Exception as e:
                     error(f"Error processing subscription data: {e}")
             q = self.subscriptions.get(subscription)
@@ -103,7 +100,6 @@ class DataClient:
                 del self.responses[callId]
                 self.cleanUpResponses()
                 return response
-            # time.sleep(1)
             await asyncio.sleep(0.1)
         return None
 
@@ -123,18 +119,14 @@ class DataClient:
         for key in keysToDelete:
             del self.responses[key]
 
-    def handleResponse(self, response: Message) -> None:
-        if response.status == "success" and response.data is not None:
-            try:
-                df = pd.read_json(StringIO(response.data), orient='split')
-                if response.method in ["record-at-or-before", "data-in-range"]:
-                    self.db.deleteTable(response.table_uuid)
-                    self.db.createTable(response.table_uuid)
-                self.db._dataframeToDatabase(response.table_uuid, df)
-                info(f"\nData saved to database: {self.db.dbname}")
-                debug(f"Table name: {response.table_uuid}")
-            except Exception as e:
-                error(f"Database error: {e}")
+    # def handleResponse(self, response: Message) -> None:
+    #     if response.status == "success" and response.data is not None:
+    #         try:
+    #             df = pd.read_json(StringIO(response.data), orient='split')
+    #             # TODO : 
+    #             debug(f"Table name: {response.table_uuid}")
+    #         except Exception as e:
+    #             error(f"Database error: {e}")
 
     async def disconnect(self, peer: ConnectedPeer) -> None:
         peer.stop.set()
@@ -143,14 +135,14 @@ class DataClient:
 
     async def disconnectAll(self):
         """Disconnect from all peers and stop the server"""
-        for connectedPeer in self.connectedServers.values():
+        for connectedPeer in self.connectedServer.values():
             self.disconnect(connectedPeer)
         info("Disconnected from all peers and stopped server")
 
     async def connect(self, peerAddr: Tuple[str, int]) -> Dict:
-        if peerAddr not in self.connectedServers:
+        if peerAddr not in self.connectedServer:
             peerHost, peerPort = peerAddr
-            await self.connectToPeer(peerHost, peerPort)
+            await self.connectToServer(peerHost, peerPort)
 
     async def send(
         self,
@@ -163,12 +155,10 @@ class DataClient:
         # debug(request.to_dict(), print=True)
         await self.connect(peerAddr)
         try:
-            await self.connectedServers[peerAddr].websocket.send(request.to_json())
+            await self.connectedServer[peerAddr].websocket.send(request.to_json())
             if sendOnly:
                 return None
             response = await self.listenForResponse(request.id)
-            # debug(response, print=True)
-            self.handleResponse(response)
             return response
         except Exception as e:
             error(f"Error sending request to peer: {e}")
@@ -229,7 +219,7 @@ class DataClient:
         if method == "initiate-connection":
             request = Message({"method": method, "id": id})
         # TODO: might need to change this endpoint to be something more like "save this data (and of course pass it on to any subscribers of this data)"
-        elif method == "subscription-suggestions":
+        elif method == "subscription-suggestions": # TODO : 
             request = Message(
                 {"method": method, "id": id}
             )
@@ -237,10 +227,10 @@ class DataClient:
             request = Message(
                 {"method": method, "id": id, "params": {"table_uuid": table_uuid}, "data": data}
             )
-        elif method == "subscribe":
-            request = Message(
-                {"method": method, "id": id, "message": f"Subscibe to {table_uuid}"}
-            )
+        # elif method == "subscribe":
+        #     request = Message(
+        #         {"method": method, "id": id, "message": f"Subscibe to {table_uuid}"}
+        #     )
         elif method == "data-in-range" and data is not None:
             if 'from_ts' in data.columns and 'to_ts' in data.columns:
                 fromDate = data['from_ts'].iloc[0]
@@ -276,52 +266,3 @@ class DataClient:
             }
         )
         return await self.send(peerAddr, request)
-
-    async def _getStreamData(self, table_uuid: str) -> pd.DataFrame:
-        """Get data for a specific stream directly from SQLite database"""
-        try:
-            df = self.db._databasetoDataframe(table_uuid)
-            if df is None or df.empty:
-                debug("No data available to send")
-                return pd.DataFrame()
-            return df
-        except Exception as e:
-            error(f"Error getting data for stream {table_uuid}: {e}")
-
-    async def _getStreamDataByDateRange(
-        self, table_uuid: str, from_date: str, to_date: str
-    ) -> pd.DataFrame:
-        """Get stream data within a specific date range (inclusive)"""
-        try:
-            df = self.db._databasetoDataframe(table_uuid)
-            if df is None or df.empty:
-                debug("No data available to send")
-                return pd.DataFrame()
-            from_ts = pd.to_datetime(from_date)
-            to_ts = pd.to_datetime(to_date)
-            df['ts'] = pd.to_datetime(df['ts'])
-            filtered_df = df[(df['ts'] >= from_ts) & (df['ts'] <= to_ts)]
-            return filtered_df if not filtered_df.empty else pd.DataFrame()
-        except Exception as e:
-            error(f"Error getting data for stream {table_uuid} in date range: {e}")
-
-    async def _getLastRecordBeforeTimestamp(
-        self, table_uuid: str, timestamp: str
-    ) -> pd.DataFrame:
-        """Get the last record before the specified timestamp (inclusive)"""
-        try:
-            df = self.db._databasetoDataframe(table_uuid)
-            if df is None or df.empty:
-                return pd.DataFrame()
-            ts = pd.to_datetime(timestamp)
-            df['ts'] = pd.to_datetime(df['ts'])
-            if not df.loc[df['ts'] == ts].empty:  # First check for exact match
-                return df.loc[df['ts'] == ts]
-            before_ts = df.loc[
-                df['ts'] < ts
-            ]  # check for timestamp before specified timestamp
-            return before_ts.iloc[[-1]] if not before_ts.empty else pd.DataFrame()
-        except Exception as e:
-            error(
-                f"Error getting last record before timestamp for stream {table_uuid}: {e}"
-            )

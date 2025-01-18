@@ -15,7 +15,7 @@ integrate with neuron-dataClient
 - put a DataClient singleton object in the neuron
   - during the startup process in init.py (StartupDag singleton) instanteate a DataClient
 - connect to our DataServer on startup
-- stay connected/reconnect on disconnect to our own DataServer
+- stay connected/reconnect on disconnect to our own DataServer        # TODO : reconnect stuff
 - tell DataServer the streams of our subscriptions and publications (that we got from checkin)
 - tell DataServer the peers of our subscriptions (who publishes, and who subscribes to the data we want) (we get this from "rendezvous" call) 
   - payload: {table_uuid: [publisher ip, random subscirber ip, random subscirber ip, ...]}

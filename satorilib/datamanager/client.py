@@ -121,7 +121,7 @@ class DataClient:
     #     if response.status == "success" and response.data is not None:
     #         try:
     #             df = pd.read_json(StringIO(response.data), orient='split')
-    #             # TODO : 
+    #             # TODO : maybe we need to handle response to send data server?
     #             debug(f"Table name: {response.table_uuid}")
     #         except Exception as e:
     #             error(f"Database error: {e}")
@@ -180,7 +180,7 @@ class DataClient:
         toDate: str = None,
     ) -> Dict:
         """
-        Creates a subscription for a given method and table_uuid with an optional callback.
+        Creates a subscription request
         """
         id = self._generateCallId()
         subscription = Subscription(method, table_uuid, callback=callback)
@@ -189,7 +189,7 @@ class DataClient:
             {
                 "method": method,
                 "id": id,
-                "sub": True,
+                "sub": False,
                 "params": {
                     "table_uuid": table_uuid,
                     "replace": replace,
@@ -217,18 +217,15 @@ class DataClient:
         if method == "initiate-connection":
             request = Message({"method": method, "id": id})
         # TODO: might need to change this endpoint to be something more like "save this data (and of course pass it on to any subscribers of this data)"
-        elif method == "subscription-suggestions": # TODO : 
+        elif method == "subscription-suggestions": # TODO : the response should be a list of subscriptions
             request = Message(
                 {"method": method, "id": id}
             )
+        # TODO : make an endpoint for publishing observation
         elif method == "notify-subscribers":
             request = Message(
                 {"method": method, "id": id, "params": {"table_uuid": table_uuid}, "data": data}
             )
-        # elif method == "subscribe":
-        #     request = Message(
-        #         {"method": method, "id": id, "message": f"Subscibe to {table_uuid}"}
-        #     )
         elif method == "data-in-range" and data is not None:
             if 'from_ts' in data.columns and 'to_ts' in data.columns:
                 fromDate = data['from_ts'].iloc[0]

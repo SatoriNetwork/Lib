@@ -8,15 +8,15 @@ create endpoint for the DataManager's DataClient to notify the DataManager's Dat
 create rendevous endpoint - Jordan
 ---
 create DataManager startup process - it's a separate process, starts up before the Neuron
-- run DataManager app in the background before neuron starts                  # TODO : inside start.sh data.py should run as a background process
-- create DataServer object and listen for instructions forever (data.py)
+- subscriptionsinside start.sh data.py should run as a background process
+- create DataServer object and listen for instructions forever (data.py) ( Done )
 --- 
 integrate with neuron-dataClient
-- put a DataClient singleton object in the neuron
-  - during the startup process in init.py (StartupDag singleton) instanteate a DataClient
-- connect to our DataServer on startup
+- put a DataClient singleton object in the neuron ( Done )
+  - during the startup process in init.py (StartupDag singleton) instanteate a DataClient ( Done )
+- connect to our DataServer on startup ( Done )
 - stay connected/reconnect on disconnect to our own DataServer        # TODO : reconnect stuff
-- tell DataServer the streams of our subscriptions and publications (that we got from checkin)
+- tell DataServer the streams of our subscriptions and publications (that we got from checkin) ( Done )
 - tell DataServer the peers of our subscriptions (who publishes, and who subscribes to the data we want) (we get this from "rendezvous" call) 
   - payload: {table_uuid: [publisher ip, random subscirber ip, random subscirber ip, ...]}
 - subscribe to our own list of subscriptions and publications for UI 

@@ -3,11 +3,16 @@ import websockets
 import json
 import queue
 import pandas as pd
-from typing import Dict, Any, Optional, Union, Tuple, Set
+from typing import Dict, Any, Optional, Union, Tuple, Set, List
 from io import StringIO
 from satorilib.logging import INFO, setup, debug, info, warning, error
 from satorilib.sqlite import SqliteDatabase
-from satorilib.datamanager.helper import Message, ConnectedPeer, Subscription, Publication
+from satorilib.datamanager.helper import (
+    Message,
+    ConnectedPeer,
+    Subscription,
+    PeerInfo
+)
 
 
 class DataServer:
@@ -22,11 +27,11 @@ class DataServer:
         self.host = host
         self.port = port
         self.server = None
-        self.connectedClients: Dict[Tuple[str, int], ConnectedPeer] = {}
+        self.connectedClients: dict[Tuple[str, int], ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
-        self.Publications: dict[Publication, queue.Queue] = {}
+        self.subscriptionsList: dict[str, PeerInfo] = {}
+        self.publicationsList: dict[str, PeerInfo] = {}
         self.responses: dict[str, Message] = {}
-        self.responses: dict[str, dict] = {}
         self.db = SqliteDatabase(db_path, db_name)
         self.db.importFromDataFolder()  # can be disabled if new rows are added to the Database and new rows recieved are inside the database
 
@@ -41,13 +46,25 @@ class DataServer:
         """Handle incoming connections and messages"""
         peerAddr: Tuple[str, int] = websocket.remote_address
         debug(f"New connection from {peerAddr}")
-        self.connectedClients[peerAddr] = self.connectedClients.get(peerAddr, ConnectedPeer(peerAddr, websocket))
+        self.connectedClients[peerAddr] = self.connectedClients.get(
+            peerAddr, ConnectedPeer(peerAddr, websocket)
+        )
         debug("Connected peers:", self.connectedClients, print=True)
         try:
             async for message in websocket:
                 debug(f"Received request: {message}", print=True)
                 try:
                     response = await self.handleRequest(peerAddr, websocket, message)
+                    debug(
+                        "length of subscriptions list:",
+                        len(self.subscriptionsList),
+                        print=True,
+                    )
+                    debug(
+                        "length of publications list:",
+                        len(self.publicationsList),
+                        print=True,
+                    )
                     await self.connectedClients[peerAddr].websocket.send(
                         json.dumps(response)
                     )
@@ -79,8 +96,8 @@ class DataServer:
         if yes, await self.connected_peers[subscribig_peer].websocket.send(message)
         '''
         for peerAddr in self.connectedClients.values():
-           if msg.table_uuid in self.connectedClients[peerAddr].subscriptions:
-               await self.connectedClients[peerAddr].websocket.send(msg.to_json())
+            if msg.table_uuid in self.connectedClients[peerAddr].subscriptions:
+                await self.connectedClients[peerAddr].websocket.send(msg.to_json())
 
     async def disconnectAllPeers(self):
         """Disconnect from all peers and stop the server"""
@@ -92,7 +109,6 @@ class DataServer:
             await self.server.wait_closed()
         info("Disconnected from all peers and stopped server")
 
-    
     async def handleRequest(
         self,
         peerAddr: Tuple[str, int],
@@ -101,81 +117,91 @@ class DataServer:
     ) -> Dict:
         request: Message = Message(json.loads(message))
 
-        def _createResponse( status: str, message: str, data: Optional[str] = None, subscription_list: list=None) -> Dict:
+        def _createResponse(
+            status: str,
+            message: str,
+            data: Optional[str] = None,
+            subscription_list: list = None,
+        ) -> Dict:
             response = {
                 "status": status,
                 "id": request.id,
-                "method":request.method,
+                "method": request.method,
                 "message": message,
                 "params": {
-                "table_uuid": request.table_uuid,
+                    "table_uuid": request.table_uuid,
                 },
-                "sub": request.sub
+                "sub": request.sub,
             }
             if data is not None:
                 response["data"] = data
             if subscription_list is not None:
                 response["subscription-list"] = subscription_list
             return response
-        
+
         if request.isSubscription and request.table_uuid is not None:
             self.connectedClients[peerAddr].add_subcription(request.table_uuid)
-            return _createResponse("success", f"Subscribed to {request.table_uuid}")
+            return _createResponse(
+                "success", f"Observation recieved for {request.table_uuid}"
+            )
         elif request.method == 'subscription-suggestions':
-            return _createResponse("success", "Subscription suggestions processed successfully.", subscription_list=list)
+            # TODO : logic for providing subscriptions suggestions
+            return _createResponse(
+                "success",
+                "Subscription suggestions processed successfully.",
+                subscription_list=list,
+            )
         elif request.method == 'notify-subscribers':
-            await self.notifySubscribers(request) # TODO : define what should be mentioned for notifying subscribers
+            await self.notifySubscribers(request)
             return _createResponse("success", "Subscribers Notified", request.data)
         elif request.method == 'initiate-connection':
             return _createResponse("success", "Connection established")
         elif request.method == 'subscribers-list':
-            if request.data:
-                try:
-                    sub_list = json.loads(request.data) if isinstance(request.data, str) else request.data
-                    for sub_data in sub_list:
-                        subscription = Subscription(request.method, request.table_uuid)
-                        self.subscriptions[subscription] = queue.Queue()
-                        debug(f"Stored subscription: {subscription}, Data: {sub_data}")
-                    return _createResponse("success", f"Stored {len(sub_list)} subscriptions", request.data)
-                except Exception as e:
-                    error(f"Error storing subscriptions: {e}")
-                    return _createResponse("error", "Failed to store subscriptions")
-
+            for table_uuid, data_dict in request.table_uuid.items():
+                self.subscriptionsList[table_uuid] = PeerInfo(data_dict['subscribers'], data_dict['publishers'])
+            return _createResponse("success", "Subscriber list added in Server")
         elif request.method == 'publishers-list':
-            if request.data:
-                try:
-                    pub_list = json.loads(request.data) if isinstance(request.data, str) else request.data
-                    for pub_data in pub_list:
-                        publication = Publication(request.method, request.table_uuid)
-                        self.Publications[publication] = queue.Queue()
-                        debug(f"Stored publication: {publication}, Data: {pub_data}")
-                    return _createResponse("success", f"Stored {len(pub_list)} publications", request.data)
-                except Exception as e:
-                    error(f"Error storing publications: {e}")
-                    return _createResponse("error", "Failed to store publications")
-        
+            for table_uuid, data_dict in request.table_uuid.items():
+                self.publicationsList[table_uuid] = PeerInfo(data_dict['subscribers'], data_dict['publishers'])
+            return _createResponse("success", "publication list added in Server")
+
         if request.table_uuid is None:
             return _createResponse("error", "Missing table_uuid parameter")
 
         if request.method == 'stream_data':
             df = await self._getStreamData(request.table_uuid)
             if df is None:
-                return _createResponse("error", f"No data found for stream {request.table_uuid}")
-            return _createResponse("success", f" data found for stream {request.table_uuid}", df.to_json(orient='split')) 
+                return _createResponse(
+                    "error", f"No data found for stream {request.table_uuid}"
+                )
+            return _createResponse(
+                "success",
+                f" data found for stream {request.table_uuid}",
+                df.to_json(orient='split'),
+            )
 
         elif request.method == 'data-in-range':
             if not request.fromDate or not request.toDate:
-                return _createResponse("error", "Missing from_date or to_date parameter")  
-            
+                return _createResponse(
+                    "error", "Missing from_date or to_date parameter"
+                )
+
             df = await self._getStreamDataByDateRange(
                 request.table_uuid, request.fromDate, request.toDate
             )
             if df is None:
-                return _createResponse("error", f"No data found for stream {request.table_uuid} in specified date range")
+                return _createResponse(
+                    "error",
+                    f"No data found for stream {request.table_uuid} in specified date range",
+                )
 
             if 'ts' in df.columns:
                 df['ts'] = df['ts'].astype(str)
-            return _createResponse("success", f" data found for stream {request.table_uuid} in specified date range",df.to_json(orient='split'))
+            return _createResponse(
+                "success",
+                f" data found for stream {request.table_uuid} in specified date range",
+                df.to_json(orient='split'),
+            )
 
         elif request.method == 'record-at-or-before':
             try:
@@ -187,31 +213,45 @@ class DataServer:
                     request.table_uuid, timestamp
                 )
                 if df is None:
-                    return _createResponse("error", f"No records found before timestamp for stream {request.table_uuid}")
+                    return _createResponse(
+                        "error",
+                        f"No records found before timestamp for stream {request.table_uuid}",
+                    )
 
                 if 'ts' in df.columns:
                     df['ts'] = df['ts'].astype(str)
-                return _createResponse("success", f" records found before timestamp for stream {request.table_uuid}",df.to_json(orient='split'))
+                return _createResponse(
+                    "success",
+                    f" records found before timestamp for stream {request.table_uuid}",
+                    df.to_json(orient='split'),
+                )
             except Exception as e:
-                return _createResponse("error", f"Error processing timestamp request: {str(e)}") 
+                return _createResponse(
+                    "error", f"Error processing timestamp request: {str(e)}"
+                )
 
         elif request.method == 'insert':
             try:
                 if request.data is None:
-                    return _createResponse("error", "No data provided for insert operation")
+                    return _createResponse(
+                        "error", "No data provided for insert operation"
+                    )
                 data = pd.read_json(StringIO(request.data), orient='split')
                 if request.replace:
                     self.db.deleteTable(request.table_uuid)
                     self.db.createTable(request.table_uuid)
                 success = self.db._dataframeToDatabase(request.table_uuid, data)
-                return _createResponse("success" if success else "error", (
+                return _createResponse(
+                    "success" if success else "error",
+                    (
                         f"Data {'replaced' if request.replace else 'merged'} successfully"
                         if success
                         else "Failed to insert data"
-                    ))
+                    ),
+                )
             except Exception as e:
                 return _createResponse("error", f"Error inserting data: {str(e)}")
-            
+
         elif request.method == 'delete':
             try:
                 if request.data is not None:
@@ -222,12 +262,13 @@ class DataServer:
                     return _createResponse("success", "Delete operation completed")
                 else:
                     self.db.deleteTable(request.table_uuid)
-                    return _createResponse("success", f"Table {request.table_uuid} deleted")
+                    return _createResponse(
+                        "success", f"Table {request.table_uuid} deleted"
+                    )
             except Exception as e:
                 return _createResponse("error", f"Error deleting data: {str(e)}")
         else:
             return _createResponse("error", f"Unknown request type: {request.method}")
-    
 
     async def _getStreamData(self, table_uuid: str) -> pd.DataFrame:
         """Get data for a specific stream directly from SQLite database"""
@@ -279,11 +320,11 @@ class DataServer:
             )
 
 
-
 async def main():
     peer1 = DataServer("0.0.0.0", 8080)
     await peer1.startServer()
-    await asyncio.Future()  
+    await asyncio.Future()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

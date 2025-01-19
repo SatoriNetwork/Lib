@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional, Union, Tuple, Set
 from io import StringIO
 from satorilib.logging import INFO, setup, debug, info, warning, error
 from satorilib.datamanager.server import DataServer
-from satorilib.datamanager.helper import Message, ConnectedPeer, Subscription, Publication
+from satorilib.datamanager.helper import Message, ConnectedPeer, Subscription
 
 class DataClient:
     def __init__(

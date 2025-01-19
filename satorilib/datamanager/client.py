@@ -18,7 +18,6 @@ class DataClient:
         self.otherServers = otherServer
         self.connectedServer: Dict[Tuple[str, int], ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
-        self.Publications: dict[Publication, queue.Queue] = {}
         self.responses: dict[str, Message] = {}
 
     async def connectToServer(self, peerHost: str, peerPort: int):
@@ -204,7 +203,7 @@ class DataClient:
 
     async def sendRequest(
         self,
-        peerAddr: Tuple[str, int],
+        peerAddr: Tuple[str, int] = ("0.0.0.0", 24602),
         table_uuid: str = None,
         method: str = "initiate-connection",
         data: pd.DataFrame = None,

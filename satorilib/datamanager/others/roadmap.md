@@ -17,9 +17,9 @@ integrate with neuron-dataClient
 - connect to our DataServer on startup ( Done )
 - stay connected/reconnect on disconnect to our own DataServer        # TODO : reconnect stuff
 - tell DataServer the streams of our subscriptions and publications (that we got from checkin) ( Done )
-- tell DataServer the peers of our subscriptions (who publishes, and who subscribes to the data we want) (we get this from "rendezvous" call) 
-  - payload: {table_uuid: [publisher ip, random subscirber ip, random subscirber ip, ...]}
-- subscribe to our own list of subscriptions and publications for UI 
+- tell DataServer the peers of our subscriptions (who publishes, and who subscribes to the data we want) (we get this from "rendezvous" call) ( Done )
+  - payload: {table_uuid: [publisher ip, random subscirber ip, random subscirber ip, ...]} ( Done )
+- subscribe to our own list of subscriptions and publications for UI ( )
 - (implement later) ask for any data necessary on demand
 
 integrate with engine-dataClient

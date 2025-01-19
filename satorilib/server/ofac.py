@@ -1,5 +1,17 @@
 import requests
-from satorilib import logging
+import logging
+
+def acceptTerms() -> bool:
+    response = requests.post('http://195.26.255.217:3005/accept-tos')
+    try:
+        response.raise_for_status()
+    except Exception as e:
+        logging.error(f"err: {e} server returned status code {response.status_code}: {response.text}")
+        return False
+    if 200 <= response.status_code <= 399:
+        return True
+    logging.error(f"Server returned status code {response.status_code}: {response.text}")
+    return False
 
 
 def requestPermission() -> bool:
@@ -10,19 +22,6 @@ def requestPermission() -> bool:
         logging.error(f"err: {e} server returned status code {response.status_code}: {response.text}")
         return False
     if 200 <= response.status_code <= 399 and response.text.lower() == 'true':
-        return True
-    logging.error(f"Server returned status code {response.status_code}: {response.text}")
-    return False
-
-
-def acceptTerms() -> bool:
-    response = requests.post('http://195.26.255.217:3005/accept-tos')
-    try:
-        response.raise_for_status()
-    except Exception as e:
-        logging.error(f"err: {e} server returned status code {response.status_code}: {response.text}")
-        return False
-    if 200 <= response.status_code <= 399:
         return True
     logging.error(f"Server returned status code {response.status_code}: {response.text}")
     return False
@@ -44,8 +43,8 @@ def reportTxid(txid) -> bool:
 
 
 def verifyTxid(txid) -> bool:
-    response = requests.post(
-        'http://195.26.255.217:3005/verify-txid',
+    response = requests.get(
+        'http://195.26.255.217:3005/validate-txid',
         json={'txid': txid})
     try:
         response.raise_for_status()

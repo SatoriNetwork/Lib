@@ -11,6 +11,44 @@ class TxUtils():
     evrBurnMintAddressTest: str = 'n1BurnMintXXXXXXXXXXXXXXXXXXbVTQiY'
 
     @staticmethod
+    def estimateMultisigFee(
+        inputCount: int,
+        outputCount: int,
+        signatureCount: int,
+        feeRateSatsPerByte: int = 1900,
+        # 150000 = 470 bytes which is 6
+        # 900000 = 1,914.893617021277 per byte
+        # 1500 per byte would probably be fine, we'll just use 1900 to be safe
+    ) -> int:
+        """
+        Estimate the transaction fee for a multisig P2SH transaction.
+
+        :param inputCount: Number of inputs (UTXOs being spent).
+        :param outputCount: Number of outputs (recipients + change).
+        :param signatureCount: Signatures required for each input.
+        :param feeRateSatsPerByte: Fee rate in satoshis per byte (default 10).
+        :return: Estimated fee in satoshis.
+        """
+        # Redeem script size for a multisig: OP_CHECKMULTISIG and public keys (~105 bytes for 2-of-3).
+        redeemScriptSize = 1 + (signatureCount * 33) + 1 + 1  # Multisig opcode overhead + keys + OP_CHECKMULTISIG
+
+        # Estimate the size of each input
+        inputSize = 32 + 4 + 1 + (signatureCount * 72) + redeemScriptSize + 4
+
+        # Estimate the size of each output
+        outputSize = 34
+
+        # Fixed transaction overhead
+        baseSize = 10  # Version + locktime
+
+        # Total transaction size
+        totalSize = baseSize + (inputCount * inputSize) + (outputCount * outputSize)
+
+        # Calculate fee
+        fee = totalSize * feeRateSatsPerByte
+        return fee
+
+    @staticmethod
     def txhexToTxid(txhex:str) -> str:
         # Decode the hex string into bytes
         raw = bytes.fromhex(txhex)

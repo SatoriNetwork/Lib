@@ -29,7 +29,9 @@ def acceptTerms() -> bool:
 
 
 def reportTxid(txid) -> bool:
-    response = requests.post('http://195.26.255.217:3005/register-txid', json={'txid': txid})
+    response = requests.post(
+        'http://195.26.255.217:3005/validate-ip-txid',
+        json={'txid': txid})
     try:
         response.raise_for_status()
     except Exception as e:
@@ -42,7 +44,9 @@ def reportTxid(txid) -> bool:
 
 
 def verifyTxid(txid) -> bool:
-    response = requests.post('http://195.26.255.217:3005/verify-txid', json={'txid': txid})
+    response = requests.post(
+        'http://195.26.255.217:3005/verify-txid',
+        json={'txid': txid})
     try:
         response.raise_for_status()
     except Exception as e:

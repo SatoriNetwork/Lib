@@ -8,13 +8,8 @@ from evrmore.core.script import CreateMultisigRedeemScript
 from evrmore.core import CMutableTxOut, CMutableTxIn, COutPoint, lx, CScript
 from evrmore.core.transaction import CMultiSigTransaction
 from satorilib.electrumx import Electrumx
-<<<<<<< Updated upstream
 from satorilib.wallet.utils.transaction import TxUtils
 from satorilib.wallet.wallet import WalletBase  # Import WalletBase
-=======
-from satorilib.wallet.wallet import WalletBase
-
->>>>>>> Stashed changes
 
 class EvrmoreP2SHWallet(WalletBase):
     electrumx_servers: list[str] = [

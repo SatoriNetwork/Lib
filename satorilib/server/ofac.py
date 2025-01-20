@@ -2,8 +2,8 @@ import requests
 import logging
 
 def acceptTerms() -> bool:
-    response = requests.post('http://195.26.255.217:3005/accept-tos')
     try:
+        response = requests.post('http://195.26.255.217:3005/accept-tos')
         response.raise_for_status()
     except Exception as e:
         logging.error(f"err: {e} server returned status code {response.status_code}: {response.text}")
@@ -15,8 +15,8 @@ def acceptTerms() -> bool:
 
 
 def requestPermission() -> bool:
-    response = requests.get('http://195.26.255.217:3005/validate-ip')
     try:
+        response = requests.get('http://195.26.255.217:3005/validate-ip')
         response.raise_for_status()
     except Exception as e:
         logging.error(f"err: {e} server returned status code {response.status_code}: {response.text}")
@@ -28,10 +28,10 @@ def requestPermission() -> bool:
 
 
 def reportTxid(txid) -> bool:
-    response = requests.post(
-        'http://195.26.255.217:3005/validate-ip-txid',
-        json={'txid': txid})
     try:
+        response = requests.post(
+            'http://195.26.255.217:3005/validate-ip-txid',
+            json={'txid': txid})
         response.raise_for_status()
     except Exception as e:
         logging.error(f"err: {e} server returned status code {response.status_code}: {response.text}")
@@ -43,10 +43,10 @@ def reportTxid(txid) -> bool:
 
 
 def verifyTxid(txid) -> bool:
-    response = requests.get(
-        'http://195.26.255.217:3005/validate-txid',
-        json={'txid': txid})
     try:
+        response = requests.get(
+            'http://195.26.255.217:3005/validate-txid',
+            json={'txid': txid})
         response.raise_for_status()
     except Exception as e:
         logging.error(f"err: {e} server returned status code {response.status_code}: {response.text}")

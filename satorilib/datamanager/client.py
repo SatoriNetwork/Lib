@@ -45,6 +45,7 @@ class DataClient:
         async def listen():
             try:
                 response = Message(json.loads(await peer.websocket.recv()))
+                print(response.table_uuid)
                 await self.handleMessage(response)
             except websockets.exceptions.ConnectionClosed:
                 self.disconnect(peer)
@@ -83,6 +84,9 @@ class DataClient:
             debug("Current subscriptions:", self.subscriptions)
             info("Subscribed to : ", message.table_uuid)
         elif message.isResponse:
+            print(1)
+            print(message.table_uuid)
+            print(message.id)
             self.responses[message.id] = message
 
     def listenForSubscriptions(self, method: str, params: list) -> dict:
@@ -95,6 +99,7 @@ class DataClient:
         while time.time() < then + 30:
             response = self.responses.get(callId)
             if response is not None:
+                print(3)
                 del self.responses[callId]
                 self.cleanUpResponses()
                 return response
@@ -116,15 +121,6 @@ class DataClient:
                 warning(f'error in cleanUpResponses {e}')
         for key in keysToDelete:
             del self.responses[key]
-
-    # def handleResponse(self, response: Message) -> None:
-    #     if response.status == "success" and response.data is not None:
-    #         try:
-    #             df = pd.read_json(StringIO(response.data), orient='split')
-    #             # TODO : maybe we need to handle response to send data server?
-    #             debug(f"Table name: {response.table_uuid}")
-    #         except Exception as e:
-    #             error(f"Database error: {e}")
 
     async def disconnect(self, peer: ConnectedPeer) -> None:
         peer.stop.set()
@@ -157,6 +153,7 @@ class DataClient:
             if sendOnly:
                 return None
             response = await self.listenForResponse(request.id)
+            # print(response)
             return response
         except Exception as e:
             error(f"Error sending request to peer: {e}")
@@ -216,19 +213,23 @@ class DataClient:
 
         if method == "initiate-connection":
             request = Message({"method": method, "id": id})
-        # TODO: might need to change this endpoint to be something more like "save this data (and of course pass it on to any subscribers of this data)"
-        elif method == "subscription-suggestions": # TODO : the response should be a list of subscriptions
+        elif method == "get-subscriptions-publications": 
             request = Message(
                 {"method": method, "id": id}
             )
-        elif method == "publishers-list":
+        elif method == "get-pubsub-list":
+            request = Message(
+                {"method": method, "id": id}
+            )
+        elif method == "send-publishers-list":
             request = Message(
                 {"method": method, "id": id, "params": {"table_uuid": table_uuid}, "data": data}
             )
-        elif method == "subscribers-list":
+        elif method == "send-subscribers-list":
             request = Message(
                 {"method": method, "id": id, "params": {"table_uuid": table_uuid}, "data": data}
             )
+
         elif method == "notify-subscribers":
             request = Message(
                 {"method": method, "id": id, "params": {"table_uuid": table_uuid}, "data": data}

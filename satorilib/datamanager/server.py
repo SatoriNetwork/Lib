@@ -121,7 +121,7 @@ class DataServer:
             status: str,
             message: str,
             data: Optional[str] = None,
-            subscription_list: list = None,
+            streamInfo: list = None,
         ) -> Dict:
             response = {
                 "status": status,
@@ -135,8 +135,8 @@ class DataServer:
             }
             if data is not None:
                 response["data"] = data
-            if subscription_list is not None:
-                response["subscription-list"] = subscription_list
+            if streamInfo is not None:
+                response["table_uuid"] = streamInfo
             return response
 
         if request.isSubscription and request.table_uuid is not None:
@@ -144,23 +144,28 @@ class DataServer:
             return _createResponse(
                 "success", f"Observation recieved for {request.table_uuid}"
             )
-        elif request.method == 'subscription-suggestions':
-            # TODO : logic for providing subscriptions suggestions
+        elif request.method == 'get-sub-list':
             return _createResponse(
                 "success",
-                "Subscription suggestions processed successfully.",
-                subscription_list=list,
+                "Stream information of subscriptions with peer information recieved",
+                streamInfo=self.subscriptionsList,
+            )
+        elif request.method == 'get-pub-list':
+            return _createResponse(
+                "success",
+                "Stream information of publications with peer information recieved",
+                streamInfo=self.publicationsList,
             )
         elif request.method == 'notify-subscribers':
             await self.notifySubscribers(request)
             return _createResponse("success", "Subscribers Notified", request.data)
         elif request.method == 'initiate-connection':
             return _createResponse("success", "Connection established")
-        elif request.method == 'subscribers-list':
+        elif request.method == 'send-subscribers-list':
             for table_uuid, data_dict in request.table_uuid.items():
                 self.subscriptionsList[table_uuid] = PeerInfo(data_dict['subscribers'], data_dict['publishers'])
             return _createResponse("success", "Subscriber list added in Server")
-        elif request.method == 'publishers-list':
+        elif request.method == 'send-publishers-list':
             for table_uuid, data_dict in request.table_uuid.items():
                 self.publicationsList[table_uuid] = PeerInfo(data_dict['subscribers'], data_dict['publishers'])
             return _createResponse("success", "publication list added in Server")

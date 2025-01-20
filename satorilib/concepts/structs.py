@@ -1,5 +1,6 @@
 from typing import Union
 import json
+import uuid
 import pandas as pd
 import datetime as dt
 from functools import partial
@@ -10,6 +11,18 @@ from functools import partial
 
 class StreamId:
     """unique identifier for a stream"""
+
+    @staticmethod
+    def generateUUID(data: dict) -> uuid:
+        namespace = uuid.NAMESPACE_DNS
+        values = [
+            data.get('source'), 
+            data.get('author'), 
+            data.get('stream'), 
+            data.get('target')]
+        combined = ':'.join(str(v) for v in values)
+        return uuid.uuid5(namespace, combined)
+
 
     def __init__(
         self,
@@ -51,7 +64,9 @@ class StreamId:
         return ["source", "author", "stream", "target"]
 
     def topic(
-        self, asJson: bool = True, authorAsPubkey=False
+        self, 
+        asJson: bool = True, 
+        authorAsPubkey=False
     ) -> Union[str, dict[str, str]]:
         """
         the topic (id) for this stream.
@@ -76,6 +91,10 @@ class StreamId:
     @property
     def id(self):
         return (self.__source, self.__author, self.__stream, self.__target)
+    
+    @property
+    def uuid(self) -> str:
+        return str(StreamId.generateUUID(self.topic(asJson=False)))
 
     @property
     def cleanId(self):
@@ -159,7 +178,6 @@ class StreamId:
     @property
     def generateHash(self) -> str:
         from satorilib.utils.hash import generatePathId, hashIt
-
         return generatePathId(streamId=self)
 
     @property

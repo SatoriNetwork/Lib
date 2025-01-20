@@ -18,7 +18,7 @@ integrate with neuron-dataClient
 - put a DataClient singleton object in the neuron ( Done )
   - during the startup process in init.py (StartupDag singleton) instanteate a DataClient ( Done )
 - connect to our DataServer on startup ( Done )
-- stay connected/reconnect on disconnect to our own DataServer        # TODO : reconnect stuff
+- stay connected/reconnect on disconnect to our own DataServer  ( Done )
 - tell DataServer the streams of our subscriptions and publications (that we got from checkin) ( Done )
 - tell DataServer the peers of our subscriptions (who publishes, and who subscribes to the data we want) (we get this from "rendezvous" call) ( Done )
   - payload: {table_uuid: [publisher ip, subscirber ip, subscirber ip, ...]} ( Done )
@@ -29,10 +29,10 @@ integrate with engine-dataClient
 - get DataServer Ip
   - dsIp = (from satorineuron import config) config.get().get('peer ip', '0.0.0.0')
   - if that doesn't work... dsIp = start.server.getPublicIp().text.split()[-1] # /ip
-- put a DataClient singleton object in the engine
-- connect to our DataServer on startup
-- ask DataServer for streams along with peer information (must somehow know how to contact our data server)
-  - payload: {table_uuid: [publisher ip, subscirber ip, subscirber ip, ...]}
+- put a DataClient singleton object in the engine ( Done )
+- connect to our DataServer on startup ( Done )
+- ask DataServer for streams along with peer information (must somehow know how to contact our data server) ( Done )
+  - payload: {table_uuid: [publisher ip, subscirber ip, subscirber ip, ...]} ( Done )
 - ask DataServer for our current known data of our streams (from disk, full df)
 - engine data client asks external data servers for subscriptions
   - handle subscriber list

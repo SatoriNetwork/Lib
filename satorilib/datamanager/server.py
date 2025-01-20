@@ -133,8 +133,8 @@ class DataServer:
             converted_data = {}
             for uuid, peer_info in data.items():
                 converted_data[uuid] = {
-                    'subscriber': peer_info.subscribersIp,
-                    'publisher': peer_info.publishersIp
+                    'subscribers': peer_info.subscribersIp,
+                    'publishers': peer_info.publishersIp
                 }
             return converted_data
 

@@ -33,14 +33,14 @@ class DataServer:
         self.publicationsList: dict[str, PeerInfo] = {}
         self.responses: dict[str, Message] = {}
         self.db = SqliteDatabase(db_path, db_name)
-        self.db.importFromDataFolder()  # can be disabled if new rows are added to the Database and new rows recieved are inside the database
+        # self.db.importFromDataFolder()  # can be disabled if new rows are added to the Database and new rows recieved are inside the database
 
     async def startServer(self):
         """Start the WebSocket server"""
         self.server = await websockets.serve(
             self.handleConnection, self.host, self.port
         )
-        info(f"Server started on ws://{self.host}:{self.port}")
+        info(f"Server started on ws://{self.host}:{self.port}", color="green")
 
     async def handleConnection(self, websocket: websockets.WebSocketServerProtocol):
         """Handle incoming connections and messages"""
@@ -55,16 +55,6 @@ class DataServer:
                 debug(f"Received request: {message}", print=True)
                 try:
                     response = await self.handleRequest(peerAddr, websocket, message)
-                    debug(
-                        "length of subscriptions list:",
-                        len(self.subscriptionsList),
-                        print=True,
-                    )
-                    debug(
-                        "length of publications list:",
-                        len(self.publicationsList),
-                        print=True,
-                    )
                     await self.connectedClients[peerAddr].websocket.send(
                         json.dumps(response)
                     )
@@ -136,8 +126,17 @@ class DataServer:
             if data is not None:
                 response["data"] = data
             if streamInfo is not None:
-                response["table_uuid"] = streamInfo
+                response["stream_info"] = streamInfo
             return response
+        
+        def _convertPeerInfoDict(data: dict) -> dict:
+            converted_data = {}
+            for uuid, peer_info in data.items():
+                converted_data[uuid] = {
+                    'subscriber': peer_info.subscribersIp,
+                    'publisher': peer_info.publishersIp
+                }
+            return converted_data
 
         if request.isSubscription and request.table_uuid is not None:
             self.connectedClients[peerAddr].add_subcription(request.table_uuid)
@@ -145,16 +144,18 @@ class DataServer:
                 "success", f"Observation recieved for {request.table_uuid}"
             )
         elif request.method == 'get-sub-list':
+            streamDict = _convertPeerInfoDict(self.subscriptionsList)
             return _createResponse(
                 "success",
                 "Stream information of subscriptions with peer information recieved",
-                streamInfo=self.subscriptionsList,
+                streamInfo=streamDict,
             )
         elif request.method == 'get-pub-list':
+            streamDict = _convertPeerInfoDict(self.publicationsList)
             return _createResponse(
                 "success",
                 "Stream information of publications with peer information recieved",
-                streamInfo=self.publicationsList,
+                streamInfo=streamDict,
             )
         elif request.method == 'notify-subscribers':
             await self.notifySubscribers(request)

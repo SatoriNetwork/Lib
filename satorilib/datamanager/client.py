@@ -45,7 +45,6 @@ class DataClient:
         async def listen():
             try:
                 response = Message(json.loads(await peer.websocket.recv()))
-                print(response.table_uuid)
                 await self.handleMessage(response)
             except websockets.exceptions.ConnectionClosed:
                 self.disconnect(peer)
@@ -84,9 +83,6 @@ class DataClient:
             debug("Current subscriptions:", self.subscriptions)
             info("Subscribed to : ", message.table_uuid)
         elif message.isResponse:
-            print(1)
-            print(message.table_uuid)
-            print(message.id)
             self.responses[message.id] = message
 
     def listenForSubscriptions(self, method: str, params: list) -> dict:
@@ -99,7 +95,6 @@ class DataClient:
         while time.time() < then + 30:
             response = self.responses.get(callId)
             if response is not None:
-                print(3)
                 del self.responses[callId]
                 self.cleanUpResponses()
                 return response
@@ -146,14 +141,12 @@ class DataClient:
     ) -> Dict:
         """Send a request to a specific peer"""
 
-        # debug(request.to_dict(), print=True)
         await self.connect(peerAddr)
         try:
             await self.connectedServer[peerAddr].websocket.send(request.to_json())
             if sendOnly:
                 return None
             response = await self.listenForResponse(request.id)
-            # print(response)
             return response
         except Exception as e:
             error(f"Error sending request to peer: {e}")

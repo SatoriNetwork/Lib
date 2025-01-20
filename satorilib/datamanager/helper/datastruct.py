@@ -101,6 +101,7 @@ class Message:
                 'to_ts': self.toDate,
             },
             'data': self.data,
+            'stream_info': self.streamInfo
         }
 
     def to_json(self) -> str:
@@ -111,6 +112,11 @@ class Message:
         """Get the method"""
         return self.message.get('method')
 
+    @property
+    def streamInfo(self) -> str:
+        """Get the method"""
+        return self.message.get('stream_info')
+    
     @property
     def id(self) -> str:
         """Get the id UUID"""

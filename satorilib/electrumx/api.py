@@ -177,10 +177,10 @@ class ElectrumxApi():
     def getBanner(self) -> dict:
         return self.sendRequest(method='server.banner')
 
-    def getUnspentCurrency(self, scripthash: str) -> list:
+    def getUnspentCurrency(self, scripthash: str, extraParam: bool = False) -> list:
         return self.sendRequest(
             method='blockchain.scripthash.listunspent',
-            params=[scripthash])
+            params=[scripthash] + ([True] if extraParam else []))
 
     def getUnspentAssets(self, scripthash: str, targetAsset: str = 'SATORI') -> list:
         '''

@@ -215,12 +215,15 @@ class AssetTransaction():
 
     @staticmethod
     def satoriHex(currency: str) -> str:
-        if currency.lower() == 'rvn':
+        currency = currency.lower()
+        if currency == 'rvn':
             symbol = AssetTransaction.rvn
-        elif currency.lower() == 'evr':
+        elif currency == 'evr':
             symbol = AssetTransaction.evr
+        elif currency == 'satori':
+            symbol = AssetTransaction.satori
         else:
-            raise Exception('invalid currency')
+            raise Exception(f'Invalid currency: {currency}')
         return (
             symbol +
             AssetTransaction.t +

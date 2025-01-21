@@ -34,97 +34,53 @@ class TestEvrmoreP2SHWallet(unittest.TestCase):
         self.assertIsNotNone(p2sh_address, "P2SH address generation failed.")
         self.assertIsNotNone(redeem_script, "Redeem script generation failed.")
         
-        fetched_utxos = self.wallet.fetch_utxos("EVRMORE")
-        logging.info(f"fetched utxos: {fetched_utxos}")
-        
+        fetched_utxos = self.wallet.fetch_utxos("EVR")
+        self.assertIsInstance(fetched_utxos, list)
         self.assertEqual(len(self.public_keys), 3)
-        print(f"Generated P2SH Address: {p2sh_address}")
         
     def test_fetch_utxos_known_address(self):
         """Test UTXO fetching with a known funded address."""
         self.wallet.p2sh_address = P2SHEvrmoreAddress("eEY5brnAULc9wnr2Evfr31rdUHpoZbn1Uq")  
         fetched_stori_utxos = self.wallet.fetch_utxos("SATORI")
-        fetched_evr_utxos = self.wallet.fetch_utxos()
+        fetched_evr_utxos = self.wallet.fetch_utxos("EVR")
         
         self.assertIsInstance(fetched_stori_utxos, list)
         self.assertIsInstance(fetched_evr_utxos, list)
-        print("Fetched SATORI UTXOs: ", fetched_stori_utxos)
-        print("Fetched EVR UTXOs: ", fetched_evr_utxos)
+        # print("Fetched SATORI UTXOs: ", fetched_stori_utxos)
+        # print("Fetched EVR UTXOs: ", fetched_evr_utxos)
 
     def test_create_unsigned_transaction(self):
         """Test creating an unsigned transaction using a specific P2SH address."""
-        # Set a known P2SH address with pre-existing UTXOs
-        self.wallet.p2sh_address = P2SHEvrmoreAddress("eEY5brnAULc9wnr2Evfr31rdUHpoZbn1Uq")
-                
-        # Test with SATORI asset
-        unsigned_tx_satori = self.wallet.create_unsigned_transaction(
-            amount=self.amount_to_send,
-            recipient_address=self.recipient_address,
-            asset="SATORI"
-        )
-        self.assertIsNotNone(unsigned_tx_satori, "Failed to create unsigned transaction for SATORI asset.")
-        print(f"unsigned_tx_satori: {unsigned_tx_satori}")
-        # Test with EVR asset (asset=None)
-        unsigned_tx_evr = self.wallet.create_unsigned_transaction(
-            amount=self.amount_to_send,
-            recipient_address=self.recipient_address,
-            asset=None
-        )
-        self.assertIsNotNone(unsigned_tx_evr, "Failed to create unsigned transaction for EVR asset.")
-        print(f"unsigned_tx_evr: {unsigned_tx_evr}")
-    
-    def test_sign_transaction(self):
-        """Test signing a transaction."""
-        # Set a known P2SH address with pre-existing UTXOs
-        self.wallet.p2sh_address = P2SHEvrmoreAddress("eEY5brnAULc9wnr2Evfr31rdUHpoZbn1Uq")
-
+        self.wallet.p2sh_address = P2SHEvrmoreAddress("eEY5brnAULc9wnr2Evfr31rdUHpoZbn1Uq") 
         self.wallet.generate_multi_party_p2sh_address(self.public_keys, required_signatures=2)
-        unsigned_tx = self.wallet.create_unsigned_transaction(
-            amount=self.amount_to_send,
-            recipient_address=self.recipient_address,
-            asset="SATORI"
-        )
-        
+        recipients = [
+            # {"address": "EMgpUQ8ucUSnZnrpYvD2n7na48LfSbZHti", "amount": 1000000, "asset": "EVR"},
+            # {"address": "EQ2dsWBZAJCUJsNTFm1aDY4BQHXTmFRGK5", "amount": 1000000, "asset": "EVR"},
+            {"address": "EMgpUQ8ucUSnZnrpYvD2n7na48LfSbZHti", "amount": 1000000, "asset": "SATORI"}
+        ]
+        fee_rate = 2000
+        change_address = "eEY5brnAULc9wnr2Evfr31rdUHpoZbn1Uq"
+
+        # Create the transaction
+        unsigned_tx = self.wallet.create_unsigned_transaction_multi(recipients, fee_rate, change_address)
+        # print(f"tx: {unsigned_tx}")
         sighash = self.wallet.generate_sighash(unsigned_tx)
-        
-        # Independent signing with each key
         signatures = [
             self.wallet.sign_independently(unsigned_tx, self.private_keys[0], sighash),
             self.wallet.sign_independently(unsigned_tx, self.private_keys[1], sighash)
         ]
-
+        
         # Apply the collected signatures
         signed_tx = self.wallet.apply_signatures(unsigned_tx, signatures)
-        print(f"signed_tx: {signed_tx}")
+        # print(f"signed_tx: {signed_tx}")
         self.assertIsNotNone(signed_tx)
-        print("Transaction Signed Successfully.")
-
-    def test_broadcast_transaction(self):
-        """Test broadcasting a transaction."""
-        # Set a known P2SH address with pre-existing UTXOs
-        self.wallet.p2sh_address = P2SHEvrmoreAddress("eEY5brnAULc9wnr2Evfr31rdUHpoZbn1Uq")
-
-        self.wallet.generate_multi_party_p2sh_address(self.public_keys, required_signatures=2)
-        unsigned_tx = self.wallet.create_unsigned_transaction(
-            amount=self.amount_to_send,
-            recipient_address=self.recipient_address,
-            asset="SATORI"
-        )
-        
-        sighash = self.wallet.generate_sighash(unsigned_tx)
-        
-        # Independent signing with each key
-        signatures = [
-            self.wallet.sign_independently(unsigned_tx, self.private_keys[0], sighash),
-            self.wallet.sign_independently(unsigned_tx, self.private_keys[1], sighash)
-        ]
-
-        # Apply signatures and broadcast
-        signed_tx = self.wallet.apply_signatures(unsigned_tx, signatures)
+        # print("Transaction Signed Successfully.")
         txid = self.wallet.broadcast_transaction(signed_tx)
-        
-        self.assertIsNotNone(txid, "Failed to broadcast transaction.")
-        print(f"Transaction Broadcasted Successfully with txid: {txid}")
+        print(f"txid: {txid}")
+        self.assertIsNotNone(txid)
+        # print("Transaction Broadcasted Successfully.")
+
+        # print("Test passed: create_unsigned_transaction_multi")
 
 if __name__ == '__main__':
     unittest.main()

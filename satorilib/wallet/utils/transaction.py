@@ -47,6 +47,25 @@ class TxUtils():
         # Calculate fee
         fee = totalSize * feeRateSatsPerByte
         return fee
+    
+    @staticmethod
+    def estimateTransactionSize(inputCount: int, outputCount: int, signatureCount: int = 1) -> int:
+        """
+        Estimate the size of a transaction in bytes.
+
+        :param inputCount: Number of inputs.
+        :param outputCount: Number of outputs.
+        :param signatureCount: Number of signatures per input (default is 1 for standard transactions).
+        :return: Estimated transaction size in bytes.
+        """
+        # Typical sizes for transaction components
+        baseSize = 10  # Version (4 bytes) + locktime (4 bytes) + input/output count (2 bytes)
+        inputSize = 32 + 4 + 1 + (signatureCount * 72) + 33 + 4  # txid (32) + vout (4) + scriptSig size (1) + signatures (72 each) + pubkey (33) + sequence (4)
+        outputSize = 8 + 1 + 25  # value (8) + scriptPubKey size (1) + scriptPubKey (25)
+
+        # Calculate total size
+        totalSize = baseSize + (inputCount * inputSize) + (outputCount * outputSize)
+        return totalSize
 
     @staticmethod
     def txhexToTxid(txhex:str) -> str:

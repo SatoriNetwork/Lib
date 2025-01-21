@@ -4,12 +4,13 @@ import os
 import random
 from typing import List, Tuple, Union
 from evrmore.wallet import CEvrmoreAddress, CEvrmoreSecret, P2SHEvrmoreAddress
-from evrmore.core.script import CreateMultisigRedeemScript
+from evrmore.core.script import CreateMultisigRedeemScript, OP_HASH160, OP_EQUAL, OP_EVR_ASSET, OP_DUP, OP_EQUALVERIFY, OP_CHECKSIG, OP_DROP
 from evrmore.core import CMutableTxOut, CMutableTxIn, COutPoint, lx, CScript
 from evrmore.core.transaction import CMultiSigTransaction
 from satorilib.electrumx import Electrumx
 from satorilib.wallet.utils.transaction import TxUtils
 from satorilib.wallet.wallet import WalletBase  # Import WalletBase
+from satorilib.wallet.evrmore.wallet import AssetTransaction
 
 class EvrmoreP2SHWallet(WalletBase):
     electrumx_servers: list[str] = [
@@ -59,6 +60,11 @@ class EvrmoreP2SHWallet(WalletBase):
             if not self.p2sh_address:
                 raise ValueError("P2SH address not generated yet.")
             all_utxos = self.electrumx.api.getUnspentCurrency(self.p2sh_address.to_scripthash(), extraParam=True)
+            
+            for utxo in all_utxos:
+                if utxo.get('asset') is None:
+                    utxo['asset'] = 'EVR'
+            
             return [utxo for utxo in all_utxos if utxo['asset'] == asset]
         except Exception as e:
             logging.error(f"Error fetching UTXOs: {e}", exc_info=True)
@@ -88,69 +94,91 @@ class EvrmoreP2SHWallet(WalletBase):
             logging.error(f"Error applying signatures: {e}", exc_info=True)
             return None
 
-    def create_unsigned_transaction(self, txid: str, vout_index: int, amount: int, recipient_address: str) -> CMultiSigTransaction:
-        '''
-        Creates an unsigned transaction to send funds from a P2SH address to a recipient address.
+    def compileInputs(self, utxos_by_asset, required_amounts, fee_rate):
+        txins = []
+        total_input_by_asset = {}
+        for asset, utxos in utxos_by_asset.items():
+            total_input_by_asset[asset] = 0
+            required_amount = required_amounts.get(asset, 0)
+            if asset == 'EVR':
+                estimated_size = TxUtils.estimateTransactionSize(len(txins), len(required_amounts) + 1) 
+                fee = fee_rate * estimated_size
+                required_amount += fee
 
-        Parameters:
-        - txid (str): Transaction ID of the UTXO being spent.
-        - vout_index (int): Index of the output in the UTXO being spent.
-        - amount (int): Amount to send (in satoshis).
-        - recipient_address (str): Recipient's address.
-        - redeem_script (CScript): Redeem script for the P2SH address.
+            for utxo in utxos:
+                if utxo["value"] < 546:
+                    continue
+                if total_input_by_asset[asset] >= required_amount:
+                    break
+                outpoint = COutPoint(lx(utxo["tx_hash"]), utxo["tx_pos"])
+                txin = CMutableTxIn(prevout=outpoint)
+                txins.append(txin)
+                total_input_by_asset[asset] += utxo["value"]
 
-        Returns:
-        - CMultiSigTransaction: The unsigned transaction.
-        '''
-        try:
-            # Create the input (vin) referencing the UTXO
-            outpoint = COutPoint(lx(txid), vout_index)
-            txin = CMutableTxIn(prevout=outpoint)
+        return txins, total_input_by_asset
 
-            # Create the scriptPubKey for the recipient address
-            recipient_script_pubkey = CEvrmoreAddress(recipient_address).to_scriptPubKey()
-            if not isinstance(recipient_script_pubkey, CScript):
-                raise ValueError("Failed to generate recipient scriptPubKey.")
+    def compileOutputs(self, recipients, change_value_by_asset, change_address):
+        txouts = []
+        total_outs_by_asset = {}
+        for recipient in recipients:
+            asset = recipient.get('asset', 'EVR').upper()
+            recipient_script_pubkey = CEvrmoreAddress(recipient["address"]).to_scriptPubKey()
+            if recipient["amount"] < 546:
+                raise ValueError(f"Output amount for {recipient['address']} is below the dust threshold.")
+            
+            if asset != 'EVR':
+                asset_script = CScript([
+                    OP_DUP, OP_HASH160, recipient_script_pubkey, OP_EQUALVERIFY, OP_CHECKSIG,
+                    OP_EVR_ASSET,
+                    bytes.fromhex(AssetTransaction.satoriHex(asset) +
+                                    TxUtils.padHexStringTo8Bytes(
+                                        TxUtils.intToLittleEndianHex(recipient["amount"]))),
+                    OP_DROP
+                ])
+                txout = CMutableTxOut(nValue=0, scriptPubKey=asset_script)
+            else:
+                txout = CMutableTxOut(nValue=recipient["amount"], scriptPubKey=recipient_script_pubkey)
+            
+            txouts.append(txout)
+            total_outs_by_asset[asset] = total_outs_by_asset.get(asset, 0) + recipient["amount"]
 
-            # Create the output (vout) with the specified amount and recipient address
-            txout = CMutableTxOut(nValue=amount, scriptPubKey=recipient_script_pubkey)
+        # Add change outputs if necessary
+        for asset, change_value in change_value_by_asset.items():
+            if change_value > 546 and change_address is not None:
+                change_script_pubkey = CEvrmoreAddress(change_address).to_scriptPubKey()
+                if asset != 'EVR':
+                    change_script = CScript([
+                        OP_DUP, OP_HASH160, change_script_pubkey, OP_EQUALVERIFY, OP_CHECKSIG,
+                        OP_EVR_ASSET,
+                        bytes.fromhex(AssetTransaction.satoriHex(asset) +
+                                        TxUtils.padHexStringTo8Bytes(
+                                            TxUtils.intToLittleEndianHex(change_value))),
+                        OP_DROP
+                    ])
+                    change_txout = CMutableTxOut(nValue=0, scriptPubKey=change_script)
+                else:
+                    change_txout = CMutableTxOut(nValue=change_value, scriptPubKey=change_script_pubkey)
+                txouts.append(change_txout)
 
-            # Create the unsigned transaction
-            tx = CMultiSigTransaction(vin=[txin], vout=[txout])
-
-            return tx
-
-        except Exception as e:
-            logging.error(f"Error in create_unsigned_transaction: {e}", exc_info=True)
-            return None
+        return txouts
 
     def create_unsigned_transaction_multi(
         self,
-        inputs: List[dict],
         recipients: List[dict],
-        change_address: Union[str, None] = None,
-        fee: Union[int, None] = None,
+        fee_rate: int,
+        change_address: Union[str, None] = None
     ) -> CMultiSigTransaction:
         """
-        Create an unsigned multi-input, multi-output transaction.
+        Create an unsigned multi-input, multi-output transaction automatically.
 
-        :param inputs: List of UTXOs, each a dict with:
-            {
-                "txid": "<hex-string>",
-                "vout": <int>,
-                "amount": <int in satoshis>,
-                "asset": "SATORI" (optional, defaults to "EVR" or null)
-                "redeem_script": <CScript> (optional if the same redeem_script is stored in the wallet)
-            }
-            - 'redeem_script' might be omitted if the wallet assumes a single script in self.redeem_script.
         :param recipients: List of outputs, each a dict with:
             {
                 "address": "<string base58/Bech32>",
-                "amount": <int in satoshis>
-                "asset": "SATORI" (optional, defaults to "EVR" or null)
+                "amount": <int in satoshis>,
+                "asset": "SATORI" (optional, defaults to "EVR")
             }
+        :param fee_rate: Fee rate in satoshis per byte.
         :param change_address: Address to send leftover change to, if any.
-        :param fee: The transaction fee in satoshis.
 
         :return: A CMultiSigTransaction object with all specified inputs/outputs but no signatures.
         """
@@ -158,91 +186,37 @@ class EvrmoreP2SHWallet(WalletBase):
             if not recipients:
                 raise ValueError("No recipients provided.")
 
-            # 1) Build the list of TxIn
-            txins = []
-            total_input_by_asset: dict[str, int] = {'EVR': 0}
-            for utxo in inputs:
-                if "txid" not in utxo or "vout" not in utxo or "amount" not in utxo:
-                    raise ValueError("Each UTXO dict must contain 'txid', 'vout', and 'amount'.")
-
-                # TODO: what if the input is not a multisig output, but just a standard vout (sent from a p2pkh address)? maybe this is already handled?
-
-                if utxo.get('asset', 'EVR').upper() == 'EVR':
-                    outpoint = COutPoint(lx(utxo["txid"]), utxo["vout"])
-                    txin = CMutableTxIn(prevout=outpoint)
-                    txins.append(txin)
-                    total_input_by_asset['EVR'] = total_input_by_asset.get('EVR', 0) + utxo["amount"]
-                else:
-                    # this would typically be the case for
-                    # if utxo.get('asset', 'EVR').upper() == 'SATORI':
-                    # TODO: handle including asset input?
-                    total_input_by_asset[utxo['asset']] = total_input_by_asset.get(utxo['asset'], 0) + utxo["amount"]
-
-            # 2) Build the list of TxOut
-            txouts = []
-            total_outs_by_asset: dict[str, int] = {'EVR': 0}
+            utxos_by_asset = {}
             for recipient in recipients:
-                if "address" not in recipient or "amount" not in recipient:
-                    raise ValueError("Each recipient dict must contain 'address' and 'amount'.")
+                asset = recipient.get('asset', 'EVR').upper()
+                if asset not in utxos_by_asset:
+                    utxos_by_asset[asset] = self.fetch_utxos(asset)
 
-                # TODO: what if the output is going to a standard vout (sent to a p2pkh address)? maybe this is already handled?
+            if 'EVR' not in utxos_by_asset:
+                utxos_by_asset['EVR'] = self.fetch_utxos('EVR')
 
-                if recipient.get('asset', 'EVR').upper() == 'EVR':
-                    recipient_script_pubkey = CEvrmoreAddress(recipient["address"]).to_scriptPubKey()
-                    txout = CMutableTxOut(nValue=recipient["amount"], scriptPubKey=recipient_script_pubkey)
-                    txouts.append(txout)
-                    total_outs_by_asset['EVR'] = (
-                        total_outs_by_asset.get('EVR', 0) + recipient["amount"])
-                else:
-                    # this would typically be the case for
-                    # if utxo.get('asset', 'EVR').upper() == 'SATORI':
-                    # TODO: handle including asset output?
-                    #       I think we just need to add OP_EVR_ASSET <asset data> like so:
-                    #       OP_HASH160 <redeemScriptHash> OP_EQUAL OP_EVR_ASSET <asset data> OP_DROP
-                    #       and <asset data> is:
-                    #           bytes.fromhex(
-                    #               AssetTransaction.satoriHex(recipient["asset"]) +
-                    #                   TxUtils.padHexStringTo8Bytes(
-                    #                       TxUtils.intToLittleEndianHex(sats)))
-                    total_outs_by_asset[recipient["asset"]] = (
-                        total_outs_by_asset.get(recipient["asset"], 0) +
-                        recipient["amount"])
+            required_amounts = {r.get('asset', 'EVR').upper(): r['amount'] for r in recipients}
+            txins, total_input_by_asset = self.compileInputs(utxos_by_asset, required_amounts, fee_rate)
 
-            # 3) Calculate fee:
-            fee = fee or TxUtils.estimateMultisigFee(
-                inputCount=len(txins),
-                outputCount=len(txouts),
-                signatureCount=len(txins) * 3)
-
-            # 4) Calculate change each asset, if any
-            #    total_input_amount - (total_output_amount + fee)
-            change_value_by_asset: dict[str, int] = {'EVR': 0}
+            change_value_by_asset = {}
             for asset, total_input_amount in total_input_by_asset.items():
-                total_output_amount = total_outs_by_asset.get(asset, 0)
+                total_output_amount = sum(r['amount'] for r in recipients if r.get('asset', 'EVR').upper() == asset)
                 if asset == 'EVR':
+                    estimated_size = TxUtils.estimateTransactionSize(len(txins), len(recipients) + 1)
+                    fee = fee_rate * estimated_size
                     total_output_amount += fee
                 change_value = total_input_amount - total_output_amount
                 if change_value < 0:
                     raise ValueError(f"Not enough input to cover outputs + fee for asset {asset}.")
                 change_value_by_asset[asset] = change_value
 
-            # 5) If there is leftover, add a change output for each asset
-            for asset, change_value in change_value_by_asset.items():
-                if change_value > 0 and change_address is not None:
-                    if asset == 'EVR':
-                        change_script_pubkey = CEvrmoreAddress(change_address).to_scriptPubKey()
-                        change_txout = CMutableTxOut(nValue=change_value, scriptPubKey=change_script_pubkey)
-                        txouts.append(change_txout)
-                    else:
-                        # TODO: handle including asset output?
-                        pass
+            txouts = self.compileOutputs(recipients, change_value_by_asset, change_address)
 
-            # 6) Construct the transaction
             tx = CMultiSigTransaction(vin=txins, vout=txouts)
             return tx
 
         except Exception as e:
-            logging.error(f"Error in create_unsigned_transaction: {e}", exc_info=True)
+            logging.error(f"Error in create_unsigned_transaction_multi: {e}", exc_info=True)
             return None
 
     def broadcast_transaction(self, signed_tx: CMultiSigTransaction) -> str:

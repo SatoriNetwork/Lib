@@ -1,5 +1,6 @@
 from typing import Union
 import json
+import uuid
 import pandas as pd
 import datetime as dt
 from functools import partial
@@ -10,6 +11,17 @@ from functools import partial
 
 class StreamId:
     """unique identifier for a stream"""
+
+    @staticmethod
+    def generateUUID(data: dict) -> uuid:
+        namespace = uuid.NAMESPACE_DNS
+        values = [
+            data.get('source'),
+            data.get('author'),
+            data.get('stream'),
+            data.get('target')]
+        combined = ':'.join(str(v) for v in values)
+        return uuid.uuid5(namespace, combined)
 
     def __init__(
         self,
@@ -72,6 +84,10 @@ class StreamId:
         this is how the pubsub system identifies the stream.
         """
         return json.dumps(self.topic(asJson=False, authorAsPubkey=authorAsPubkey))
+
+    @property
+    def uuid(self) -> str:
+        return str(StreamId.generateUUID(self.topic(asJson=False)))
 
     @property
     def id(self):
@@ -192,6 +208,14 @@ class StreamId:
     @staticmethod
     def fromTopic(topic: str = None):
         return StreamId.fromMap(json.loads(topic or "{}"))
+
+
+class StreamUuid(StreamId):
+    """unique identifier for a stream"""
+
+    def __init__(self, uuid: str):
+        super().__init__(source='', author='', stream='', target='')
+        self.uuid = uuid
 
 
 # now that we've made the StreamId hashable this is basically unnecessary.

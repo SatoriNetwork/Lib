@@ -26,9 +26,9 @@ integrate with neuron-dataClient
 - (implement later) ask for any data necessary on demand
 
 integrate with engine-dataClient
-- get DataServer Ip
-  - dsIp = (from satorineuron import config) config.get().get('peer ip', '0.0.0.0')
-  - if that doesn't work... dsIp = start.server.getPublicIp().text.split()[-1] # /ip
+- get DataServer Ip ( Done )
+  - dsIp = (from satorineuron import config) config.get().get('peer ip', '0.0.0.0') ( Done )
+  - if that doesn't work... dsIp = start.server.getPublicIp().text.split()[-1] # /ip ( Done )
 - put a DataClient singleton object in the engine ( Done )
 - connect to our DataServer on startup ( Done )
 - ask DataServer for streams along with peer information (must somehow know how to contact our data server) ( Done )

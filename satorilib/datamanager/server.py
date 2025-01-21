@@ -33,7 +33,7 @@ class DataServer:
         self.publicationsList: dict[str, PeerInfo] = {}
         self.responses: dict[str, Message] = {}
         self.db = SqliteDatabase(db_path, db_name)
-        # self.db.importFromDataFolder()  # can be disabled if new rows are added to the Database and new rows recieved are inside the database
+        self.db.importFromDataFolder()  # can be disabled if new rows are added to the Database and new rows recieved are inside the database
 
     async def startServer(self):
         """Start the WebSocket server"""
@@ -173,7 +173,7 @@ class DataServer:
         if request.table_uuid is None:
             return _createResponse("error", "Missing table_uuid parameter")
 
-        if request.method == 'stream_data':
+        if request.method == 'stream-data':
             df = await self._getStreamData(request.table_uuid)
             if df is None:
                 return _createResponse(

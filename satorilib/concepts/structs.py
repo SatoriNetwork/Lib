@@ -8,7 +8,6 @@ from functools import partial
 # from satorilib.utils.hash import generatePathId
 # from enum import Enum
 
-
 class StreamId:
     """unique identifier for a stream"""
 
@@ -210,6 +209,14 @@ class StreamId:
     @staticmethod
     def fromTopic(topic: str = None):
         return StreamId.fromMap(json.loads(topic or "{}"))
+
+
+class StreamUuid(StreamId):
+    """unique identifier for a stream"""
+
+    def __init__(self, uuid: str):
+        super().__init__(source='', author='', stream='', target='')
+        self.uuid = uuid
 
 
 # now that we've made the StreamId hashable this is basically unnecessary.

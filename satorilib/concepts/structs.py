@@ -13,22 +13,24 @@ class StreamId:
     """unique identifier for a stream"""
 
     @staticmethod
-    def generateUUID(data: dict) -> uuid:
+    def generateUUID(data: Union['StreamId', str, dict] = None) -> uuid:
         namespace = uuid.NAMESPACE_DNS
-        values = [
-            data.get('source'),
-            data.get('author'),
-            data.get('stream'),
-            data.get('target')]
-        combined = ':'.join(str(v) for v in values)
-        return uuid.uuid5(namespace, combined)
+        if isinstance(data, StreamId):
+            data = data.jsonId
+        elif isinstance(data, dict):
+            data = StreamId.fromMap(data).jsonId
+        return uuid.uuid5(namespace, data)
+
+    @staticmethod
+    def keys():
+        return ['source', 'author', 'stream', 'target']
 
     def __init__(
         self,
         source: str,
         author: str,
         stream: str,
-        target: str = "",
+        target: str = '',
     ):
         self.__source = source
         self.__author = author
@@ -58,45 +60,33 @@ class StreamId:
     def target(self):
         return self.__target
 
-    @staticmethod
-    def itemNames():
-        return ["source", "author", "stream", "target"]
-
-    def topic(
-        self, asJson: bool = True, authorAsPubkey=False
-    ) -> Union[str, dict[str, str]]:
-        """
-        the topic (id) for this stream.
-        this is how the pubsub system identifies the stream.
-        """
-        if asJson:
-            return self.topicJson(authorAsPubkey=authorAsPubkey)
+    @property
+    def mapId(self) -> dict[str, str]:
         return {
-            "source": self.__source,
-            "pubkey" if authorAsPubkey else "author": self.__author,
-            "stream": self.__stream,
-            "target": self.__target,
-        }
+            'source': self.__source,
+            'author': self.__author,
+            'stream': self.__stream,
+            'target': self.__target}
 
-    def topicJson(self, authorAsPubkey=False) -> str:
-        """
-        the topic (id) for this stream.
-        this is how the pubsub system identifies the stream.
-        """
-        return json.dumps(self.topic(asJson=False, authorAsPubkey=authorAsPubkey))
+    @property
+    def jsonId(self) -> str:
+        return json.dumps(self.mapId)
 
     @property
     def uuid(self) -> str:
-        return str(StreamId.generateUUID(self.topic(asJson=False)))
+        return str(StreamId.generateUUID(self))
 
     @property
-    def id(self):
+    def id(self)-> tuple[str, str, str, Union[str, None]]:
         return (self.__source, self.__author, self.__stream, self.__target)
 
     @property
-    def cleanId(self):
+    def strId(self) -> str:
         return str((self.__source, self.__author, self.__stream, self.__target)).replace("'", '')
 
+    # TODO: remove after datamanager is live, this is used to determine the
+    #       location of the dataset on disk as a csv, if we ever do save to
+    #       disk we should use something else anyway
     @property
     def idString(self):  # todo: make this .id and the .key a tuple
         return (
@@ -107,14 +97,7 @@ class StreamId:
         )
 
     def __repr__(self):
-        return str(
-            {
-                "source": self.__source,
-                "author": self.__author,
-                "stream": self.__stream,
-                "target": self.__target,
-            }
-        )
+        return str(self.mapId)
 
     def __str__(self):
         return str(self.__repr__())
@@ -122,11 +105,10 @@ class StreamId:
     def __eq__(self, other):
         if isinstance(other, StreamId):
             return (
-                self.source == other.source
-                and self.author == other.author
-                and self.stream == other.stream
-                and self.target == other.target
-            )
+                self.source == other.source and
+                self.author == other.author and
+                self.stream == other.stream and
+                self.target == other.target)
         return False
 
     def __hash__(self):
@@ -169,13 +151,11 @@ class StreamId:
         """
         return hash(
             self.__source + self.__author +
-            self.__stream + (self.__target or "")
-        )
+            self.__stream + (self.__target or ""))
 
     @property
     def generateHash(self) -> str:
         from satorilib.utils.hash import generatePathId, hashIt
-
         return generatePathId(streamId=self)
 
     @property
@@ -193,8 +173,7 @@ class StreamId:
             source=source or self.source,
             author=author or self.author,
             stream=stream or self.stream,
-            target=target or self.target,
-        )
+            target=target or self.target)
 
     @staticmethod
     def fromMap(map: dict = None):
@@ -202,8 +181,7 @@ class StreamId:
             source=(map or {}).get("source"),
             author=(map or {}).get("author", (map or {}).get("pubkey")),
             stream=(map or {}).get("stream", (map or {}).get("name")),
-            target=(map or {}).get("target"),
-        )
+            target=(map or {}).get("target"))
 
     @staticmethod
     def fromTopic(topic: str = None):
@@ -211,7 +189,7 @@ class StreamId:
 
 
 class StreamUuid(StreamId):
-    """unique identifier for a stream"""
+    '''unique identifier for a stream'''
 
     def __init__(self, uuid: str):
         super().__init__(source='', author='', stream='', target='')
@@ -389,7 +367,7 @@ class Stream:
         rep = extractPredicting("reason", rep)  # subscribing to predict x
         return Stream(
             streamId=StreamId.fromMap(rep),
-            **{k: rep[k] for k in rep.keys() if k not in StreamId.itemNames()},
+            **{k: rep[k] for k in rep.keys() if k not in StreamId.keys()},
         )
 
     def asMap(self, noneToBlank=False, includeTopic=True):
@@ -399,7 +377,7 @@ class Stream:
                 if noneToBlank
                 else vars(self)
             ),
-            **({"topic": self.streamId.topic()} if includeTopic else {}),
+            **({"topic": self.streamId.jsonId} if includeTopic else {}),
         }
 
 
@@ -482,7 +460,7 @@ class StreamOverview:
 
     @property
     def topic(self):
-        return self.streamId.topic()
+        return self.streamId.jsonId
 
     @property
     def hashed(self):

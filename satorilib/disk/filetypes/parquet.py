@@ -229,7 +229,7 @@
 #         with open(self.path(aggregate='readme.md'), mode='w+') as f:
 #             file_data = f.read()
 #             if not file_data:
-#                 f.write(self.id.topic())
+#                 f.write(self.id.jsonId)
 
 #     def append(self, df: pd.DataFrame = None):
 #         ''' Layer 1

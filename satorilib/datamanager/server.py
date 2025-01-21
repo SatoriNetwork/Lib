@@ -19,7 +19,7 @@ class DataServer:
     def __init__(
         self,
         host: str,
-        port: int,
+        port: int = 24602,
         db_path: str = "../data",
         db_name: str = "data.db",
     ):
@@ -40,7 +40,6 @@ class DataServer:
         self.server = await websockets.serve(
             self.handleConnection, self.host, self.port
         )
-        info(f"Server started on ws://{self.host}:{self.port}", color="green")
 
     async def handleConnection(self, websocket: websockets.WebSocketServerProtocol):
         """Handle incoming connections and messages"""

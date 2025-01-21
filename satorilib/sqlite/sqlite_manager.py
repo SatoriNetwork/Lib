@@ -47,7 +47,7 @@ class SqliteDatabase:
         try:
             if self.conn:
                 self.conn.close()
-            info(f"Connecting to database at: {self.dbname}")
+            debug(f"Connecting to database at: {self.dbname}")
             os.makedirs(os.path.dirname(self.dbname), exist_ok=True)
             self.conn = sqlite3.connect(self.dbname)
             self.cursor = self.conn.cursor()

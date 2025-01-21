@@ -12,9 +12,9 @@ create DataManager startup process - it's a separate process, starts up before t
 - create DataServer object and listen for instructions forever (data.py) ( Done )
 --- 
 integrate with neuron-dataClient
-- get DataServer Ip
-  - dsIp = config.get().get('peer ip', '0.0.0.0')
-  - if that doesn't work... dsIp = start.server.getPublicIp().text.split()[-1] # /ip
+- get DataServer Ip ( Done )
+  - dsIp = config.get().get('peer ip', '0.0.0.0') ( Done )
+  - if that doesn't work... dsIp = start.server.getPublicIp().text.split()[-1] # /ip ( Done )
 - put a DataClient singleton object in the neuron ( Done )
   - during the startup process in init.py (StartupDag singleton) instanteate a DataClient ( Done )
 - connect to our DataServer on startup ( Done )

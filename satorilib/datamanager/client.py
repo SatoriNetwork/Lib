@@ -20,7 +20,7 @@ class DataClient:
         self.subscriptions: dict[Subscription, queue.Queue] = {}
         self.responses: dict[str, Message] = {}
 
-    async def connectToServer(self, peerHost: str, peerPort: int):
+    async def connectToServer(self, peerHost: str, peerPort: int = 24602):
         """Connect to our own Server"""
         uri = f"ws://{peerHost}:{peerPort}"
         try:
@@ -193,7 +193,8 @@ class DataClient:
 
     async def sendRequest(
         self,
-        peerAddr: Tuple[str, int] = ("0.0.0.0", 24602),
+        peerHost: str = '0.0.0.0',
+        peerPort: int = 24602,
         table_uuid: str = None,
         method: str = "initiate-connection",
         data: pd.DataFrame = None,
@@ -202,6 +203,7 @@ class DataClient:
         toDate: str = None,
     ) -> Dict:
 
+        peerAddr = (peerHost, peerPort)
         id = self._generateCallId()
 
         if method == "initiate-connection":

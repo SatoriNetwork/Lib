@@ -191,7 +191,7 @@ class DataClient:
         )
         return await self.send(peerAddr, request)
 
-    async def sendRequest(
+    async def sendRequest( 
         self,
         peerHost: str = '0.0.0.0',
         peerPort: int = 24602,
@@ -203,33 +203,9 @@ class DataClient:
         toDate: str = None,
     ) -> Dict:
 
-        peerAddr = (peerHost, peerPort)
         id = self._generateCallId()
 
-        if method == "initiate-connection":
-            request = Message({"method": method, "id": id})
-        elif method == "get-subscriptions-publications": 
-            request = Message(
-                {"method": method, "id": id}
-            )
-        elif method == "get-pubsub-list":
-            request = Message(
-                {"method": method, "id": id}
-            )
-        elif method == "send-publishers-list":
-            request = Message(
-                {"method": method, "id": id, "params": {"table_uuid": table_uuid}, "data": data}
-            )
-        elif method == "send-subscribers-list":
-            request = Message(
-                {"method": method, "id": id, "params": {"table_uuid": table_uuid}, "data": data}
-            )
-
-        elif method == "notify-subscribers":
-            request = Message(
-                {"method": method, "id": id, "params": {"table_uuid": table_uuid}, "data": data}
-            )
-        elif method == "data-in-range" and data is not None:
+        if method == "data-in-range" and data is not None:
             if 'from_ts' in data.columns and 'to_ts' in data.columns:
                 fromDate = data['from_ts'].iloc[0]
                 toDate = data['to_ts'].iloc[0]
@@ -242,7 +218,7 @@ class DataClient:
                 raise ValueError(
                     "DataFrame with timestamp is required for last record before requests"
                 )
-            if 'ts' not in data.columns:
+            elif 'ts' not in data.columns:
                 raise ValueError(
                     "DataFrame must contain 'ts' column for last record before requests"
                 )
@@ -263,4 +239,4 @@ class DataClient:
                 "data": data,
             }
         )
-        return await self.send(peerAddr, request)
+        return await self.send((peerHost, peerPort), request)

@@ -29,6 +29,7 @@ class DataServer:
         self.server = None
         self.connectedClients: dict[Tuple[str, int], ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
+        self.pubSubMapping: dict[str, dict] = {}
         self.subscriptionsList: dict[str, PeerInfo] = {}
         self.publicationsList: dict[str, PeerInfo] = {}
         self.responses: dict[str, Message] = {}
@@ -128,20 +129,46 @@ class DataServer:
                 response["stream_info"] = streamInfo
             return response
         
-        def _convertPeerInfoDict(data: dict) -> dict:
-            converted_data = {}
-            for uuid, peer_info in data.items():
-                converted_data[uuid] = {
-                    'subscribers': peer_info.subscribersIp,
-                    'publishers': peer_info.publishersIp
-                }
-            return converted_data
+        def _convertPeerInfoDict(data: dict, pubsubmap: bool = False) -> dict:
+            convertedData = {}
+            if pubsubmap:
+                for subUuid, data in data.items():
+                    convertedData[subUuid] = data
+            else:
+                for uuid, peerInfo in data.items():
+                    convertedData[uuid] = {
+                        'subscribers': peerInfo.subscribersIp,
+                        'publishers': peerInfo.publishersIp
+                    }
+            return convertedData
 
         if request.isSubscription and request.table_uuid is not None:
             self.connectedClients[peerAddr].add_subcription(request.table_uuid)
             return _createResponse(
                 "success", f"Observation recieved for {request.table_uuid}"
             )
+        elif request.method == 'notify-subscribers':
+            await self.notifySubscribers(request)
+            return _createResponse("success", "Subscribers Notified", request.data)
+        elif request.method == 'initiate-connection':
+            return _createResponse("success", "Connection established")
+        elif request.method == 'send-pubsub-map':
+            for sub_uuid, data in request.table_uuid.items():
+                self.pubSubMapping[sub_uuid] = data
+                self.subscriptionsList[sub_uuid] = PeerInfo(data['subscription_subscribers'], data['subscription_publishers'])
+                self.publicationsList[data['publication_uuid']] = PeerInfo(data['publication_subscribers'], data['publication_publishers'])
+            return _createResponse("success", "Pub-Sub Mapping added in Server")
+        elif request.method == 'get-pubsub-map':
+            streamDict = _convertPeerInfoDict(self.pubSubMapping, True)
+            return _createResponse(
+                "success",
+                "Stream information of subscriptions with peer information recieved",
+                streamInfo=streamDict,
+            )
+        elif request.method == 'send-subscribers-list':
+            for table_uuid, data_dict in request.table_uuid.items():
+                self.subscriptionsList[table_uuid] = PeerInfo(data_dict['subscribers'], data_dict['publishers'])
+            return _createResponse("success", "Subscriber list added in Server")
         elif request.method == 'get-sub-list':
             streamDict = _convertPeerInfoDict(self.subscriptionsList)
             return _createResponse(
@@ -149,6 +176,10 @@ class DataServer:
                 "Stream information of subscriptions with peer information recieved",
                 streamInfo=streamDict,
             )
+        elif request.method == 'send-publishers-list':
+            for table_uuid, data_dict in request.table_uuid.items():
+                self.publicationsList[table_uuid] = PeerInfo(data_dict['subscribers'], data_dict['publishers'])
+            return _createResponse("success", "publication list added in Server")
         elif request.method == 'get-pub-list':
             streamDict = _convertPeerInfoDict(self.publicationsList)
             return _createResponse(
@@ -156,19 +187,6 @@ class DataServer:
                 "Stream information of publications with peer information recieved",
                 streamInfo=streamDict,
             )
-        elif request.method == 'notify-subscribers':
-            await self.notifySubscribers(request)
-            return _createResponse("success", "Subscribers Notified", request.data)
-        elif request.method == 'initiate-connection':
-            return _createResponse("success", "Connection established")
-        elif request.method == 'send-subscribers-list':
-            for table_uuid, data_dict in request.table_uuid.items():
-                self.subscriptionsList[table_uuid] = PeerInfo(data_dict['subscribers'], data_dict['publishers'])
-            return _createResponse("success", "Subscriber list added in Server")
-        elif request.method == 'send-publishers-list':
-            for table_uuid, data_dict in request.table_uuid.items():
-                self.publicationsList[table_uuid] = PeerInfo(data_dict['subscribers'], data_dict['publishers'])
-            return _createResponse("success", "publication list added in Server")
 
         if request.table_uuid is None:
             return _createResponse("error", "Missing table_uuid parameter")

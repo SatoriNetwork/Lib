@@ -46,41 +46,37 @@ class TestEvrmoreP2SHWallet(unittest.TestCase):
         
         self.assertIsInstance(fetched_stori_utxos, list)
         self.assertIsInstance(fetched_evr_utxos, list)
-        # print("Fetched SATORI UTXOs: ", fetched_stori_utxos)
-        # print("Fetched EVR UTXOs: ", fetched_evr_utxos)
 
     def test_create_unsigned_transaction(self):
         """Test creating an unsigned transaction using a specific P2SH address."""
         self.wallet.p2sh_address = P2SHEvrmoreAddress("eEY5brnAULc9wnr2Evfr31rdUHpoZbn1Uq") 
         self.wallet.generate_multi_party_p2sh_address(self.public_keys, required_signatures=2)
         recipients = [
-            # {"address": "EMgpUQ8ucUSnZnrpYvD2n7na48LfSbZHti", "amount": 1000000, "asset": "EVR"},
-            # {"address": "EQ2dsWBZAJCUJsNTFm1aDY4BQHXTmFRGK5", "amount": 1000000, "asset": "EVR"},
-            {"address": "EMgpUQ8ucUSnZnrpYvD2n7na48LfSbZHti", "amount": 1000000, "asset": "SATORI"}
+            {"address": "EMgpUQ8ucUSnZnrpYvD2n7na48LfSbZHti", "amount": 1000000, "asset": "EVR"},
+            {"address": "EMgpUQ8ucUSnZnrpYvD2n7na48LfSbZHti", "amount": 20000000, "asset": "SATORI"}
         ]
         fee_rate = 2000
         change_address = "eEY5brnAULc9wnr2Evfr31rdUHpoZbn1Uq"
 
-        # Create the transaction
         unsigned_tx = self.wallet.create_unsigned_transaction_multi(recipients, fee_rate, change_address)
-        # print(f"tx: {unsigned_tx}")
-        sighash = self.wallet.generate_sighash(unsigned_tx)
-        signatures = [
-            self.wallet.sign_independently(unsigned_tx, self.private_keys[0], sighash),
-            self.wallet.sign_independently(unsigned_tx, self.private_keys[1], sighash)
-        ]
         
-        # Apply the collected signatures
-        signed_tx = self.wallet.apply_signatures(unsigned_tx, signatures)
-        # print(f"signed_tx: {signed_tx}")
+        signatures_list = []
+
+        for i, vin in enumerate(unsigned_tx.vin):
+            sighash = self.wallet.generate_sighash(unsigned_tx, i)
+
+            signatures = [
+                self.wallet.sign_independently(unsigned_tx, self.private_keys[0], sighash),
+                self.wallet.sign_independently(unsigned_tx, self.private_keys[1], sighash)
+            ]
+            signatures_list.append(signatures)
+
+        signed_tx = self.wallet.apply_signatures(unsigned_tx, signatures_list)
+
         self.assertIsNotNone(signed_tx)
-        # print("Transaction Signed Successfully.")
         txid = self.wallet.broadcast_transaction(signed_tx)
         print(f"txid: {txid}")
         self.assertIsNotNone(txid)
-        # print("Transaction Broadcasted Successfully.")
-
-        # print("Test passed: create_unsigned_transaction_multi")
 
 if __name__ == '__main__':
     unittest.main()

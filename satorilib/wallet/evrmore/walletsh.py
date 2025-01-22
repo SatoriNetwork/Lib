@@ -70,11 +70,11 @@ class EvrmoreP2SHWallet(WalletBase):
             logging.error(f"Error fetching UTXOs: {e}", exc_info=True)
             return []
 
-    def generate_sighash(self, tx: CMultiSigTransaction) -> bytes:
+    def generate_sighash(self, tx: CMultiSigTransaction, input_index: int) -> bytes:
         """Generate the sighash for a transaction (for all participants)."""
         if not self.redeem_script:
             raise ValueError("Redeem script not set.")
-        return tx.generate_sighash(self.redeem_script)
+        return tx.generate_sighash(self.redeem_script, input_index)
 
     @staticmethod
     def sign_independently(tx: CMultiSigTransaction, private_key: CEvrmoreSecret, sighash: bytes) -> bytes:
@@ -85,10 +85,10 @@ class EvrmoreP2SHWallet(WalletBase):
             logging.error(f"Error signing transaction: {e}", exc_info=True)
             return b''
 
-    def apply_signatures(self, tx: CMultiSigTransaction, signatures: List[bytes]) -> CMultiSigTransaction:
+    def apply_signatures(self, tx: CMultiSigTransaction, signatures_list: List[List[bytes]]) -> CMultiSigTransaction:
         """Apply multiple signatures to a multisig transaction."""
         try:
-            tx.apply_multisig_signatures(signatures, self.redeem_script)
+            tx.apply_multisig_signatures(signatures_list, self.redeem_script)
             return tx
         except Exception as e:
             logging.error(f"Error applying signatures: {e}", exc_info=True)
@@ -128,9 +128,9 @@ class EvrmoreP2SHWallet(WalletBase):
             
             if asset != 'EVR':
                 asset_script = CScript([
-                    OP_DUP, OP_HASH160, recipient_script_pubkey, OP_EQUALVERIFY, OP_CHECKSIG,
+                    *recipient_script_pubkey,
                     OP_EVR_ASSET,
-                    bytes.fromhex(AssetTransaction.satoriHex(asset) +
+                    bytes.fromhex(AssetTransaction.satoriHex(currency="evr", asset=asset) +
                                     TxUtils.padHexStringTo8Bytes(
                                         TxUtils.intToLittleEndianHex(recipient["amount"]))),
                     OP_DROP
@@ -148,9 +148,9 @@ class EvrmoreP2SHWallet(WalletBase):
                 change_script_pubkey = CEvrmoreAddress(change_address).to_scriptPubKey()
                 if asset != 'EVR':
                     change_script = CScript([
-                        OP_DUP, OP_HASH160, change_script_pubkey, OP_EQUALVERIFY, OP_CHECKSIG,
+                        *change_script_pubkey,
                         OP_EVR_ASSET,
-                        bytes.fromhex(AssetTransaction.satoriHex(asset) +
+                        bytes.fromhex(AssetTransaction.satoriHex(currency="evr", asset=asset) +
                                         TxUtils.padHexStringTo8Bytes(
                                             TxUtils.intToLittleEndianHex(change_value))),
                         OP_DROP
@@ -197,7 +197,6 @@ class EvrmoreP2SHWallet(WalletBase):
 
             required_amounts = {r.get('asset', 'EVR').upper(): r['amount'] for r in recipients}
             txins, total_input_by_asset = self.compileInputs(utxos_by_asset, required_amounts, fee_rate)
-
             change_value_by_asset = {}
             for asset, total_input_amount in total_input_by_asset.items():
                 total_output_amount = sum(r['amount'] for r in recipients if r.get('asset', 'EVR').upper() == asset)

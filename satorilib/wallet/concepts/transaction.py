@@ -214,21 +214,24 @@ class AssetTransaction():
     satori = '5341544f5249'
 
     @staticmethod
-    def satoriHex(currency: str) -> str:
-        currency = currency.lower()
-        if currency == 'rvn':
+    def satoriHex(currency: str, asset: str) -> str:
+        if currency.lower() == 'rvn':
             symbol = AssetTransaction.rvn
-        elif currency == 'evr':
+        elif currency.lower() == 'evr':
             symbol = AssetTransaction.evr
-        elif currency == 'satori':
-            symbol = AssetTransaction.satori
         else:
-            raise Exception(f'Invalid currency: {currency}')
+            raise Exception('invalid currency')
+
+        asset_length_hex = f"{len(asset):02x}"
+
+        asset_hex = asset.encode('utf-8').hex()
+
         return (
             symbol +
             AssetTransaction.t +
-            AssetTransaction.satoriLen +
-            AssetTransaction.satori)
+            asset_length_hex +
+            asset_hex
+        )
 
     @staticmethod
     def memoHex(memo: str) -> str:

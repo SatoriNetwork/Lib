@@ -60,11 +60,11 @@ class EvrmoreP2SHWallet(WalletBase):
             if not self.p2sh_address:
                 raise ValueError("P2SH address not generated yet.")
             all_utxos = self.electrumx.api.getUnspentCurrency(self.p2sh_address.to_scripthash(), extraParam=True)
-            
+
             for utxo in all_utxos:
                 if utxo.get('asset') is None:
                     utxo['asset'] = 'EVR'
-            
+
             return [utxo for utxo in all_utxos if utxo['asset'] == asset]
         except Exception as e:
             logging.error(f"Error fetching UTXOs: {e}", exc_info=True)
@@ -84,6 +84,7 @@ class EvrmoreP2SHWallet(WalletBase):
         except Exception as e:
             logging.error(f"Error signing transaction: {e}", exc_info=True)
             return b''
+
 
     def apply_signatures(self, tx: CMultiSigTransaction, signatures_list: List[List[bytes]]) -> CMultiSigTransaction:
         """Apply multiple signatures to a multisig transaction."""

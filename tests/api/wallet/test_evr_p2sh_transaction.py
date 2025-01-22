@@ -33,7 +33,7 @@ class TestEvrmoreP2SHWallet(unittest.TestCase):
         )
         self.assertIsNotNone(p2sh_address, "P2SH address generation failed.")
         self.assertIsNotNone(redeem_script, "Redeem script generation failed.")
-        
+
         fetched_utxos = self.wallet.fetch_utxos("EVR")
         self.assertIsInstance(fetched_utxos, list)
         self.assertEqual(len(self.public_keys), 3)

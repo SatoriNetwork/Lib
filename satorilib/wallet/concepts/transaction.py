@@ -221,11 +221,8 @@ class AssetTransaction():
             symbol = AssetTransaction.evr
         else:
             raise Exception('invalid currency')
-
         asset_length_hex = f"{len(asset):02x}"
-
         asset_hex = asset.encode('utf-8').hex()
-
         return (
             symbol +
             AssetTransaction.t +

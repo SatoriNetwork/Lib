@@ -13,10 +13,10 @@ from satorilib.datamanager.helper import Message, ConnectedPeer, Subscription
 class DataClient:
     def __init__(
         self,
-        otherServer: Union[DataServer, None] = None,
+        server: Union[DataServer, None] = None,
     ):
-        self.otherServers = otherServer
-        self.connectedServer: Dict[Tuple[str, int], ConnectedPeer] = {}
+        self.server = server
+        self.peers: Dict[Tuple[str, int], ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
         self.responses: dict[str, Message] = {}
 
@@ -25,11 +25,11 @@ class DataClient:
         uri = f"ws://{peerHost}:{peerPort}"
         try:
             websocket = await websockets.connect(uri)
-            self.connectedServer[(peerHost, peerPort)] = ConnectedPeer(
+            self.peers[(peerHost, peerPort)] = ConnectedPeer(
                 (peerHost, peerPort), websocket
             )
             asyncio.create_task(
-                self.listenToPeer(self.connectedServer[(peerHost, peerPort)])
+                self.listenToPeer(self.peers[(peerHost, peerPort)])
             )
             debug(f"Connected to peer at {uri}", print=True)
         except Exception as e:
@@ -45,7 +45,10 @@ class DataClient:
         async def listen():
             try:
                 response = Message(json.loads(await peer.websocket.recv()))
-                await self.handleMessage(response)
+                # could we leverage async here to handle the message in the 
+                # background, allowing us to immedaitely return to listening 
+                # for the next message?
+                self.handleMessage(response)
             except websockets.exceptions.ConnectionClosed:
                 self.disconnect(peer)
 
@@ -62,16 +65,22 @@ class DataClient:
     def _generateCallId() -> str:
         return str(time.time())
 
-    async def handleMessage(self, message: Message) -> None:
+    def handleMessage(self, message: Message) -> None:
         if message.isSubscription:
-            if self.otherServers is not None:
-                self.otherServers.notifySubscribers(message)
+            if self.server is not None:
+                # this should probably change
+                # we want to pass the message to the server for two purposes
+                #  - so it can notify it's subscribers
+                #  - and also so it can save the data properly
+                # so we should just pass it and let it handle it.
+                self.server.notifySubscribers(message)
             subscription = self.findSubscription(
                 subscription=Subscription(message.method, message.table_uuid)
             )
             if message.data is not None:
                 try:
-                    df = pd.read_json(StringIO(message.data), orient='split')
+                    # how to turn the message into a dataframe
+                    #df = pd.read_json(StringIO(message.data), orient='split')
                     # TODO : send observation to server to save in database
                     debug(f"Received and send subscription data to Data Manager for {message.table_uuid}")
                 except Exception as e:
@@ -124,12 +133,12 @@ class DataClient:
 
     async def disconnectAll(self):
         """Disconnect from all peers and stop the server"""
-        for connectedPeer in self.connectedServer.values():
+        for connectedPeer in self.peers.values():
             self.disconnect(connectedPeer)
         info("Disconnected from all peers and stopped server")
 
     async def connect(self, peerAddr: Tuple[str, int]) -> Dict:
-        if peerAddr not in self.connectedServer:
+        if peerAddr not in self.peers:
             peerHost, peerPort = peerAddr
             await self.connectToServer(peerHost, peerPort)
 
@@ -143,7 +152,7 @@ class DataClient:
 
         await self.connect(peerAddr)
         try:
-            await self.connectedServer[peerAddr].websocket.send(request.to_json())
+            await self.peers[peerAddr].websocket.send(request.to_json())
             if sendOnly:
                 return None
             response = await self.listenForResponse(request.id)

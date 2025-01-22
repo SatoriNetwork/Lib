@@ -33,9 +33,10 @@ integrate with engine-dataClient
 - connect to our DataServer on startup ( Done )
 - ask DataServer for streams along with peer information (must somehow know how to contact our data server) ( Done )
   - payload: {table_uuid: [publisher ip, subscirber ip, subscirber ip, ...]} ( Done )
-- ask DataServer for our current known data of our streams (from disk, full df)
-- engine data client asks external data servers for subscriptions
-  - handle subscriber list
+- ask DataServer for our current known data of our streams (from disk, full df) ( Done )
+
+choose peer to connect to
+- handle subscriber list
     - filter our own ip out of the subscriber list
     - randomize subscriber list (shuffle payload[table_uuid][1:])
   - connect to a peer for a stream
@@ -43,11 +44,16 @@ integrate with engine-dataClient
       - if able to connect, make sure they have the stream we're looking for available for subscribing to
         - if not, keep looking for a valid peer
     - go down the subscriber list until you find one...
+
+- engine data client asks external data servers for subscriptions
+  
   - and sync (for now just ask for their entire dataset every time)
     - if it's different than the df we got from our own dataserver, then tell dataserver to save this instead
   - and subscribe to the stream so we get the information
     - whenever we get an observation on this stream, pass to the DataServer
-- continually generate predictions for prediction publication streams and pass that to DataServer
+- continually generate predictions for prediction publication streams and pass that to DataServer ( Done )
+
+
 
 ---
 subsume all logic currently used in engine for managing data on disk

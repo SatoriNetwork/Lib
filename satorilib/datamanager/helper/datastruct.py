@@ -3,9 +3,11 @@ import websockets
 import asyncio
 import json
 
+
 class Subscription:
     def __init__(
         self,
+        #unique id?
         method: str,
         tableuuid: Union[list, None] = None,
         callback: Union[callable, None] = None

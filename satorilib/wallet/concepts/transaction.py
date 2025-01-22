@@ -214,7 +214,7 @@ class AssetTransaction():
     satori = '5341544f5249'
 
     @staticmethod
-    def satoriHex(currency: str, asset: str) -> str:
+    def satoriHex(currency: str, asset: str = 'SATORI') -> str:
         if currency.lower() == 'rvn':
             symbol = AssetTransaction.rvn
         elif currency.lower() == 'evr':

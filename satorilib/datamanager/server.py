@@ -128,7 +128,7 @@ class DataServer:
             if streamInfo is not None:
                 response["stream_info"] = streamInfo
             return response
-        
+
         def _convertPeerInfoDict(data: dict, pubsubmap: bool = False) -> dict:
             convertedData = {}
             if pubsubmap:
@@ -187,6 +187,17 @@ class DataServer:
                 "Stream information of publications with peer information recieved",
                 streamInfo=streamDict,
             )
+        elif request.method == 'confirm-subscription':
+            hasUuid = any(request.table_uuid in key for key in self.publicationsList.keys())
+            if hasUuid:
+                return _createResponse(
+                    "success",
+                    "Stream available for subscription",
+                )
+            else:
+                return _createResponse(
+                    "failed", "Stream not available for subscribing to"
+                )
 
         if request.table_uuid is None:
             return _createResponse("error", "Missing table_uuid parameter")

@@ -48,7 +48,7 @@ class DataClient:
                 # could we leverage async here to handle the message in the 
                 # background, allowing us to immedaitely return to listening 
                 # for the next message?
-                self.handleMessage(response)
+                asyncio.create_task(self.handleMessage(response))
             except websockets.exceptions.ConnectionClosed:
                 self.disconnect(peer)
 
@@ -65,7 +65,7 @@ class DataClient:
     def _generateCallId() -> str:
         return str(time.time())
 
-    def handleMessage(self, message: Message) -> None:
+    async def handleMessage(self, message: Message) -> None:
         if message.isSubscription:
             if self.server is not None:
                 # this should probably change
@@ -73,7 +73,7 @@ class DataClient:
                 #  - so it can notify it's subscribers
                 #  - and also so it can save the data properly
                 # so we should just pass it and let it handle it.
-                self.server.notifySubscribers(message)
+                await self.server.notifySubscribers(message)
             subscription = self.findSubscription(
                 subscription=Subscription(message.method, message.table_uuid)
             )
@@ -88,7 +88,7 @@ class DataClient:
             q = self.subscriptions.get(subscription)
             if isinstance(q, queue.Queue):
                 q.put(message)
-            subscription(message)
+            await subscription(message)
             debug("Current subscriptions:", self.subscriptions)
             info("Subscribed to : ", message.table_uuid)
         elif message.isResponse:

@@ -32,20 +32,22 @@ def isValidEvrmoreAddress(address: str) -> bool:
     try:
         from evrmore.wallet import CEvrmoreAddress
         CEvrmoreAddress(address)
+        if not isValidEvrmoreAddressBasic(address):
+            return False
+        is_valid, version = base58_check_decode(address)
+        if not is_valid:
+            return False
+        # Evrmore P2PKH (starts with 'E'), adjust the version byte accordingly
+        if version == 0x21:  # Example for Evrmore P2PKH (adjust if necessary)
+            return True
+        elif version == 0x5a:  # Example for Evrmore P2SH (adjust if necessary)
+            return True
+        else:
+            return False  # Invalid version byte
     except Exception:
         return False
-    if not isValidEvrmoreAddressBasic(address):
-        return False
-    is_valid, version = base58_check_decode(address)
-    if not is_valid:
-        return False
-    # Evrmore P2PKH (starts with 'E'), adjust the version byte accordingly
-    if version == 0x21:  # Example for Evrmore P2PKH (adjust if necessary)
-        return True
-    elif version == 0x5a:  # Example for Evrmore P2SH (adjust if necessary)
-        return True
-    else:
-        return False  # Invalid version byte
+
+
 
 
 def validEvrmoreAddress(address: str) -> Union[str, None]:

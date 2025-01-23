@@ -53,7 +53,9 @@ choose peer to connect to
     - whenever we get an observation on this stream, pass to the DataServer
 - continually generate predictions for prediction publication streams and pass that to DataServer ( Done )
 
-
+when a client is connected to a server that goes down or gives a message on a subscription that it's no longer providing that subscription
+then it should send that message to it's dataserver so all subscribers to it on that stream (or all the streams of the server that went down)
+stop relying on it for that subscription. it should then restart it's process for the stream or affected streams to find a new provider to subscribe to.
 
 ---
 subsume all logic currently used in engine for managing data on disk
@@ -64,8 +66,9 @@ p2p - get histories (just request history of data)
 p2p - replace pubsub servers (start using subscriptions)
 ---
 relay if necessary?
-- requires mesh network
+- requires mesh network for edge cases
 ---
+optimization - prior attribute added to StreamId:
 datastreams are immutable, they don't change, so if there's anything that does change 
 (like the target changes because the api became different) then we have to build a new
 stream, for optimization purposes we may want to be able to link back to the old stream

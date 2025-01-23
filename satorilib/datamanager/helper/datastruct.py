@@ -24,7 +24,7 @@ class Subscription:
             return self.method == other.method and self.tableuuid == other.tableuuid
         return False
 
-    def __call__(self, *args, **kwargs):
+    async def __call__(self, *args, **kwargs):
         '''
         This is the callback that is called when a subscription is triggered.
         it takes time away from listening to the socket, so it should be short-
@@ -37,7 +37,7 @@ class Subscription:
         '''
         if self.shortLivedCallback is None:
             return None
-        return self.shortLivedCallback(*args, **kwargs)
+        return await self.shortLivedCallback(self, *args, **kwargs)
 
 class PeerInfo:
 

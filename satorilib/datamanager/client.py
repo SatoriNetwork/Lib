@@ -15,6 +15,7 @@ class DataClient:
         self,
         server: Union[DataServer, None] = None,
     ):
+        # this should be a ConnectedPeer to the server.
         self.server = server
         self.peers: Dict[Tuple[str, int], ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
@@ -36,24 +37,12 @@ class DataClient:
             error(f"Failed to connect to peer at {uri}: {e}")
 
     async def listenToPeer(self, peer: ConnectedPeer):
-        """Listen for messages from a connected peer"""
-
-        def handleMultipleMessages(buffer: str):
-            '''split on the first newline to handle multiple messages'''
-            return buffer.partition('\n')
-
-        async def listen():
-            try:
-                response = Message(json.loads(await peer.websocket.recv()))
-                # could we leverage async here to handle the message in the 
-                # background, allowing us to immedaitely return to listening 
-                # for the next message?
-                asyncio.create_task(self.handleMessage(response))
-            except websockets.exceptions.ConnectionClosed:
-                self.disconnect(peer)
-
-        while not peer.stop.is_set():
-            await listen()
+        try:
+            async for raw_msg in peer.websocket:
+                message = Message(json.loads(raw_msg))
+                asyncio.create_task(self.handleMessage(message))
+        except websockets.exceptions.ConnectionClosed:
+            self.disconnect(peer)
 
     def findSubscription(self, subscription: Subscription) -> Subscription:
         for s in self.subscriptions.keys():
@@ -65,6 +54,7 @@ class DataClient:
     def _generateCallId() -> str:
         return str(time.time())
 
+    # TODO : refactor
     async def handleMessage(self, message: Message) -> None:
         if message.isSubscription:
             if self.server is not None:
@@ -73,7 +63,7 @@ class DataClient:
                 #  - so it can notify it's subscribers
                 #  - and also so it can save the data properly
                 # so we should just pass it and let it handle it.
-                await self.server.notifySubscribers(message)
+                await self.server.notifySubscribers(message) # TODO : request send to the server about the subscription
             subscription = self.findSubscription(
                 subscription=Subscription(message.method, message.table_uuid)
             )

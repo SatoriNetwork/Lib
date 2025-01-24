@@ -1,1 +1,1 @@
-stakeRequired: float = 11.0
+stakeRequired: float = 12.0

@@ -65,14 +65,14 @@ class DataClient:
                 # so we should just pass it and let it handle it.
                 await self.server.notifySubscribers(message) # TODO : request send to the server about the subscription
             subscription = self.findSubscription(
-                subscription=Subscription(message.method, message.table_uuid)
+                subscription=Subscription(message.method, message.uuid)
             )
             if message.data is not None:
                 try:
                     # how to turn the message into a dataframe
                     #df = pd.read_json(StringIO(message.data), orient='split')
                     # TODO : send observation to server to save in database
-                    debug(f"Received and send subscription data to Data Manager for {message.table_uuid}")
+                    debug(f"Received and send subscription data to Data Manager for {message.uuid}")
                 except Exception as e:
                     error(f"Error processing subscription data: {e}")
             q = self.subscriptions.get(subscription)
@@ -80,7 +80,7 @@ class DataClient:
                 q.put(message)
             await subscription(message)
             debug("Current subscriptions:", self.subscriptions)
-            info("Subscribed to : ", message.table_uuid)
+            info("Subscribed to : ", message.uuid)
         elif message.isResponse:
             self.responses[message.id] = message
 
@@ -160,7 +160,7 @@ class DataClient:
     async def subscribe(
         self,
         peerAddr: Tuple[str, int],
-        table_uuid: str,
+        uuid: str,
         method: str = "subscribe",
         callback: Union[callable, None] = None,
         data: pd.DataFrame = None,
@@ -172,7 +172,7 @@ class DataClient:
         Creates a subscription request
         """
         id = self._generateCallId()
-        subscription = Subscription(method, table_uuid, callback=callback)
+        subscription = Subscription(method, uuid, callback=callback)
         self.subscriptions[subscription] = queue.Queue()
         request = Message(
             {
@@ -180,7 +180,7 @@ class DataClient:
                 "id": id,
                 "sub": False,
                 "params": {
-                    "table_uuid": table_uuid,
+                    "uuid": uuid,
                     "replace": replace,
                     "from_ts": fromDate,
                     "to_ts": toDate,
@@ -194,7 +194,7 @@ class DataClient:
         self,
         peerHost: str = '0.0.0.0',
         peerPort: int = 24602,
-        table_uuid: str = None,
+        uuid: str = None,
         method: str = "initiate-connection",
         data: pd.DataFrame = None,
         replace: bool = False,
@@ -230,7 +230,7 @@ class DataClient:
                 "method": method,
                 "id": id,
                 "params": {
-                    "table_uuid": table_uuid,
+                    "uuid": uuid,
                     "replace": replace,
                     "from_ts": fromDate,
                     "to_ts": toDate,

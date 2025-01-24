@@ -86,7 +86,7 @@ class DataServer:
         if yes, await self.connected_peers[subscribig_peer].websocket.send(message)
         '''
         for peerAddr in self.connectedClients.values():
-            if msg.table_uuid in self.connectedClients[peerAddr].subscriptions:
+            if msg.uuid in self.connectedClients[peerAddr].subscriptions:
                 await self.connectedClients[peerAddr].websocket.send(msg.to_json())
 
     async def disconnectAllPeers(self):
@@ -119,7 +119,7 @@ class DataServer:
                 "method": request.method,
                 "message": message,
                 "params": {
-                    "table_uuid": request.table_uuid,
+                    "uuid": request.uuid,
                 },
                 "sub": request.sub,
             }
@@ -142,10 +142,10 @@ class DataServer:
                     }
             return convertedData
 
-        if request.isSubscription and request.table_uuid is not None:
-            self.connectedClients[peerAddr].add_subcription(request.table_uuid)
+        if request.isSubscription and request.uuid is not None:
+            self.connectedClients[peerAddr].add_subcription(request.uuid)
             return _createResponse(
-                "success", f"Observation recieved for {request.table_uuid}"
+                "success", f"Observation recieved for {request.uuid}"
             )
         elif request.method == 'notify-subscribers':
             await self.notifySubscribers(request)
@@ -153,7 +153,7 @@ class DataServer:
         elif request.method == 'initiate-connection':
             return _createResponse("success", "Connection established")
         elif request.method == 'send-pubsub-map':
-            for sub_uuid, data in request.table_uuid.items():
+            for sub_uuid, data in request.uuid.items():
                 self.pubSubMapping[sub_uuid] = data
                 self.subscriptionsList[sub_uuid] = PeerInfo(data['subscription_subscribers'], data['subscription_publishers'])
                 self.publicationsList[data['publication_uuid']] = PeerInfo(data['publication_subscribers'], data['publication_publishers'])
@@ -166,8 +166,8 @@ class DataServer:
                 streamInfo=streamDict,
             )
         elif request.method == 'send-subscribers-list':
-            for table_uuid, data_dict in request.table_uuid.items():
-                self.subscriptionsList[table_uuid] = PeerInfo(data_dict['subscribers'], data_dict['publishers'])
+            for uuid, data_dict in request.uuid.items():
+                self.subscriptionsList[uuid] = PeerInfo(data_dict['subscribers'], data_dict['publishers'])
             return _createResponse("success", "Subscriber list added in Server")
         elif request.method == 'get-sub-list':
             streamDict = _convertPeerInfoDict(self.subscriptionsList)
@@ -177,8 +177,8 @@ class DataServer:
                 streamInfo=streamDict,
             )
         elif request.method == 'send-publishers-list':
-            for table_uuid, data_dict in request.table_uuid.items():
-                self.publicationsList[table_uuid] = PeerInfo(data_dict['subscribers'], data_dict['publishers'])
+            for uuid, data_dict in request.uuid.items():
+                self.publicationsList[uuid] = PeerInfo(data_dict['subscribers'], data_dict['publishers'])
             return _createResponse("success", "publication list added in Server")
         elif request.method == 'get-pub-list':
             streamDict = _convertPeerInfoDict(self.publicationsList)
@@ -188,7 +188,7 @@ class DataServer:
                 streamInfo=streamDict,
             )
         elif request.method == 'confirm-subscription':
-            hasUuid = any(request.table_uuid in key for key in self.publicationsList.keys())
+            hasUuid = any(request.uuid in key for key in self.publicationsList.keys())
             if hasUuid:
                 return _createResponse(
                     "success",
@@ -198,19 +198,42 @@ class DataServer:
                 return _createResponse(
                     "failed", "Stream not available for subscribing to"
                 )
+        elif request.method == 'add-publisherIp':
+            if not isinstance(request.uuid, dict):
+                return _createResponse("error", "Wrong Uuid format")
+            else:
+                uuidToEdit = next(iter(request.uuid.values()))  
+                for subUuid in self.pubSubMapping:                     
+                    if uuidToEdit not in self.pubSubMapping[subUuid]['subscription_publishers']:
+                        self.pubSubMapping[subUuid]['subscription_publishers'].clear()
+                        self.pubSubMapping[subUuid]['subscription_publishers'].append(uuidToEdit)
+                        return _createResponse("success", "Publisher Ip added to server")
+                return _createResponse("error", "Publisher Ip already in server")
+        elif request.method == 'remove-publisherIp':
+            if not isinstance(request.uuid, dict):
+                return _createResponse("error", "Wrong Uuid format")
+            else:
+                uuidToEdit = next(iter(request.uuid.values()))  
+                for subUuid in self.pubSubMapping:                     
+                    if uuidToEdit in self.pubSubMapping[subUuid]['subscription_publishers']:
+                        self.pubSubMapping[subUuid]['subscription_publishers'].remove(uuidToEdit)
+                        return _createResponse("success", "Publisher Ip removed from server")
+                return _createResponse("error", "Publisher Ip not found in server")
 
-        if request.table_uuid is None:
-            return _createResponse("error", "Missing table_uuid parameter")
+
+
+        if request.uuid is None:
+            return _createResponse("error", "Missing uuid parameter")
 
         if request.method == 'stream-data':
-            df = await self._getStreamData(request.table_uuid)
+            df = await self._getStreamData(request.uuid)
             if df is None:
                 return _createResponse(
-                    "error", f"No data found for stream {request.table_uuid}"
+                    "error", f"No data found for stream {request.uuid}"
                 )
             return _createResponse(
                 "success",
-                f" data found for stream {request.table_uuid}",
+                f" data found for stream {request.uuid}",
                 df.to_json(orient='split'),
             )
 
@@ -221,19 +244,19 @@ class DataServer:
                 )
 
             df = await self._getStreamDataByDateRange(
-                request.table_uuid, request.fromDate, request.toDate
+                request.uuid, request.fromDate, request.toDate
             )
             if df is None:
                 return _createResponse(
                     "error",
-                    f"No data found for stream {request.table_uuid} in specified date range",
+                    f"No data found for stream {request.uuid} in specified date range",
                 )
 
             if 'ts' in df.columns:
                 df['ts'] = df['ts'].astype(str)
             return _createResponse(
                 "success",
-                f" data found for stream {request.table_uuid} in specified date range",
+                f" data found for stream {request.uuid} in specified date range",
                 df.to_json(orient='split'),
             )
 
@@ -244,19 +267,19 @@ class DataServer:
                 timestamp_df = pd.read_json(StringIO(request.data), orient='split')
                 timestamp = timestamp_df['ts'].iloc[0]
                 df = await self._getLastRecordBeforeTimestamp(
-                    request.table_uuid, timestamp
+                    request.uuid, timestamp
                 )
                 if df is None:
                     return _createResponse(
                         "error",
-                        f"No records found before timestamp for stream {request.table_uuid}",
+                        f"No records found before timestamp for stream {request.uuid}",
                     )
 
                 if 'ts' in df.columns:
                     df['ts'] = df['ts'].astype(str)
                 return _createResponse(
                     "success",
-                    f" records found before timestamp for stream {request.table_uuid}",
+                    f" records found before timestamp for stream {request.uuid}",
                     df.to_json(orient='split'),
                 )
             except Exception as e:
@@ -272,9 +295,9 @@ class DataServer:
                     )
                 data = pd.read_json(StringIO(request.data), orient='split')
                 if request.replace:
-                    self.db.deleteTable(request.table_uuid)
-                    self.db.createTable(request.table_uuid)
-                success = self.db._dataframeToDatabase(request.table_uuid, data)
+                    self.db.deleteTable(request.uuid)
+                    self.db.createTable(request.uuid)
+                success = self.db._dataframeToDatabase(request.uuid, data)
                 return _createResponse(
                     "success" if success else "error",
                     (
@@ -292,35 +315,35 @@ class DataServer:
                     data = pd.read_json(StringIO(request.data), orient='split')
                     timestamps = data['ts'].tolist()
                     for ts in timestamps:
-                        self.db.editTable('delete', request.table_uuid, timestamp=ts)
+                        self.db.editTable('delete', request.uuid, timestamp=ts)
                     return _createResponse("success", "Delete operation completed")
                 else:
-                    self.db.deleteTable(request.table_uuid)
+                    self.db.deleteTable(request.uuid)
                     return _createResponse(
-                        "success", f"Table {request.table_uuid} deleted"
+                        "success", f"Table {request.uuid} deleted"
                     )
             except Exception as e:
                 return _createResponse("error", f"Error deleting data: {str(e)}")
         else:
             return _createResponse("error", f"Unknown request type: {request.method}")
 
-    async def _getStreamData(self, table_uuid: str) -> pd.DataFrame:
+    async def _getStreamData(self, uuid: str) -> pd.DataFrame:
         """Get data for a specific stream directly from SQLite database"""
         try:
-            df = self.db._databasetoDataframe(table_uuid)
+            df = self.db._databasetoDataframe(uuid)
             if df is None or df.empty:
                 debug("No data available to send")
                 return pd.DataFrame()
             return df
         except Exception as e:
-            error(f"Error getting data for stream {table_uuid}: {e}")
+            error(f"Error getting data for stream {uuid}: {e}")
 
     async def _getStreamDataByDateRange(
-        self, table_uuid: str, from_date: str, to_date: str
+        self, uuid: str, from_date: str, to_date: str
     ) -> pd.DataFrame:
         """Get stream data within a specific date range (inclusive)"""
         try:
-            df = self.db._databasetoDataframe(table_uuid)
+            df = self.db._databasetoDataframe(uuid)
             if df is None or df.empty:
                 debug("No data available to send")
                 return pd.DataFrame()
@@ -330,14 +353,14 @@ class DataServer:
             filtered_df = df[(df['ts'] >= from_ts) & (df['ts'] <= to_ts)]
             return filtered_df if not filtered_df.empty else pd.DataFrame()
         except Exception as e:
-            error(f"Error getting data for stream {table_uuid} in date range: {e}")
+            error(f"Error getting data for stream {uuid} in date range: {e}")
 
     async def _getLastRecordBeforeTimestamp(
-        self, table_uuid: str, timestamp: str
+        self, uuid: str, timestamp: str
     ) -> pd.DataFrame:
         """Get the last record before the specified timestamp (inclusive)"""
         try:
-            df = self.db._databasetoDataframe(table_uuid)
+            df = self.db._databasetoDataframe(uuid)
             if df is None or df.empty:
                 return pd.DataFrame()
             ts = pd.to_datetime(timestamp)
@@ -350,7 +373,7 @@ class DataServer:
             return before_ts.iloc[[-1]] if not before_ts.empty else pd.DataFrame()
         except Exception as e:
             error(
-                f"Error getting last record before timestamp for stream {table_uuid}: {e}"
+                f"Error getting last record before timestamp for stream {uuid}: {e}"
             )
 
 

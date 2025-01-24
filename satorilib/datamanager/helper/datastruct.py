@@ -76,8 +76,8 @@ class ConnectedPeer:
     def isServer(self):
         return not self.isClient
 
-    def add_subcription(self, table_uuid: str):
-        self.subscriptions.append(table_uuid)
+    def add_subcription(self, uuid: str):
+        self.subscriptions.append(uuid)
 
 
 class Message:
@@ -97,7 +97,7 @@ class Message:
             'sub': self.sub,
             'status': self.status,
             'params': {
-                'table_uuid': self.table_uuid,
+                'uuid': self.uuid,
                 'replace': self.replace,
                 'from_ts': self.fromDate,
                 'to_ts': self.toDate,
@@ -128,6 +128,11 @@ class Message:
     def status(self) -> str:
         """Get the status"""
         return self.message.get('status')
+    
+    @property
+    def statusMsg(self) -> str:
+        """Get the status"""
+        return self.message.get('message')
 
     @property
     def sub(self) -> bool:
@@ -140,23 +145,23 @@ class Message:
         return self.message.get('params', {})
 
     @property
-    def table_uuid(self) -> str:
-        """Get the table_uuid from params"""
-        return self.params.get('table_uuid')
+    def uuid(self) -> str:
+        """Get the uuid from params"""
+        return self.params.get('uuid')
 
     @property
     def replace(self) -> str:
-        """Get the table_uuid from params"""
+        """Get the uuid from params"""
         return self.params.get('replace')
 
     @property
     def fromDate(self) -> str:
-        """Get the table_uuid from params"""
+        """Get the uuid from params"""
         return self.params.get('from_ts')
 
     @property
     def toDate(self) -> str:
-        """Get the table_uuid from params"""
+        """Get the uuid from params"""
         return self.params.get('to_ts')
 
     @property

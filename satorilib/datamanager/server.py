@@ -155,8 +155,6 @@ class DataServer:
         elif request.method == 'send-pubsub-map':
             for sub_uuid, data in request.uuid.items():
                 self.pubSubMapping[sub_uuid] = data
-                self.subscriptionsList[sub_uuid] = PeerInfo(data['subscription_subscribers'], data['subscription_publishers'])
-                self.publicationsList[data['publication_uuid']] = PeerInfo(data['publication_subscribers'], data['publication_publishers'])
             return _createResponse("success", "Pub-Sub Mapping added in Server")
         elif request.method == 'get-pubsub-map':
             streamDict = _convertPeerInfoDict(self.pubSubMapping, True)
@@ -208,8 +206,16 @@ class DataServer:
                         self.pubSubMapping[subUuid]['subscription_publishers'].remove(uuidToEdit)
                         return _createResponse("success", "Publisher Ip removed from server")
                 return _createResponse("error", "Publisher Ip not found in server")
-
-
+        # mockup
+        elif request.method == 'confirm-subscription':
+            return _createResponse("success", "Available streams sent", streamInfo=givenStream in availableStreams)
+        elif request.method == 'get-available-subscription-streams':
+            self.availableStreams: list[str] = [a, a, a, c, c, b, d,]
+            return _createResponse("success", "Available streams sent", streamInfo=set(self.availableStreams))
+        
+        #elif request.method == 'add-available-subscription-streams':
+        #elif request.method == 'remove-available-subscription-streams':
+        
 
         if request.uuid is None:
             return _createResponse("error", "Missing uuid parameter")

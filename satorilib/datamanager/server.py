@@ -187,17 +187,6 @@ class DataServer:
                 "Stream information of publications with peer information recieved",
                 streamInfo=streamDict,
             )
-        elif request.method == 'confirm-subscription':
-            hasUuid = any(request.uuid in key for key in self.publicationsList.keys())
-            if hasUuid:
-                return _createResponse(
-                    "success",
-                    "Stream available for subscription",
-                )
-            else:
-                return _createResponse(
-                    "failed", "Stream not available for subscribing to"
-                )
         elif request.method == 'add-publisherIp':
             if not isinstance(request.uuid, dict):
                 return _createResponse("error", "Wrong Uuid format")

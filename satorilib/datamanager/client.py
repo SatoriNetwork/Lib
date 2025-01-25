@@ -11,17 +11,15 @@ from satorilib.datamanager.server import DataServer
 from satorilib.datamanager.helper import Message, ConnectedPeer, Subscription
 
 class DataClient:
-    def __init__(
-        self,
-        server: Union[DataServer, None] = None,
-    ):
+    def __init__(self, serverHostPort: str):
         # this should be a ConnectedPeer to the server.
-        self.server = server
+        self.server: Union[DataServer, None] = None
         self.peers: Dict[Tuple[str, int], ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
+        self.publications: list[str] = []
         self.responses: dict[str, Message] = {}
 
-    async def connectToServer(self, peerHost: str, peerPort: int = 24602):
+    async def connectToPeer(self, peerHost: str, peerPort: int = 24602):
         """Connect to our own Server"""
         uri = f"ws://{peerHost}:{peerPort}"
         try:
@@ -40,7 +38,7 @@ class DataClient:
         try:
             async for raw_msg in peer.websocket:
                 message = Message(json.loads(raw_msg))
-                asyncio.create_task(self.handleMessage(message))
+                asyncio.create_task(self.handlePeerMessage(message))
         except websockets.exceptions.ConnectionClosed:
             self.disconnect(peer)
 
@@ -55,15 +53,30 @@ class DataClient:
         return str(time.time())
 
     # TODO : refactor
-    async def handleMessage(self, message: Message) -> None:
+    async def handlePeerMessageForServer(self, message: Message) -> None:
+        # look at the message - see if it's special (like "stream no longer active")
+        # if stream no longer active, remove the subscription from the list (that involves telling the server we have removed it)
+
+        # idea
+        # dc holds a list of subscriptions (active)
+        # ds should just keep an up-to-date copy of that list
+        #   - n dc has a list of streams it publishes (relays from the real world)
+        #   - engine dc has a list of streams it subscribe to and publishes
+        #   - 4 list of active streams: n s variable, n publish variable, e s variable, e publish variable
+        
+
+        # if we have an active connection to the server - if not maybe make one?
+        if self.server is not None:
+            # this should probably change
+            # we want to pass the message to the server for two purposes
+            #  - so it can notify it's subscribers
+            #  - and also so it can save the data properly
+            # so we should just pass it and let it handle it.
+            await self.server.notifySubscribers(message) # TODO : request send to the server about the subscription
+        
+    async def handlePeerMessage(self, message: Message) -> None:
         if message.isSubscription:
-            if self.server is not None:
-                # this should probably change
-                # we want to pass the message to the server for two purposes
-                #  - so it can notify it's subscribers
-                #  - and also so it can save the data properly
-                # so we should just pass it and let it handle it.
-                await self.server.notifySubscribers(message) # TODO : request send to the server about the subscription
+            await self.handlePeerMessageForServer(message)
             subscription = self.findSubscription(
                 subscription=Subscription(message.method, message.uuid)
             )
@@ -130,7 +143,7 @@ class DataClient:
     async def connect(self, peerAddr: Tuple[str, int]) -> Dict:
         if peerAddr not in self.peers:
             peerHost, peerPort = peerAddr
-            await self.connectToServer(peerHost, peerPort)
+            await self.connectToPeer(peerHost, peerPort)
 
     async def send(
         self,

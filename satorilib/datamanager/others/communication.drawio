@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="Tr3QYgPfv3LOChohxtou" name="Page-1">
-        <mxGraphModel dx="1711" dy="1819" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+        <mxGraphModel dx="1429" dy="1976" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -73,7 +73,7 @@
                 <mxCell id="22" value="Engine for Neuron B (client C)" style="swimlane;whiteSpace=wrap;html=1;" parent="1" vertex="1">
                     <mxGeometry x="980" y="200" width="390" height="510" as="geometry"/>
                 </mxCell>
-                <mxCell id="53" value="DataClient" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="22">
+                <mxCell id="53" value="DataClient" style="swimlane;whiteSpace=wrap;html=1;" parent="22" vertex="1">
                     <mxGeometry x="95" y="40" width="200" height="160" as="geometry"/>
                 </mxCell>
                 <mxCell id="23" value="peer B&lt;br&gt;24602" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" parent="53" vertex="1">
@@ -122,14 +122,88 @@
                 <mxCell id="52" value="&lt;h1&gt;Peer connection data&lt;/h1&gt;&lt;p&gt;{&lt;br&gt;&amp;nbsp; table_uuid: [publisher, subscribers...]&lt;br&gt;&amp;nbsp; table_uuid: [ipaddress, ipaddress,... ]&lt;br&gt;}&lt;/p&gt;" style="text;html=1;strokeColor=none;fillColor=none;spacing=5;spacingTop=-20;whiteSpace=wrap;overflow=hidden;rounded=0;" parent="1" vertex="1">
                     <mxGeometry x="640" y="-520" width="440" height="120" as="geometry"/>
                 </mxCell>
-                <mxCell id="55" value="&lt;h1&gt;Why dataClient in Neuron?&lt;/h1&gt;&lt;p&gt;1. need to get data from our own database&lt;/p&gt;&lt;p&gt;- show it on the UI (raw data, predictions)&lt;/p&gt;&lt;p&gt;2. we need to supply our own datamanager with some information&lt;/p&gt;&lt;p&gt;- other systems (other parts of the neuron) can get this information&lt;/p&gt;" style="text;html=1;strokeColor=none;fillColor=none;spacing=5;spacingTop=-20;whiteSpace=wrap;overflow=hidden;rounded=0;" vertex="1" parent="1">
+                <mxCell id="55" value="&lt;h1&gt;Why dataClient in Neuron?&lt;/h1&gt;&lt;p&gt;1. need to get data from our own database&lt;/p&gt;&lt;p&gt;- show it on the UI (raw data, predictions)&lt;/p&gt;&lt;p&gt;2. we need to supply our own datamanager with some information&lt;/p&gt;&lt;p&gt;- other systems (other parts of the neuron) can get this information&lt;/p&gt;" style="text;html=1;strokeColor=none;fillColor=none;spacing=5;spacingTop=-20;whiteSpace=wrap;overflow=hidden;rounded=0;" parent="1" vertex="1">
                     <mxGeometry x="40" y="10" width="490" height="170" as="geometry"/>
                 </mxCell>
-                <mxCell id="56" value="&lt;h1&gt;Why dataClient in Engine?&lt;/h1&gt;&lt;p&gt;1. need to get data from our own database&lt;/p&gt;&lt;p&gt;- get the history of each of our datastreams for training purposes&lt;/p&gt;&lt;p&gt;2. we need to supply data to our own datamanager&lt;/p&gt;&lt;p&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;- predictions for subscribers (including our own neuron ui)&lt;/span&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;- pass the raw data to the data server so that it can be saved to disk.&lt;/span&gt;&lt;/p&gt;" style="text;html=1;strokeColor=none;fillColor=none;spacing=5;spacingTop=-20;whiteSpace=wrap;overflow=hidden;rounded=0;" vertex="1" parent="1">
+                <mxCell id="56" value="&lt;h1&gt;Why dataClient in Engine?&lt;/h1&gt;&lt;p&gt;1. need to get data from our own database&lt;/p&gt;&lt;p&gt;- get the history of each of our datastreams for training purposes&lt;/p&gt;&lt;p&gt;2. we need to supply data to our own datamanager&lt;/p&gt;&lt;p&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;- predictions for subscribers (including our own neuron ui)&lt;/span&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;- pass the raw data to the data server so that it can be saved to disk.&lt;/span&gt;&lt;/p&gt;" style="text;html=1;strokeColor=none;fillColor=none;spacing=5;spacingTop=-20;whiteSpace=wrap;overflow=hidden;rounded=0;" parent="1" vertex="1">
                     <mxGeometry x="40" y="260" width="490" height="210" as="geometry"/>
                 </mxCell>
-                <mxCell id="58" style="edgeStyle=none;html=1;exitX=0.75;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="30" target="53">
+                <mxCell id="58" style="edgeStyle=none;html=1;exitX=0.75;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" parent="1" source="30" target="53" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="85" value="A" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="1460" y="1350" width="330" height="480" as="geometry"/>
+                </mxCell>
+                <mxCell id="86" style="edgeStyle=none;html=1;" edge="1" parent="85" source="87" target="91">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="87" value="Peer B&lt;br&gt;358148" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="85">
+                    <mxGeometry x="110" y="60" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="88" value="peer B&lt;br&gt;24602" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="85">
+                    <mxGeometry x="40" y="370" width="80" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="89" value="responses&lt;br&gt;subscriptions" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="85">
+                    <mxGeometry x="165" y="340" width="120" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="90" style="edgeStyle=none;html=1;" edge="1" parent="85" source="88" target="89">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="224.375" y="240" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="91" value="Requests" style="shape=trapezoid;perimeter=trapezoidPerimeter;whiteSpace=wrap;html=1;fixedSize=1;" vertex="1" parent="85">
+                    <mxGeometry y="130" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="97" value="Engine for Neuron B (client C)" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="1020" y="1350" width="390" height="510" as="geometry"/>
+                </mxCell>
+                <mxCell id="112" style="edgeStyle=none;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="97" source="98" target="111">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="98" value="DataClient" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="97">
+                    <mxGeometry x="150" y="40" width="200" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="115" value="subscriptions" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="98">
+                    <mxGeometry x="60" y="35" width="90" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="118" value="producing" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="98">
+                    <mxGeometry x="60" y="70" width="80" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="111" value="Engine&lt;br&gt;streamModel" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;" vertex="1" parent="97">
+                    <mxGeometry x="250" y="280" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="113" style="edgeStyle=none;html=1;" edge="1" parent="97" source="111" target="118">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="150" y="150" as="targetPoint"/>
+                        <mxPoint x="220" y="260" as="sourcePoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="103" value="DataManager for Neuron B (separate process)" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="590" y="1350" width="390" height="510" as="geometry"/>
+                </mxCell>
+                <mxCell id="104" value="DataServer" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="103">
+                    <mxGeometry x="100" y="100" width="200" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="105" value="client C&lt;br&gt;54386" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="104">
+                    <mxGeometry x="40" y="40" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="106" value="Peer A&lt;br&gt;54385" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="104">
+                    <mxGeometry x="40" y="125" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="110" value="observations" style="edgeStyle=none;html=1;" edge="1" parent="1" source="87" target="115">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="116" style="edgeStyle=none;html=1;entryX=1;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="115" target="104">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="119" style="edgeStyle=none;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="118" target="104">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="120" value="data server&amp;nbsp;&lt;br&gt;assumes raw real world ds from neuron are available for peers&lt;br&gt;assumes predictive ds from engine are available for peers" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="605" y="1885" width="360" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="121" value="in dataClient&lt;br&gt;when a subscription is setup tell the data server this stream is available&lt;br&gt;when it's torn down tell ds it's not available&lt;br&gt;when disconnect tell ds all affected streams not available&lt;br&gt;when disconnected message tell ds that stream not available" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="990" y="1885" width="450" height="100" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>

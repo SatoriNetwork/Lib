@@ -27,6 +27,7 @@ class DataServer:
         self.host = host
         self.port = port
         self.server = None
+        self.localClients: dict[Tuple[str, int], ConnectedPeer] = {} # active stream variables on ConnectedClient object
         self.connectedClients: dict[Tuple[str, int], ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
         self.pubSubMapping: dict[str, dict] = {}

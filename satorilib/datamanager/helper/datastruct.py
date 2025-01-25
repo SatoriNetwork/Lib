@@ -7,21 +7,20 @@ import json
 class Subscription:
     def __init__(
         self,
-        #unique id?
         method: str,
-        tableuuid: Union[list, None] = None,
+        uuid: str,
         callback: Union[callable, None] = None
     ):
         self.method = method
-        self.tableuuid = tableuuid
+        self.uuid = uuid
         self.shortLivedCallback = callback
 
     def __hash__(self):
-        return hash((self.method, self.tableuuid))
+        return hash((self.method, self.uuid))
 
     def __eq__(self, other):
         if isinstance(other, Subscription):
-            return self.method == other.method and self.tableuuid == other.tableuuid
+            return self.method == other.method and self.uuid == other.uuid
         return False
 
     async def __call__(self, *args, **kwargs):

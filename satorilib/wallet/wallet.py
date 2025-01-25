@@ -189,6 +189,7 @@ class Wallet(WalletBase):
         self.bridgeFee: float = 0.01
         self.bridgeAddress: str = 'EUqCW1WmT6a9Y6RBVhsxY1k4S135RPWCy7'  # TODO finish
         self.burnAddress: str = TxUtils.evrBurnMintAddressMain #'EXBurnMintXXXXXXXXXXXXXXXXXXXbdK5E'  # real
+        self.maxBridgeAmount: float = 500
         #self.burnAddress: str = 'EL1BS6HmwY1KoeqBokKjUMcWbWsn5kamGv' # testing
         self.isTestnet = isTestnet
         self.password = password
@@ -258,6 +259,14 @@ class Wallet(WalletBase):
     def networkByte(self) -> bytes:
         return (33).to_bytes(1, 'big') # evrmore by default
 
+    @property
+    def account(self) -> 'eth_account.Account':
+        from satorilib.wallet.ethereum.wallet import EthereumWallet
+        return EthereumWallet.generateAccount(self._entropy)
+
+    @property
+    def ethAddress(self) -> str:
+        return self.account.address
 
     ### Loading ################################################################
 
@@ -1954,7 +1963,7 @@ class Wallet(WalletBase):
             return False, False, 'can only bridge to base'
         if amount <= 0:
             return False, False, f'Satori Bridge Transaction bad params: unable to send amount: {amount}'
-        if amount > 100:
+        if amount > self.maxBridgeAmount:
             return False, False, 'Satori Bridge Transaction bad params: amount > 100'
         if not Validate.ethAddress(ethAddress):
             return False, False, f'Satori Bridge Transaction bad params: eth address: {ethAddress}'

@@ -189,6 +189,37 @@ class DataClient:
             }
         )
         return await self.send(peerAddr, request)
+    
+    async def passDataToServer(
+        self,
+        peerAddr: Tuple[str, int],
+        uuid: str,
+        method: str = "insert",
+        isSub: bool = False,
+        data: pd.DataFrame = None,
+        replace: bool = False,
+        fromDate: str = None,
+        toDate: str = None,
+    ) -> Dict:
+        """
+        Creates a subscription request
+        """
+        id = self._generateCallId()
+        request = Message(
+            {
+                "method": method,
+                "id": id,
+                "sub": isSub,
+                "params": {
+                    "uuid": uuid,
+                    "replace": replace,
+                    "from_ts": fromDate,
+                    "to_ts": toDate,
+                },
+                "data": data,
+            }
+        )
+        return await self.send(peerAddr, request)
 
     async def sendRequest( 
         self,

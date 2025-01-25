@@ -30,8 +30,7 @@ class DataServer:
         self.connectedClients: dict[Tuple[str, int], ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
         self.pubSubMapping: dict[str, dict] = {}
-        self.subscriptionsList: dict[str, PeerInfo] = {}
-        self.publicationsList: dict[str, PeerInfo] = {}
+        self.availableStreams: list[str] = []
         self.responses: dict[str, Message] = {}
         self.db = SqliteDatabase(db_path, db_name)
         self.db.importFromDataFolder()  # can be disabled if new rows are added to the Database and new rows recieved are inside the database
@@ -80,13 +79,13 @@ class DataServer:
                 if cp.websocket == websocket:
                     del self.connectedClients[key]
 
-    async def notifySubscribers(self, msg: Message):
+    async def notifySubscribers(self, msg: Message, streamType: str = 'subscriptions'):
         '''
         is this message something anyone has subscribed to?
         if yes, await self.connected_peers[subscribig_peer].websocket.send(message)
         '''
         for peerAddr in self.connectedClients.values():
-            if msg.uuid in self.connectedClients[peerAddr].subscriptions:
+            if msg.uuid in getattr(self.connectedClients[peerAddr], streamType):
                 await self.connectedClients[peerAddr].websocket.send(msg.to_json())
 
     async def disconnectAllPeers(self):
@@ -163,55 +162,57 @@ class DataServer:
                 "Stream information of subscriptions with peer information recieved",
                 streamInfo=streamDict,
             )
-        elif request.method == 'send-subscribers-list':
-            for uuid, data_dict in request.uuid.items():
-                self.subscriptionsList[uuid] = PeerInfo(data_dict['subscribers'], data_dict['publishers'])
-            return _createResponse("success", "Subscriber list added in Server")
-        elif request.method == 'get-sub-list':
-            streamDict = _convertPeerInfoDict(self.subscriptionsList)
-            return _createResponse(
-                "success",
-                "Stream information of subscriptions with peer information recieved",
-                streamInfo=streamDict,
-            )
-        elif request.method == 'send-publishers-list':
-            for uuid, data_dict in request.uuid.items():
-                self.publicationsList[uuid] = PeerInfo(data_dict['subscribers'], data_dict['publishers'])
-            return _createResponse("success", "publication list added in Server")
-        elif request.method == 'get-pub-list':
-            streamDict = _convertPeerInfoDict(self.publicationsList)
-            return _createResponse(
-                "success",
-                "Stream information of publications with peer information recieved",
-                streamInfo=streamDict,
-            )
-        elif request.method == 'add-publisherIp':
-            if not isinstance(request.uuid, dict):
-                return _createResponse("error", "Wrong Uuid format")
-            else:
-                uuidToEdit = next(iter(request.uuid.values()))  
-                for subUuid in self.pubSubMapping:                     
-                    if uuidToEdit not in self.pubSubMapping[subUuid]['subscription_publishers']:
-                        self.pubSubMapping[subUuid]['subscription_publishers'].clear()
-                        self.pubSubMapping[subUuid]['subscription_publishers'].append(uuidToEdit)
-                        return _createResponse("success", "Publisher Ip added to server")
-                return _createResponse("error", "Publisher Ip already in server")
-        elif request.method == 'remove-publisherIp':
-            if not isinstance(request.uuid, dict):
-                return _createResponse("error", "Wrong Uuid format")
-            else:
-                uuidToEdit = next(iter(request.uuid.values()))  
-                for subUuid in self.pubSubMapping:                     
-                    if uuidToEdit in self.pubSubMapping[subUuid]['subscription_publishers']:
-                        self.pubSubMapping[subUuid]['subscription_publishers'].remove(uuidToEdit)
-                        return _createResponse("success", "Publisher Ip removed from server")
-                return _createResponse("error", "Publisher Ip not found in server")
-        # mockup
+        # elif request.method == 'add-publisherIp':
+        #     if not isinstance(request.uuid, dict):
+        #         return _createResponse("error", "Wrong Uuid format")
+        #     else:
+        #         uuidToEdit = next(iter(request.uuid.values()))  
+        #         for subUuid in self.pubSubMapping:                     
+        #             if uuidToEdit not in self.pubSubMapping[subUuid]['subscription_publishers']:
+        #                 self.pubSubMapping[subUuid]['subscription_publishers'].clear()
+        #                 self.pubSubMapping[subUuid]['subscription_publishers'].append(uuidToEdit)
+        #                 return _createResponse("success", "Publisher Ip added to server")
+        #         return _createResponse("error", "Publisher Ip already in server")
+        # elif request.method == 'remove-publisherIp':
+        #     if not isinstance(request.uuid, dict):
+        #         return _createResponse("error", "Wrong Uuid format")
+        #     else:
+        #         uuidToEdit = next(iter(request.uuid.values()))  
+        #         for subUuid in self.pubSubMapping:                     
+        #             if uuidToEdit in self.pubSubMapping[subUuid]['subscription_publishers']:
+        #                 self.pubSubMapping[subUuid]['subscription_publishers'].remove(uuidToEdit)
+        #                 return _createResponse("success", "Publisher Ip removed from server")
+        #         return _createResponse("error", "Publisher Ip not found in server")
         elif request.method == 'confirm-subscription':
-            return _createResponse("success", "Available streams sent", streamInfo=givenStream in availableStreams)
-        elif request.method == 'get-available-subscription-streams':
-            self.availableStreams: list[str] = [a, a, a, c, c, b, d,]
-            return _createResponse("success", "Available streams sent", streamInfo=set(self.availableStreams))
+            if request.uuid in self.availableStreams:
+                return _createResponse("success", "Subscription confirmed")
+        elif request.method == 'send-available-subscription':
+            return _createResponse("success", "Available streams sent", streamInfo=self.availableStreams)
+        elif request.method == 'add-available-subscription-streams':
+            if request.uuid is not None:
+                self.availableStreams.append(request.uuid)
+                return _createResponse("success", "Subscription Stream added")
+            return _createResponse("error", "UUID must be provided")
+        elif request.method == 'add-available-publication-streams':
+            if request.uuid is not None:
+                self.availableStreams.append(request.uuid)
+                return _createResponse("success", "Publication Stream added")
+            return _createResponse("error", "UUID must be provided")
+        elif request.method == 'remove-available-subscription-streams':
+            if request.uuid is not None:
+                if request.uuid in self.availableStreams:
+                    self.availableStreams.remove(request.uuid)
+                    # TODO : tell all clients that request.uuid is removed
+                    self.notifySubscribers(_createResponse("inactive", "Subscription Stream inactive"))
+                return _createResponse("success", "Subscription Stream removed")
+            return _createResponse("error", "UUID must be provided")
+        elif request.method == 'remove-available-publication-streams':
+            if request.uuid is not None:
+                if request.uuid in self.availableStreams:
+                    self.availableStreams.remove(request.uuid)
+                    self.notifySubscribers(_createResponse("inactive", "Publication Stream removed"), 'publications')
+                return _createResponse("success", "Publication Stream removed")
+            return _createResponse("error", "UUID must be provided")
         
         #elif request.method == 'add-available-subscription-streams':
         #elif request.method == 'remove-available-subscription-streams':

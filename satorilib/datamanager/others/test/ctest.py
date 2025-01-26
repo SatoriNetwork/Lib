@@ -13,8 +13,9 @@ async def main():
         'id': client._generateCallId(),
         'params': {'uuid': None}
     })
+    await client.sendRequest('0.0.0.1')
+    await asyncio.sleep(5)
     await client.serverWs.send(request.to_json())
-    await client.send()
     
     await asyncio.sleep(30)  # Keep running for 30s
 

@@ -7,20 +7,18 @@ import json
 class Subscription:
     def __init__(
         self,
-        method: str,
         uuid: str,
         callback: Union[callable, None] = None
     ):
-        self.method = method
         self.uuid = uuid
         self.shortLivedCallback = callback
 
     def __hash__(self):
-        return hash((self.method, self.uuid))
+        return hash(self.uuid)
 
     def __eq__(self, other):
         if isinstance(other, Subscription):
-            return self.method == other.method and self.uuid == other.uuid
+            return self.uuid == other.uuid
         return False
 
     async def __call__(self, *args, **kwargs):
@@ -50,13 +48,15 @@ class ConnectedPeer:
         self,
         hostPort: Tuple[str, int],
         websocket: websockets.WebSocketServerProtocol,
-        subscriptions: Union[list, None] = None,
-        publications: Union[list, None] = None,
+        subscriptions: Union[list[str], None] = None, # the streams that this client subscribes to (from my server)
+        publications: Union[list[str], None] = None, # the streams that this client publishes (to my server)
+        local: bool = False
     ):
         self.hostPort = hostPort
         self.websocket = websocket
-        self.subscriptions = subscriptions or []
-        self.publications = publications or []
+        self.subscriptions: list[str] = subscriptions or []
+        self.publications: list[str] = publications or []
+        self.local = local
         self.stop = asyncio.Event()
 
     @property
@@ -78,6 +78,14 @@ class ConnectedPeer:
     def add_subcription(self, uuid: str):
         self.subscriptions.append(uuid)
 
+    def add_publication(self, uuid: str):
+        self.publications.append(uuid)
+
+    def remove_subscription(self, uuid: str):
+        self.subscriptions = [x for x in self.subscriptions if x != uuid]
+
+    def remove_publication(self, uuid: str):
+        self.publications = [x for x in self.publications if x != uuid]
 
 class Message:
     def __init__(self, message: dict):

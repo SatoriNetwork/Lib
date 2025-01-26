@@ -22,7 +22,6 @@ class StreamId:
         combined = ':'.join(str(v) for v in values)
         return uuid.uuid5(namespace, combined)
 
-
     def __init__(
         self,
         source: str,
@@ -213,9 +212,9 @@ class StreamId:
 
 class StreamUuid(StreamId):
     """unique identifier for a stream"""
-
-    def __init__(self, uuid: str):
-        super().__init__(source='', author='', stream='', target='')
+    
+    def __init__(self, uuid: str, source: str='', author: str='', stream: str='', target: str=''):
+        super().__init__(source=source, author=author, stream=stream, target=target)
         self.uuid = uuid
 
 

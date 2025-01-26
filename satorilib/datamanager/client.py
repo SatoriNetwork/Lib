@@ -16,7 +16,7 @@ class DataClient:
         self.serverWs: websockets = None
         self.peers: Dict[Tuple[str, int], ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
-        self.publications: list[str] = []
+        self.publications: dict[str, str] = {} # {uuid, publication uuid}
         self.responses: dict[str, Message] = {}
 
     async def connectToServer(self):
@@ -29,24 +29,13 @@ class DataClient:
         except Exception as e:
             error(f'Failed to connect to peer at {uri}: {e}')
             
-    # async def listenToServer(self):
-    #     ''' listens to our own server '''
-    #     try:
-    #         async for raw_msg in self.serverWs:
-    #             message = Message(json.loads(raw_msg))
-    #             asyncio.create_task(self.handlePeerMessage(message))
-    #     except websockets.exceptions.ConnectionClosed:
-    #         self.disconnectServer()
-
     async def listenToServer(self):
-        print("Started listening to server")
+        ''' listens to our own server '''
         try:
             async for raw_msg in self.serverWs:
-                print(f"Server message received: {raw_msg[:100]}")
                 message = Message(json.loads(raw_msg))
-                asyncio.create_task(self.handlePeerMessage(message))
+                asyncio.create_task(self.handleServerMessage(message))
         except websockets.exceptions.ConnectionClosed:
-            print("Server connection closed")
             self.disconnectServer()
 
     async def disconnectServer(self) -> None:
@@ -86,29 +75,41 @@ class DataClient:
     def _generateCallId() -> str:
         return str(time.time())
 
-    # TODO : refactor
-    async def handlePeerMessageForServer(self, message: Message) -> None:
-        # look at the message - see if it's special (like 'stream no longer active')
-        # if stream no longer active, remove the subscription from the list (that involves telling the server we have removed it)
-
-        # idea
-        # dc holds a list of subscriptions (active)
-        # ds should just keep an up-to-date copy of that list
-        #   - n dc has a list of streams it publishes (relays from the real world)
-        #   - engine dc has a list of streams it subscribe to and publishes
-        #   - 4 list of active streams: n s variable, n publish variable, e s variable, e publish variable
         
+    async def handlePeerMessage(self, message: Message) -> None:
+        '''
+        pass to server, modify owner's state, modify our state 
+        '''
+        await self.handleMessageForServer(message)
+        await self.handleMessageForOwner(message)
+        await self.handleMessageForSelf(message)
+
+    # TODO : refactor
+    async def handleMessageForServer(self, message: Message) -> None:
+        if self.serverWs is not None:
+            pass
 
         # if we have an active connection to the server - if not maybe make one?
         if self.server is not None:
+            await self.server.notifySubscribers(message) # TODO : request send to the server about the subscription
+        else: 
+            warning('No connection to server, reconnect?')
+        
+        # NOTES
+        # dc holds a list of subscriptions (active)
+        # ds should just keep an up-to-date copy of that list (should it though? shouldn't we just have one source of truth?)
+        #   - n dc has a list of streams it subscribes to (like engine predictions) and it publishes (relays from the real world)
+        #   - engine dc has a list of streams it subscribe to and publishes
+        #   - 4 list of active streams: n s variable, n publish variable, e s variable, e publish variable
             # this should probably change
             # we want to pass the message to the server for two purposes
             #  - so it can notify it's subscribers
             #  - and also so it can save the data properly
             # so we should just pass it and let it handle it.
-            await self.server.notifySubscribers(message) # TODO : request send to the server about the subscription
-        
-    async def handlePeerMessage(self, message: Message) -> None:
+                    # look at the message - see if it's special (like 'stream no longer active')
+        # if stream no longer active, remove the subscription from the list (that involves telling the server we have removed it)
+
+    async def handleMessageForOwner(self, message: Message) -> None:
         if message.isSubscription:
             await self.handlePeerMessageForServer(message)
             subscription = self.findSubscription(
@@ -122,6 +123,18 @@ class DataClient:
             info('Subscribed to : ', message.uuid)
         elif message.isResponse:
             self.responses[message.id] = message
+    
+    async def handleMessageForSelf(self, message: Message) -> None:
+        if message.status == 'inactive':
+            subscription = self.findSubscription(
+                subscription=Subscription(message.uuid.subscriber))
+            del self.subscriptions[subscription] # TODO : confirm this
+            # tell the data server to remove the subscription
+            #'remove-available-subscription-streams'
+
+            del self.publications[message.uuid]
+            # tell the data server to remove the publication
+            # TODO : 'remove-available-subscription-streams'
 
     def listenForSubscriptions(self, method: str, params: list) -> dict:
         return self.subscriptions[Subscription(method, params)].get()
@@ -200,6 +213,7 @@ class DataClient:
         self,
         peerAddr: Tuple[str, int],
         uuid: str,
+        publicationUuid: Union[str, None] = None,
         method: str = 'subscribe',
         callback: Union[callable, None] = None,
         data: pd.DataFrame = None,
@@ -210,6 +224,9 @@ class DataClient:
         '''
         Creates a subscription request
         '''
+        if publicationUuid is not None:
+            self.publications[uuid] = publicationUuid
+
         id = self._generateCallId()
         subscription = Subscription(method, uuid, callback=callback)
         self.subscriptions[subscription] = queue.Queue()

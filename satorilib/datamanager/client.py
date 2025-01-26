@@ -12,16 +12,49 @@ from satorilib.datamanager.helper import Message, ConnectedPeer, Subscription
 
 class DataClient:
     def __init__(self, serverHostPort: str):
-        # this should be a ConnectedPeer to the server.
-        self.server: Union[DataServer, None] = None
+        self.serverHostPort: str = serverHostPort
+        self.serverWs: websockets = None
         self.peers: Dict[Tuple[str, int], ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
         self.publications: list[str] = []
         self.responses: dict[str, Message] = {}
 
+    async def connectToServer(self):
+        '''Connects to our own Server'''
+        uri = f'ws://{self.serverHostPort}:{24602}'
+        try:
+            self.serverWs = await websockets.connect(uri)
+            asyncio.create_task(self.listenToServer())
+            debug(f'Connected to Server at {uri}', print=True)
+        except Exception as e:
+            error(f'Failed to connect to peer at {uri}: {e}')
+            
+    # async def listenToServer(self):
+    #     ''' listens to our own server '''
+    #     try:
+    #         async for raw_msg in self.serverWs:
+    #             message = Message(json.loads(raw_msg))
+    #             asyncio.create_task(self.handlePeerMessage(message))
+    #     except websockets.exceptions.ConnectionClosed:
+    #         self.disconnectServer()
+
+    async def listenToServer(self):
+        print("Started listening to server")
+        try:
+            async for raw_msg in self.serverWs:
+                print(f"Server message received: {raw_msg[:100]}")
+                message = Message(json.loads(raw_msg))
+                asyncio.create_task(self.handlePeerMessage(message))
+        except websockets.exceptions.ConnectionClosed:
+            print("Server connection closed")
+            self.disconnectServer()
+
+    async def disconnectServer(self) -> None:
+        await self.serverWs.close()
+
     async def connectToPeer(self, peerHost: str, peerPort: int = 24602):
-        """Connect to our own Server"""
-        uri = f"ws://{peerHost}:{peerPort}"
+        '''Connect to other Peers'''
+        uri = f'ws://{peerHost}:{peerPort}'
         try:
             websocket = await websockets.connect(uri)
             self.peers[(peerHost, peerPort)] = ConnectedPeer(
@@ -30,10 +63,11 @@ class DataClient:
             asyncio.create_task(
                 self.listenToPeer(self.peers[(peerHost, peerPort)])
             )
-            debug(f"Connected to peer at {uri}", print=True)
+            debug(f'Connected to peer at {uri}', print=True)
         except Exception as e:
-            error(f"Failed to connect to peer at {uri}: {e}")
+            error(f'Failed to connect to peer at {uri}: {e}')
 
+    
     async def listenToPeer(self, peer: ConnectedPeer):
         try:
             async for raw_msg in peer.websocket:
@@ -54,7 +88,7 @@ class DataClient:
 
     # TODO : refactor
     async def handlePeerMessageForServer(self, message: Message) -> None:
-        # look at the message - see if it's special (like "stream no longer active")
+        # look at the message - see if it's special (like 'stream no longer active')
         # if stream no longer active, remove the subscription from the list (that involves telling the server we have removed it)
 
         # idea
@@ -80,20 +114,12 @@ class DataClient:
             subscription = self.findSubscription(
                 subscription=Subscription(message.method, message.uuid)
             )
-            if message.data is not None:
-                try:
-                    # how to turn the message into a dataframe
-                    #df = pd.read_json(StringIO(message.data), orient='split')
-                    # TODO : send observation to server to save in database
-                    debug(f"Received and send subscription data to Data Manager for {message.uuid}")
-                except Exception as e:
-                    error(f"Error processing subscription data: {e}")
             q = self.subscriptions.get(subscription)
             if isinstance(q, queue.Queue):
                 q.put(message)
             await subscription(message)
-            debug("Current subscriptions:", self.subscriptions)
-            info("Subscribed to : ", message.uuid)
+            debug('Current subscriptions:', self.subscriptions)
+            info('Subscribed to : ', message.uuid)
         elif message.isResponse:
             self.responses[message.id] = message
 
@@ -135,10 +161,10 @@ class DataClient:
         del peer
 
     async def disconnectAll(self):
-        """Disconnect from all peers and stop the server"""
+        '''Disconnect from all peers and stop the server'''
         for connectedPeer in self.peers.values():
             self.disconnect(connectedPeer)
-        info("Disconnected from all peers and stopped server")
+        info('Disconnected from all peers and stopped server')
 
     async def connect(self, peerAddr: Tuple[str, int]) -> Dict:
         if peerAddr not in self.peers:
@@ -151,7 +177,7 @@ class DataClient:
         request: Message,
         sendOnly: bool = False,
     ) -> Dict:
-        """Send a request to a specific peer"""
+        '''Send a request to a specific peer'''
 
         await self.connect(peerAddr)
         try:
@@ -161,8 +187,8 @@ class DataClient:
             response = await self.listenForResponse(request.id)
             return response
         except Exception as e:
-            error(f"Error sending request to peer: {e}")
-            return {"status": "error", "message": str(e)}
+            error(f'Error sending request to peer: {e}')
+            return {'status': 'error', 'message': str(e)}
 
     # should we need this?
     # def resubscribe(self):
@@ -174,31 +200,31 @@ class DataClient:
         self,
         peerAddr: Tuple[str, int],
         uuid: str,
-        method: str = "subscribe",
+        method: str = 'subscribe',
         callback: Union[callable, None] = None,
         data: pd.DataFrame = None,
         replace: bool = False,
         fromDate: str = None,
         toDate: str = None,
     ) -> Dict:
-        """
+        '''
         Creates a subscription request
-        """
+        '''
         id = self._generateCallId()
         subscription = Subscription(method, uuid, callback=callback)
         self.subscriptions[subscription] = queue.Queue()
         request = Message(
             {
-                "method": method,
-                "id": id,
-                "sub": False,
-                "params": {
-                    "uuid": uuid,
-                    "replace": replace,
-                    "from_ts": fromDate,
-                    "to_ts": toDate,
+                'method': method,
+                'id': id,
+                'sub': False,
+                'params': {
+                    'uuid': uuid,
+                    'replace': replace,
+                    'from_ts': fromDate,
+                    'to_ts': toDate,
                 },
-                "data": data,
+                'data': data,
             }
         )
         return await self.send(peerAddr, request)
@@ -207,39 +233,39 @@ class DataClient:
         self,
         peerAddr: Tuple[str, int],
         uuid: str,
-        method: str = "insert",
+        method: str = 'insert',
         isSub: bool = False,
         data: pd.DataFrame = None,
         replace: bool = False,
         fromDate: str = None,
         toDate: str = None,
     ) -> Dict:
-        """
+        '''
         Creates a subscription request
-        """
+        '''
         id = self._generateCallId()
         request = Message(
             {
-                "method": method,
-                "id": id,
-                "sub": isSub,
-                "params": {
-                    "uuid": uuid,
-                    "replace": replace,
-                    "from_ts": fromDate,
-                    "to_ts": toDate,
+                'method': method,
+                'id': id,
+                'sub': isSub,
+                'params': {
+                    'uuid': uuid,
+                    'replace': replace,
+                    'from_ts': fromDate,
+                    'to_ts': toDate,
                 },
-                "data": data,
+                'data': data,
             }
         )
         return await self.send(peerAddr, request)
 
     async def sendRequest( 
         self,
-        peerHost: str = '0.0.0.0',
+        peerHost: str,
         peerPort: int = 24602,
         uuid: str = None,
-        method: str = "initiate-connection",
+        method: str = 'initiate-connection',
         data: pd.DataFrame = None,
         replace: bool = False,
         fromDate: str = None,
@@ -248,22 +274,22 @@ class DataClient:
 
         id = self._generateCallId()
 
-        if method == "data-in-range" and data is not None:
+        if method == 'data-in-range' and data is not None:
             if 'from_ts' in data.columns and 'to_ts' in data.columns:
                 fromDate = data['from_ts'].iloc[0]
                 toDate = data['to_ts'].iloc[0]
             else:
                 raise ValueError(
-                    "DataFrame must contain 'from_ts' and 'to_ts' columns for date range queries"
+                    'DataFrame must contain "from_ts" and "to_ts" columns for date range queries'
                 )
-        elif method == "record-at-or-before":
+        elif method == 'record-at-or-before':
             if data is None:
                 raise ValueError(
-                    "DataFrame with timestamp is required for last record before requests"
+                    'DataFrame with timestamp is required for last record before requests'
                 )
             elif 'ts' not in data.columns:
                 raise ValueError(
-                    "DataFrame must contain 'ts' column for last record before requests"
+                    'DataFrame must contain "ts" column for last record before requests'
                 )
 
         if data is not None:
@@ -271,15 +297,15 @@ class DataClient:
 
         request = Message(
             {
-                "method": method,
-                "id": id,
-                "params": {
-                    "uuid": uuid,
-                    "replace": replace,
-                    "from_ts": fromDate,
-                    "to_ts": toDate,
+                'method': method,
+                'id': id,
+                'params': {
+                    'uuid': uuid,
+                    'replace': replace,
+                    'from_ts': fromDate,
+                    'to_ts': toDate,
                 },
-                "data": data,
+                'data': data,
             }
         )
         return await self.send((peerHost, peerPort), request)

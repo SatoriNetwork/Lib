@@ -150,7 +150,9 @@ class DataServer:
         elif request.method == 'notify-subscribers':
             await self.notifySubscribers(request)
             return _createResponse("success", "Subscribers Notified", request.data)
-        elif request.method == 'initiate-connection':
+        elif request.method == 'initiate-server-connection':
+            self.localClients[peerAddr] = self.connectedClients[peerAddr]
+            print(self.localClients[peerAddr].websocket)
             return _createResponse("success", "Connection established")
         elif request.method == 'send-pubsub-map':
             for sub_uuid, data in request.uuid.items():

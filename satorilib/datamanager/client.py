@@ -4,42 +4,18 @@ import json
 import time
 import queue
 import pandas as pd
-from typing import Dict, Any, Optional, Union, Tuple, Set
-from io import StringIO
+from typing import Dict, Any, Union, Tuple, Set
 from satorilib.logging import INFO, setup, debug, info, warning, error
-from satorilib.datamanager.server import DataServer
 from satorilib.datamanager.helper import Message, ConnectedPeer, Subscription
 
 class DataClient:
     def __init__(self, serverHostPort: str):
         self.serverHostPort: str = serverHostPort
-        self.serverWs: websockets = None
         self.peers: Dict[Tuple[str, int], ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
         self.publications: dict[str, str] = {} # {uuid, publication uuid}
         self.responses: dict[str, Message] = {}
 
-    async def connectToServer(self):
-        '''Connects to our own Server'''
-        uri = f'ws://{self.serverHostPort}:{24602}'
-        try:
-            self.serverWs = await websockets.connect(uri)
-            asyncio.create_task(self.listenToServer())
-            debug(f'Connected to Server at {uri}', print=True)
-        except Exception as e:
-            error(f'Failed to connect to peer at {uri}: {e}')
-            
-    async def listenToServer(self):
-        ''' listens to our own server '''
-        try:
-            async for raw_msg in self.serverWs:
-                message = Message(json.loads(raw_msg))
-                asyncio.create_task(self.handleServerMessage(message))
-        except websockets.exceptions.ConnectionClosed:
-            self.disconnectServer()
-
-    async def disconnectServer(self) -> None:
-        await self.serverWs.close()
 
     async def connectToPeer(self, peerHost: str, peerPort: int = 24602):
         '''Connect to other Peers'''
@@ -80,20 +56,16 @@ class DataClient:
         '''
         pass to server, modify owner's state, modify our state 
         '''
-        await self.handleMessageForServer(message)
+        # await self.handleMessageForServer(message) # handled inside handleMessageForOwner()
         await self.handleMessageForOwner(message)
         await self.handleMessageForSelf(message)
 
-    # TODO : refactor
     async def handleMessageForServer(self, message: Message) -> None:
-        if self.serverWs is not None:
-            pass
-
-        # if we have an active connection to the server - if not maybe make one?
-        if self.server is not None:
-            await self.server.notifySubscribers(message) # TODO : request send to the server about the subscription
-        else: 
-            warning('No connection to server, reconnect?')
+        ''' Notify server about subscription '''
+        try:
+            await self.sendRequest(self.serverHostPort, rawMsg=message)
+        except Exception as e:
+            error('Error sending message to server : ', e)
         
         # NOTES
         # dc holds a list of subscriptions (active)
@@ -111,7 +83,7 @@ class DataClient:
 
     async def handleMessageForOwner(self, message: Message) -> None:
         if message.isSubscription:
-            await self.handlePeerMessageForServer(message)
+            await self.handleMessageForServer(message)
             subscription = self.findSubscription(
                 subscription=Subscription(message.method, message.uuid)
             )
@@ -119,8 +91,6 @@ class DataClient:
             if isinstance(q, queue.Queue):
                 q.put(message)
             await subscription(message)
-            debug('Current subscriptions:', self.subscriptions)
-            info('Subscribed to : ', message.uuid)
         elif message.isResponse:
             self.responses[message.id] = message
     
@@ -128,7 +98,8 @@ class DataClient:
         if message.status == 'inactive':
             subscription = self.findSubscription(
                 subscription=Subscription(message.uuid.subscriber))
-            del self.subscriptions[subscription] # TODO : confirm this
+            del self.subscriptions[subscription]
+            # once the ds gets the message saying its inactive, why dont the ds itself handle removing it
             # tell the data server to remove the subscription
             #'remove-available-subscription-streams'
 
@@ -189,9 +160,8 @@ class DataClient:
         peerAddr: Tuple[str, int],
         request: Message,
         sendOnly: bool = False,
-    ) -> Dict:
+    ) -> Message:
         '''Send a request to a specific peer'''
-
         await self.connect(peerAddr)
         try:
             await self.peers[peerAddr].websocket.send(request.to_json())
@@ -203,11 +173,6 @@ class DataClient:
             error(f'Error sending request to peer: {e}')
             return {'status': 'error', 'message': str(e)}
 
-    # should we need this?
-    # def resubscribe(self):
-    #    if self.connected():
-    #        for subscription in self.subscriptions.keys():
-    #            self.subscribe(subscription.method, *subscription.params)
 
     async def subscribe(
         self,
@@ -220,12 +185,14 @@ class DataClient:
         replace: bool = False,
         fromDate: str = None,
         toDate: str = None,
-    ) -> Dict:
+    ) -> Message:
         '''
-        Creates a subscription request
+        creates a subscription request
         '''
         if publicationUuid is not None:
             self.publications[uuid] = publicationUuid
+        
+        self.saveStreamInServer(uuid, publicationUuid)
 
         id = self._generateCallId()
         subscription = Subscription(method, uuid, callback=callback)
@@ -246,6 +213,25 @@ class DataClient:
         )
         return await self.send(peerAddr, request)
     
+    # should we need this?
+    # def resubscribe(self):
+    #    if self.connected():
+    #        for subscription in self.subscriptions.keys():
+    #            self.subscribe(subscription.method, *subscription.params)
+    
+    async def saveStreamInServer(self, subUuid: str, pubUuid: Union[str, None] = None) -> None:
+        ''' tells the server to save the subscription and publication streams '''
+        try:
+            await self.sendRequest(self.serverHostPort, uuid=subUuid, method='add-available-subscription-streams')
+        except Exception as e:
+            error("Unable to send request to server : ", e)
+        if pubUuid is not None:
+            try:
+                await self.sendRequest(self.serverHostPort, uuid=pubUuid, method='add-available-publication-streams')
+            except Exception as e:
+                error("Unable to send request to server : ", e)
+
+    
     async def passDataToServer(
         self,
         peerAddr: Tuple[str, int],
@@ -256,10 +242,8 @@ class DataClient:
         replace: bool = False,
         fromDate: str = None,
         toDate: str = None,
-    ) -> Dict:
-        '''
-        Creates a subscription request
-        '''
+    ) -> Message:
+        ''' passes the dataframe to the server '''
         id = self._generateCallId()
         request = Message(
             {
@@ -287,7 +271,8 @@ class DataClient:
         replace: bool = False,
         fromDate: str = None,
         toDate: str = None,
-    ) -> Dict:
+        rawMsg: Message = None,
+    ) -> Message:
 
         id = self._generateCallId()
 
@@ -312,17 +297,44 @@ class DataClient:
         if data is not None:
             data = data.to_json(orient='split')
 
-        request = Message(
-            {
-                'method': method,
-                'id': id,
-                'params': {
-                    'uuid': uuid,
-                    'replace': replace,
-                    'from_ts': fromDate,
-                    'to_ts': toDate,
-                },
-                'data': data,
-            }
-        )
+        if rawMsg is None:
+            request = Message(
+                {
+                    'method': method,
+                    'id': id,
+                    'params': {
+                        'uuid': uuid,
+                        'replace': replace,
+                        'from_ts': fromDate,
+                        'to_ts': toDate,
+                    },
+                    'data': data,
+                }
+            )
+        else:
+            request = rawMsg
+
         return await self.send((peerHost, peerPort), request)
+
+    # Note : in-case we need a separate a listener for the internal data server
+    # async def connectToServer(self):
+    #     '''Connects to our own Server'''
+    #     uri = f'ws://{self.serverHostPort}:{24602}'
+    #     try:
+    #         self.serverWs = await websockets.connect(uri)
+    #         asyncio.create_task(self.listenToServer())
+    #         debug(f'Connected to Server at {uri}', print=True)
+    #     except Exception as e:
+    #         error(f'Failed to connect to peer at {uri}: {e}')
+            
+    # async def listenToServer(self):
+    #     ''' listens to our own server '''
+    #     try:
+    #         async for raw_msg in self.serverWs:
+    #             message = Message(json.loads(raw_msg))
+    #             asyncio.create_task(self.handleServerMessage(message))
+    #     except websockets.exceptions.ConnectionClosed:
+    #         self.disconnectServer()
+
+    # async def disconnectServer(self) -> None:
+    #     await self.serverWs.close()

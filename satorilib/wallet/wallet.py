@@ -1890,7 +1890,6 @@ class Wallet(WalletBase):
                         result=None,
                         success=False,
                         msg='Send Failed: OFAC on Report')
-                return "ending early until tested"
                 r = broadcastBridgeSimplePartialFn(
                     tx=tx,
                     reportedFeeSats=reportedFeeSats,

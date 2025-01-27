@@ -14,6 +14,14 @@ from satorilib.datamanager.helper import (
     PeerInfo
 )
 
+# TODO : 
+# Handle predictionData and rawData to include the hash before saving it to the disk
+    # if no hash make a hash and appends to the observation
+    # save to disk
+    # get the last row
+    # notify others
+# if sync, maybe handle hash ( optimization )
+
 
 class DataServer:
     def __init__(

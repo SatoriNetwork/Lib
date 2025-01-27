@@ -63,6 +63,7 @@ class DataClient:
     async def handleMessageForServer(self, message: Message) -> None:
         ''' Notify server about subscription, so it can notify other subscribers '''
         try:
+            # TODO : server should save the observation if its a observation / remove the stream if inactive and notify
             await self.sendRequest(self.serverHostPort, rawMsg=message)
         except Exception as e:
             error('Error sending message to server : ', e)

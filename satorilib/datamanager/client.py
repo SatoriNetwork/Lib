@@ -53,17 +53,13 @@ class DataClient:
 
         
     async def handlePeerMessage(self, message: Message) -> None:
-        '''
-        pass to server, modify owner's state, modify our state 
-        '''
-        # await self.handleMessageForServer(message) # handled inside handleMessageForOwner()
+        ''' pass to server, modify owner's state, modify our state '''
         await self.handleMessageForOwner(message)
         await self.handleMessageForSelf(message)
 
     async def handleMessageForServer(self, message: Message) -> None:
-        ''' Notify server about subscription, so it can notify other subscribers '''
+        ''' Notify server about subscription or if the stream is inactive, so it can notify other subscribers '''
         try:
-            # TODO : server should save the observation if its a observation / remove the stream if inactive and notify
             await self.sendRequest(self.serverHostPort, rawMsg=message)
         except Exception as e:
             error('Error sending message to server : ', e)
@@ -97,26 +93,14 @@ class DataClient:
             self.responses[message.id] = message
     
     async def handleMessageForSelf(self, message: Message) -> None:
+        ''' modify internal state '''
         if message.status == 'inactive':
             subscription = self.findSubscription(
                 subscription=Subscription(message.uuid))
             if self.subscriptions.get(subscription) is not None:
-                # should this be inside the handleMessageForServer()?
-                try:
-                    await self.sendRequest(self.serverHostPort, uuid=message.uuid, method='remove-available-subscription-streams')
-                except Exception as e:
-                    error("Unable to send request to server : ", e)
                 del self.subscriptions[subscription]
-            # once the ds gets the message saying its inactive, why dont the ds itself handle removing it
-            # tell the data server to remove the subscription
-            #'remove-available-subscription-streams'
             if self.publications.get(message.uuid) is not None:
-                try:
-                    await self.sendRequest(self.serverHostPort, uuid=self.publications[message.uuid], method='remove-available-publication-streams')
-                except Exception as e:
-                    error("Unable to send request to server : ", e)
                 del self.publications[message.uuid]
-            # tell the data server to remove the publication
 
     def listenForSubscriptions(self, method: str, params: list) -> dict:
         return self.subscriptions[Subscription(method, params)].get()

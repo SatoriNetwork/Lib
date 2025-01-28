@@ -1364,83 +1364,6 @@ class Wallet(WalletBase):
         if currencyChangeOut is None:
             raise TransactionFailure('unable to generate currency change')
         memoOut = self._compileMemoOutput(f'{chain}:{ethAddress}')
-        print(satoriOuts, '+', [
-                x for x in [satoriChangeOut]
-                if x is not None], '+', [mundoFeeOut, bridgeFeeOut, currencyChangeOut, memoOut])
-
-        '''
-        [CTxOut(0.0*COIN, CScript([OP_DUP, OP_HASH160, x('99f2e5e3049591220aba8b00781d0ce6f04e912a'), OP_EQUALVERIFY, OP_CHECKSIG, OP_EVR_ASSET, x('65767274065341544f524940420f0000000000'), OP_DROP]))] +
-        [CTxOut(0.0*COIN, CScript([OP_DUP, OP_HASH160, x('1f41f0871d2d14573bbf092330fdefa565a2b79a'), OP_EQUALVERIFY, OP_CHECKSIG, OP_EVR_ASSET, x('65767274065341544f5249806d0d0000000000'), OP_DROP]))] +
-        [
-            CTxOut(0.0*COIN, CScript([OP_DUP, OP_HASH160, x('291af70df5044554cc9ca3eb51cb8442f59a2ccb'), OP_EQUALVERIFY, OP_CHECKSIG, OP_EVR_ASSET, x('65767274065341544f52491027000000000000'), OP_DROP])),
-            CTxOut(0.0*COIN, CScript([OP_DUP, OP_HASH160, x('8017cd9a973d1f2831b42d5138a2ec20025536e8'), OP_EQUALVERIFY, OP_CHECKSIG, OP_EVR_ASSET, x('65767274065341544f524940420f0000000000'), OP_DROP])),
-            CTxOut(787.6585*COIN, CScript([OP_DUP, OP_HASH160, x('291af70df5044554cc9ca3eb51cb8442f59a2ccb'), OP_EQUALVERIFY, OP_CHECKSIG])),
-            CTxOut(0.0*COIN, CScript([OP_RETURN, x('626173653a307836613639383045366532433942386564366434374133313336303136343533414437343941644339')]))]
-        outgoing Satori server message to  /simple_partial/broadcast/evrmore/78767500000/1650000/0
-        2025-01-27 23:47:05,474 - INFO - outgoing Satori server message to  /simple_partial/broadcast/evrmore/78767500000/1650000/0
-        unauth'ed server err: TransactionFailure: fee mismatch, 1650000, 78767500000  400 Client Error: BAD REQUEST for url: https://mundo.satorinet.io/simple_partial/broadcast/evrmore/78767500000/1650000/0
-        2025-01-27 23:47:06,594 - ERROR - unauth'ed server err: TransactionFailure: fee mismatch, 1650000, 78767500000  400 Client Error: BAD REQUEST for url: https://mundo.satorinet.io/simple_partial/broadcast/evrmore/78767500000/1650000/0
-        Traceback (most recent call last):
-        File "/Satori/Lib/satorilib/server/server.py", line 130, in _makeUnauthenticatedCall
-            r.raise_for_status()
-        File "/usr/local/lib/python3.10/site-packages/requests/models.py", line 1024, in raise_for_status
-            raise HTTPError(http_error_msg, response=self)
-        requests.exceptions.HTTPError: 400 Client Error: BAD REQUEST for url: https://mundo.satorinet.io/simple_partial/broadcast/evrmore/78767500000/1650000/0
-
-        During handling of the above exception, another exception occurred:
-
-        Traceback (most recent call last):
-        File "/usr/local/lib/python3.10/site-packages/flask/app.py", line 1478, in __call__
-            return self.wsgi_app(environ, start_response)
-        File "/usr/local/lib/python3.10/site-packages/flask/app.py", line 1458, in wsgi_app
-            response = self.handle_exception(e)
-        File "/usr/local/lib/python3.10/site-packages/flask_cors/extension.py", line 176, in wrapped_function
-            return cors_after_request(app.make_response(f(*args, **kwargs)))
-        File "/usr/local/lib/python3.10/site-packages/flask/app.py", line 1455, in wsgi_app
-            response = self.full_dispatch_request()
-        File "/usr/local/lib/python3.10/site-packages/flask/app.py", line 869, in full_dispatch_request
-            rv = self.handle_user_exception(e)
-        File "/usr/local/lib/python3.10/site-packages/flask_cors/extension.py", line 176, in wrapped_function
-            return cors_after_request(app.make_response(f(*args, **kwargs)))
-        File "/usr/local/lib/python3.10/site-packages/flask/app.py", line 867, in full_dispatch_request
-            rv = self.dispatch_request()
-        File "/usr/local/lib/python3.10/site-packages/flask/app.py", line 852, in dispatch_request
-            return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
-        File "/Satori/Neuron/satorineuron/web/satori.py", line 258, in decorated_function
-            return f(*args, **kwargs)
-        File "/Satori/Neuron/satorineuron/web/satori.py", line 250, in decorated_function
-            return f(*args, **kwargs)
-        File "/Satori/Neuron/satorineuron/web/satori.py", line 828, in bridgeSatoriTransactionFromVault
-            result = bridgeSatoriTransactionUsing(start.vault)
-        File "/Satori/Neuron/satorineuron/web/satori.py", line 953, in bridgeSatoriTransactionUsing
-            return acceptSubmittion(bridgeForm)
-        File "/Satori/Neuron/satorineuron/web/satori.py", line 931, in acceptSubmittion
-            transactionResult = myWallet.typicalNeuronBridgeTransaction(
-        File "/Satori/Lib/satorilib/wallet/wallet.py", line 1948, in typicalNeuronBridgeTransaction
-            return sendIndirect()
-        File "/Satori/Lib/satorilib/wallet/wallet.py", line 1915, in sendIndirect
-            r = broadcastBridgeSimplePartialFn(
-        File "/Satori/Lib/satorilib/server/server.py", line 254, in broadcastSimplePartial
-            return self._makeUnauthenticatedCall(
-        File "/Satori/Lib/satorilib/server/server.py", line 133, in _makeUnauthenticatedCall
-            r.raise_for_status()
-        File "/usr/local/lib/python3.10/site-packages/requests/models.py", line 1024, in raise_for_status
-            raise HTTPError(http_error_msg, response=self)
-        requests.exceptions.HTTPError: 400 Client Error: BAD REQUEST for url: https://mundo.satorinet.io/simple_partial/broadcast/evrmore/78767500000/1650000/0
-
-        2025-01-27 23:47:05,305 - DEBUG - unspent {'tx_hash': 'e0062ce31157a9a3f5cac422397f705692f8dcf753e4f060bf54940ad1a13335', 'tx_pos': 3, 'height': 1173020, 'asset': None, 'value': 78767500000, 'scriptPubKey': '76a914291af70df5044554cc9ca3eb51cb8442f59a2ccb88ac'} 9
-        2025-01-27 23:47:05,784 - DEBUG - simplePartialBroadcastSimple evrmore 78767500000 1650000 0 <satorilib.electrumx.electrumx.Electrumx object at 0x7f25321b5dc0>
-        2025-01-27 23:47:06,786 - DEBUG - completer ELuFW1n9Bj14BUCUzNoC3jJKMP9EDNmhub
-        2025-01-27 23:47:06,787 - DEBUG - change ELuFW1n9Bj14BUCUzNoC3jJKMP9EDNmhub
-        2025-01-27 23:47:06,788 - DEBUG - simplePartialBroadcastSimple TransactionFailure: fee mismatch, 1650000, 78767500000  Traceback (most recent call last):
-        File "/Satori/Mundo/satorimundo/mundo/app.py", line 229, in simplePartialBroadcastSimple
-            result = wallet.satoriOnlyCompleterSimple(
-        File "/Satori/Lib/satorilib/wallet/wallet.py", line 1536, in satoriOnlyCompleterSimple
-            raise TransactionFailure(
-        satorilib.wallet.concepts.transaction.TransactionFailure: TransactionFailure: fee mismatch, 1650000, 78767500000
-        '''
-
-
         tx = self._createPartialOriginatorSimple(
             txins=txins,
             txinScripts=txinScripts,
@@ -1554,35 +1477,10 @@ class Wallet(WalletBase):
             '''
 
             if bridgeTransaction:
-                '''
-                this gets an error:
-                2025-01-27 23:35:05,603 - DEBUG - MAKING CLAIM
-    2025-01-27 23:35:08,507 - DEBUG - unspent {'tx_hash': 'e0062ce31157a9a3f5cac422397f705692f8dcf753e4f060bf54940ad1a13335', 'tx_pos': 3, 'height': 1173020, 'asset': None, 'value': 78767500000, 'scriptPubKey': '76a914291af70df5044554cc9ca3eb51cb8442f59a2ccb88ac'} 9
-    2025-01-27 23:35:08,914 - DEBUG - simplePartialBroadcastSimple evrmore 78767500000 2250000 0 <satorilib.electrumx.electrumx.Electrumx object at 0x7f25321b5dc0>
-    2025-01-27 23:35:09,916 - DEBUG - completer ELuFW1n9Bj14BUCUzNoC3jJKMP9EDNmhub
-    2025-01-27 23:35:09,917 - DEBUG - change ELuFW1n9Bj14BUCUzNoC3jJKMP9EDNmhub
-    2025-01-27 23:35:09,920 - DEBUG - simplePartialBroadcastSimple TransactionFailure: fee mismatch, 2250000, 78767500000  Traceback (most recent call last):
-    File "/Satori/Mundo/satorimundo/mundo/app.py", line 229, in simplePartialBroadcastSimple
-        result = wallet.satoriOnlyCompleterSimple(
-    File "/Satori/Lib/satorilib/wallet/wallet.py", line 1536, in satoriOnlyCompleterSimple
-        raise TransactionFailure(
-    satorilib.wallet.concepts.transaction.TransactionFailure: TransactionFailure: fee mismatch, 2250000, 78767500000
-                '''
-                #transactionFee = False
-                #for x in tx.vout:
-                #    if self._checkSatoriValue(x, feeSatsReserved - reportedFeeSats):
-                #        transactionFee = True
-                print(reportedFeeSats)
-                print(TxUtils.asSats(1))
-                print(feeSatsReserved)
-                print(feeSatsReserved - reportedFeeSats)
-                print(tx.vout[-2].nValue)
                 return (
                     reportedFeeSats < TxUtils.asSats(1) and
                     reportedFeeSats < feeSatsReserved and
-                    tx.vout[-2].nValue == feeSatsReserved - reportedFeeSats
-                    #transactionFee
-                    )
+                    tx.vout[-2].nValue == feeSatsReserved - reportedFeeSats)
             return (
                 reportedFeeSats < TxUtils.asSats(1) and
                 reportedFeeSats < feeSatsReserved and

@@ -3,6 +3,7 @@ import os
 import json
 import joblib
 import threading
+from enum import Enum
 from base64 import b64encode, b64decode
 from random import randrange
 import mnemonic
@@ -17,6 +18,15 @@ from satorilib.wallet.utils.transaction import TxUtils
 from satorilib.wallet.utils.validate import Validate
 from satorilib.wallet.concepts.balance import Balance
 from satorilib.wallet.concepts.transaction import TransactionResult, TransactionFailure, TransactionStruct
+
+class TxCreationValidation(Enum):
+    ready = (1, 'Initial state, ready to create')
+    partialReady = (2, 'Partially ready')
+    failure = (3, 'Creation failed')
+
+    def __init__(self, code:int, description:str):
+        self.code = code
+        self.description = description
 
 
 class WalletBase():
@@ -127,7 +137,7 @@ class WalletBase():
     def _generateWords(self):
         return mnemonic.Mnemonic('english').to_mnemonic(self._entropy or b'')
 
-    def _generatePrivateKey(self):
+    def _generatePrivateKey(self, compressed: bool = True):
         ''' returns a private key object '''
 
     def _generateAddress(self, pub=None):
@@ -135,6 +145,11 @@ class WalletBase():
 
     def _generateScriptPubKeyFromAddress(self, address: str):
         ''' returns CScript object from address '''
+
+    def _generateUncompressedPubkey(self):
+        ''' returns a private key object '''
+        return self._generatePrivateKey(compressed=False).pub.hex()
+
 
 class Wallet(WalletBase):
 
@@ -170,11 +185,12 @@ class Wallet(WalletBase):
         self.watchAssets = ['SATORI'] if watchAssets is None else watchAssets
         # at $100 SATORI this is 1 penny (for evr tx fee)
         self.mundoFee = 0.0001
-        # at $100 SATORI this is 5 dollars (for eth gas fee)
-        self.bridgeFee: float = 0.05
+        # at $100 SATORI this is 1 dollar (for risk and gas fees), by BurnBridge
+        self.bridgeFee: float = 0.01
         self.bridgeAddress: str = 'EUqCW1WmT6a9Y6RBVhsxY1k4S135RPWCy7'  # TODO finish
-        #self.burnAddress: str = 'ExxxxxxxxxxSatoriBridgeBurnAddress'  # valid?
-        self.burnAddress: str = 'EL1BS6HmwY1KoeqBokKjUMcWbWsn5kamGv'
+        self.burnAddress: str = TxUtils.evrBurnMintAddressMain #'EXBurnMintXXXXXXXXXXXXXXXXXXXbdK5E'  # real
+        self.maxBridgeAmount: float = 500
+        #self.burnAddress: str = 'EL1BS6HmwY1KoeqBokKjUMcWbWsn5kamGv' # testing
         self.isTestnet = isTestnet
         self.password = password
         self.walletPath = walletPath
@@ -243,6 +259,14 @@ class Wallet(WalletBase):
     def networkByte(self) -> bytes:
         return (33).to_bytes(1, 'big') # evrmore by default
 
+    @property
+    def account(self) -> 'eth_account.Account':
+        from satorilib.wallet.ethereum.wallet import EthereumWallet
+        return EthereumWallet.generateAccount(self._entropy)
+
+    @property
+    def ethAddress(self) -> str:
+        return self.account.address
 
     ### Loading ################################################################
 
@@ -750,7 +774,7 @@ class Wallet(WalletBase):
 
     def _checkSatoriValue(self, output: 'CMutableTxOut', amount: float=None) -> bool:
         '''
-        returns true if the output is a satori output of self.mundoFee
+        returns true if the output is a satori output of amount or self.mundoFee
         '''
 
     def _gatherReservedCurrencyUnspent(self, exactSats: int = 0):
@@ -842,7 +866,6 @@ class Wallet(WalletBase):
         unspentSatori = sorted(unspentSatori, key=lambda x: x['value'])
         haveSatori = sum([x.get('value') for x in unspentSatori])
         if not (haveSatori >= sats > 0):
-            logging.debug('not enough', haveSatori, sats, color='magenta')
             raise TransactionFailure('tx: not enough satori to send')
         # gather satori utxos at random
         gatheredSatoriSats = 0
@@ -941,7 +964,7 @@ class Wallet(WalletBase):
     def _deserialize(self, serialTx: bytes) -> 'CMutableTransaction':
         ''' serialize '''
 
-    def _broadcast(self, txHex: str) -> str:
+    def broadcast(self, txHex: str) -> str:
         self.electrumx.ensureConnected()
         return self.electrumx.api.broadcast(txHex)
 
@@ -949,7 +972,12 @@ class Wallet(WalletBase):
 
     # for server
 
-    def satoriDistribution(self, amountByAddress: dict[str: float], memo: str=None) -> str:
+    def satoriDistribution(
+        self,
+        amountByAddress: dict[str: float],
+        memo: str=None,
+        broadcast: bool = True,
+    ) -> str:
         ''' creates a transaction with multiple SATORI asset recipients '''
         if len(amountByAddress) == 0 or len(amountByAddress) > 1000:
             raise TransactionFailure('too many or too few recipients')
@@ -1000,7 +1028,9 @@ class Wallet(WalletBase):
             txouts=satoriOuts + [
                 x for x in [satoriChangeOut, currencyChangeOut, memoOut]
                 if x is not None])
-        return self._broadcast(self._txToHex(tx))
+        if broadcast:
+            return self.broadcast(self._txToHex(tx))
+        return self._txToHex(tx)
 
     # for neuron
     def currencyTransaction(self, amount: float, address: str):
@@ -1037,7 +1067,7 @@ class Wallet(WalletBase):
             txouts=currencyOuts + [
                 x for x in [currencyChangeOut]
                 if x is not None])
-        return self._broadcast(self._txToHex(tx))
+        return self.broadcast(self._txToHex(tx))
 
     # for neuron
     def satoriTransaction(self, amount: float, address: str):
@@ -1079,7 +1109,7 @@ class Wallet(WalletBase):
             txouts=satoriOuts + [
                 x for x in [satoriChangeOut, currencyChangeOut]
                 if x is not None])
-        return self._broadcast(self._txToHex(tx))
+        return self.broadcast(self._txToHex(tx))
 
     def satoriAndCurrencyTransaction(self, satoriAmount: float, currencyAmount: float, address: str):
         ''' creates a transaction to send satori and currency to one address '''
@@ -1133,7 +1163,7 @@ class Wallet(WalletBase):
                 satoriOuts + currencyOuts + [
                     x for x in [satoriChangeOut, currencyChangeOut]
                     if x is not None]))
-        return self._broadcast(self._txToHex(tx))
+        return self.broadcast(self._txToHex(tx))
 
     # def satoriOnlyPartial(self, amount: int, address: str, pullFeeFromAmount: bool = False) -> str:
     #    '''
@@ -1242,18 +1272,19 @@ class Wallet(WalletBase):
     #        txouts=satoriClaimOut + [
     #            x for x in [currencyChangeOut]
     #            if x is not None])
-    #    return self._broadcast(self._txToHex(tx))
+    #    return self.broadcast(self._txToHex(tx))
     #    # return tx  # testing
 
     def satoriOnlyBridgePartialSimple(
         self,
         amount: int,
         ethAddress: str,
+        chain: str='base',
         pullFeeFromAmount: bool = False,
         feeSatsReserved: int = 0,
         completerAddress: str = None,
         changeAddress: str = None,
-    ) -> tuple[str, int]:
+    ) -> tuple[str, int, str]:
         '''
         if people do not have a balance of rvn, they can still send satori.
         they have to pay the fee in satori. So this function produces a partial
@@ -1332,13 +1363,7 @@ class Wallet(WalletBase):
             returnSats=True)
         if currencyChangeOut is None:
             raise TransactionFailure('unable to generate currency change')
-        # logging.debug('txins', txins, color='magenta')
-        # logging.debug('txinScripts', txinScripts, color='magenta')
-        # logging.debug('satoriOuts', satoriOuts, color='magenta')
-        # logging.debug('satoriChangeOut', satoriChangeOut, color='magenta')
-        # logging.debug('mundoFeeOut', mundoFeeOut, color='magenta')
-        # logging.debug('currencyChangeOut', currencyChangeOut, color='magenta')
-        memoOut = self._compileMemoOutput(f'ethereum:{ethAddress}')
+        memoOut = self._compileMemoOutput(f'{chain}:{ethAddress}')
         tx = self._createPartialOriginatorSimple(
             txins=txins,
             txinScripts=txinScripts,
@@ -1346,8 +1371,7 @@ class Wallet(WalletBase):
                 x for x in [satoriChangeOut]
                 if x is not None] + [mundoFeeOut, bridgeFeeOut, currencyChangeOut, memoOut])
         reportedFeeSats = feeSatsReserved - currencyChange
-        # logging.debug('reportedFeeSats', reportedFeeSats, color='magenta')
-        return tx.serialize(), reportedFeeSats
+        return tx.serialize(), reportedFeeSats, self._txToHex(tx)
 
     def satoriOnlyPartialSimple(
         self,
@@ -1422,12 +1446,6 @@ class Wallet(WalletBase):
             returnSats=True)
         if currencyChangeOut is None:
             raise TransactionFailure('unable to generate currency change')
-        # logging.debug('txins', txins, color='magenta')
-        # logging.debug('txinScripts', txinScripts, color='magenta')
-        # logging.debug('satoriOuts', satoriOuts, color='magenta')
-        # logging.debug('satoriChangeOut', satoriChangeOut, color='magenta')
-        # logging.debug('mundoFeeOut', mundoFeeOut, color='magenta')
-        # logging.debug('currencyChangeOut', currencyChangeOut, color='magenta')
         tx = self._createPartialOriginatorSimple(
             txins=txins,
             txinScripts=txinScripts,
@@ -1435,9 +1453,7 @@ class Wallet(WalletBase):
                 x for x in [satoriChangeOut]
                 if x is not None] + [mundoFeeOut, currencyChangeOut])
         reportedFeeSats = feeSatsReserved - currencyChange
-        # logging.debug('reportedFeeSats', reportedFeeSats, color='magenta')
-        # logging.debug('reportedFeeSats', reportedFeeSats, color='magenta')
-        return tx.serialize(), reportedFeeSats
+        return tx.serialize(), reportedFeeSats, self._txToHex(tx)
 
     def satoriOnlyCompleterSimple(
         self,
@@ -1459,6 +1475,7 @@ class Wallet(WalletBase):
                 reportedFeeSats < TxUtils.asSats(1)
                 feeSatsReserved is greater than TxUtils.asSats(1)
             '''
+
             if bridgeTransaction:
                 return (
                     reportedFeeSats < TxUtils.asSats(1) and
@@ -1540,7 +1557,7 @@ class Wallet(WalletBase):
             tx=tx,
             txins=txins,
             txinScripts=txinScripts)
-        return self._broadcast(self._txToHex(tx))
+        return self.broadcast(self._txToHex(tx))
 
     def sendAllTransaction(self, address: str) -> str:
         '''
@@ -1591,7 +1608,7 @@ class Wallet(WalletBase):
             txins=txins,
             txinScripts=txinScripts,
             txouts=txouts)
-        return self._broadcast(self._txToHex(tx))
+        return self.broadcast(self._txToHex(tx))
 
     # not finished
     # I thought this would be worth it, but
@@ -1669,6 +1686,7 @@ class Wallet(WalletBase):
         feeSatsReserved: int = 0,
         completerAddress: str = None,
         changeAddress: str = None,
+        **kwargs
     ) -> tuple[str, int]:
         '''
         sweeps all Satori and currency to the address. so it has to take the fee
@@ -1722,205 +1740,235 @@ class Wallet(WalletBase):
             txinScripts=txinScripts,
             txouts=sweepOuts + [mundoFeeOut, currencyChangeOut])
         reportedFeeSats = feeSatsReserved - currencyChange
-        return tx.serialize(), reportedFeeSats
+        return tx.serialize(), reportedFeeSats, self._txToHex(tx)
 
     def typicalNeuronTransaction(
         self,
         amount: float,
         address: str,
         sweep: bool = False,
-        pullFeeFromAmount: bool = False,
-        completerAddress: str = None,
-        changeAddress: str = None,
-        feeSatsReserved: int = 0
+        requestSimplePartialFn: callable = None, # they provide send all if sweep
+        broadcastBridgeSimplePartialFn: callable = None,
     ) -> TransactionResult:
-        if sweep:
-            try:
-                if self.currency < self.reserve:
-                    if feeSatsReserved == 0 or completerAddress is None or changeAddress is None:
-                        return TransactionResult(
-                            result='try again',
-                            success=True,
-                            tx=None,
-                            msg='creating partial, need feeSatsReserved.')
-                    # logging.debug('a', color='magenta')
-                    result = self.sendAllPartialSimple(
-                        address=address,
-                        feeSatsReserved=feeSatsReserved,
-                        completerAddress=completerAddress,
-                        changeAddress=changeAddress,
-                    )
-                    # #logging.debug('result of sendAllPartialSimple',
-                    #               result, color='yellow')
-                    # logging.debug('b', result, color='magenta')
-                    if result is None:
-                        # logging.debug('c', color='magenta')
-                        return TransactionResult(
-                            result=None,
-                            success=False,
-                            msg='Send Failed: try again in a few minutes.')
-                    # logging.debug('d', color='magenta')
-                    return TransactionResult(
-                        result=result,
-                        success=True,
-                        tx=result[0],
-                        reportedFeeSats=result[1],
-                        msg='send transaction requires fee.')
-                # logging.debug('e', color='magenta')
-                result = self.sendAllTransaction(address)
-                # logging.debug('f', result, color='magenta')
-                if result is None:
-                    # logging.debug('g', color='magenta')
-                    return TransactionResult(
-                        result=result,
-                        success=False,
-                        msg='Send Failed: try again in a few minutes.')
-                # logging.debug('h', result, color='magenta')
-                return TransactionResult(result=str(result), success=True)
-            except TransactionFailure as e:
-                # logging.debug('i', color='magenta')
+
+        def sendDirect():
+            if sweep:
+                txid = self.sendAllTransaction(address)
+            else:
+                txid = self.satoriTransaction(amount=amount, address=address)
+            if len(txid) == 64:
                 return TransactionResult(
                     result=None,
-                    success=False,
-                    msg=f'Send Failed: {e}')
-        else:
-            # logging.debug('j', color='magenta')
-            try:
-                if self.currency < self.reserve:
-                    # if we have to make a partial we need more data so we need
-                    # to return, telling them we need more data, asking for more
-                    # information, and then if we get more data we can do this:
-                    # logging.debug('k', color='magenta')
-                    if feeSatsReserved == 0 or completerAddress is None:
-                        # logging.debug('l', color='magenta')
-                        return TransactionResult(
-                            result='try again',
-                            success=True,
-                            tx=None,
-                            msg='creating partial, need feeSatsReserved.')
-                    result = self.satoriOnlyPartialSimple(
-                        amount=amount,
-                        address=address,
-                        pullFeeFromAmount=pullFeeFromAmount,
-                        feeSatsReserved=feeSatsReserved,
-                        completerAddress=completerAddress,
-                        changeAddress=changeAddress)
-                    # logging.debug('n', color='magenta')
-                    if result is None:
-                        # logging.debug('o', color='magenta')
-                        return TransactionResult(
-                            result=None,
-                            success=False,
-                            msg='Send Failed: try again in a few minutes.')
-                    # logging.debug('p', color='magenta')
-                    return TransactionResult(
-                        result=result,
-                        success=True,
-                        tx=result[0],
-                        reportedFeeSats=result[1],
-                        msg='send transaction requires fee.')
-                # logging.debug('q', color='magenta')
-                result = self.satoriTransaction(amount=amount, address=address)
-                # logging.debug('r', result,  color='magenta')
-                if result is None:
-                    # logging.debug('s', color='magenta')
-                    return TransactionResult(
-                        result=result,
-                        success=False,
-                        msg='Send Failed: try again in a few minutes.')
-                # logging.debug('t', color='magenta')
-                return TransactionResult(result=str(result), success=True)
-            except TransactionFailure as e:
-                # logging.debug('v', color='magenta')
+                    success=True,
+                    msg=txid)
+            return TransactionResult(
+                result=None,
+                success=False,
+                msg=f'Send Failed: {txid}')
+
+        def sendIndirect():
+            responseJson = requestSimplePartialFn(network='main')
+            changeAddress = responseJson.get('changeAddress')
+            feeSatsReserved = responseJson.get('feeSatsReserved')
+            completerAddress = responseJson.get('completerAddress')
+            if feeSatsReserved == 0 or completerAddress is None:
                 return TransactionResult(
-                    result=None,
-                    success=False,
-                    msg=f'Send Failed: {e}')
+                    result='try again',
+                    success=True,
+                    tx=None,
+                    msg='creating partial, need feeSatsReserved.')
+            sendPartialFunction = self.satoriOnlyPartialSimple
+            if sweep:
+                sendPartialFunction = self.sendAllPartialSimple
+            tx, reportedFeeSats, txhex = sendPartialFunction(
+                amount=float(amount),
+                address=address,
+                changeAddress=changeAddress,
+                feeSatsReserved=feeSatsReserved,
+                completerAddress=completerAddress,
+                pullFeeFromAmount=float(amount) + self.mundoFee > self.balance.amount)
+            if ( # checking any on of these should suffice in theory...
+                tx is not None and
+                reportedFeeSats is not None and
+                reportedFeeSats > 0
+            ):
+                r = broadcastBridgeSimplePartialFn(
+                    tx=tx,
+                    reportedFeeSats=reportedFeeSats,
+                    feeSatsReserved=feeSatsReserved,
+                    walletId=responseJson.get('partialId'),
+                    network='evrmore')
+                if r.text.startswith('{"code":1,"message":'):
+                    return TransactionResult(
+                        result=None,
+                        success=False,
+                        msg=f'Send Failed: {r.json().get("message")}')
+                elif r.text != '':
+                    return TransactionResult(
+                        result=TxUtils.txhexToTxid(txhex),
+                        success=True,
+                        msg=r.text)
+                else:
+                    return TransactionResult(
+                        result=None,
+                        success=False,
+                        msg='Send Failed: and try again in a few minutes.')
+            return TransactionResult(
+                result=None,
+                success=False,
+                msg='unable to generate transaction')
+
+        ready, partialReady, msg = self.validateForTypicalNeuronTransaction(
+            amount=amount,
+            address=address)
+        if ready:
+            return sendDirect()
+        elif partialReady:
+            return sendIndirect()
+        return TransactionResult(
+            result=None,
+            success=False,
+            msg=f'Send Failed: {msg}')
 
     def typicalNeuronBridgeTransaction(
         self,
         amount: float,
         ethAddress: str,
-        completerAddress: str = None,
-        changeAddress: str = None,
-        feeSatsReserved: int = 0
+        chain: str = 'base',
+        requestSimplePartialFn: callable = None,
+        ofacReportedFn: callable = None,
+        broadcastBridgeSimplePartialFn: callable = None,
     ) -> TransactionResult:
-        #if completerAddress is None or changeAddress is None or feeSatsReserved == 0:
-        #    print('a')
-        #    raise TransactionFailure(
-        #        'Satori Bridge Transaction bad params: need completer details')
-        if amount <= 0:
-            print('b')
-            raise TransactionFailure(
-                'Satori Bridge Transaction bad params: amount <= 0')
-        if amount > 100:
-            print('c')
-            raise TransactionFailure(
-                'Satori Bridge Transaction bad params: amount > 100')
-        if not Validate.ethAddress(ethAddress):
-            print('d')
-            raise TransactionFailure(
-                'Satori Bridge Transaction bad params: eth address')
-        try:
-            if isinstance(amount, Decimal):
-                amount = float(amount)
-            if self.balance.amount < amount + self.bridgeFee:
-                raise TransactionFailure(
-                    f'Satori Bridge Transaction bad params: balance too low to pay for bridgeFee {self.balance.amount} < {amount} + {self.bridgeFee}')
-            print('g')
-            if self.currency < self.reserve:
-                print('self.currency', self.currency, 'self.reserve', self.reserve)
-                # if we have to make a partial we need more data so we need
-                # to return, telling them we need more data, asking for more
-                # information, and then if we get more data we can do this:
-                # logging.debug('k', color='magenta')
-                if feeSatsReserved == 0 or completerAddress is None:
-                    # logging.debug('l', color='magenta')
-                    print('feeSatsReserved', feeSatsReserved, 'completerAddress', completerAddress)
-                    return TransactionResult(
-                        result='try again',
-                        success=True,
-                        tx=None,
-                        msg='creating partial, need feeSatsReserved.')
-                result = self.satoriOnlyBridgePartialSimple(
-                    amount=amount,
-                    ethAddress=ethAddress,
-                    feeSatsReserved=feeSatsReserved,
-                    completerAddress=completerAddress,
-                    changeAddress=changeAddress)
-                print('result', result)
-                # logging.debug('n', color='magenta')
-                if result is None:
-                    # logging.debug('o', color='magenta')
-                    return TransactionResult(
-                        result=None,
-                        success=False,
-                        msg='Send Failed: try again in a few minutes.')
-                # logging.debug('p', color='magenta')
-                return TransactionResult(
-                    result=result,
-                    success=True,
-                    tx=result[0],
-                    reportedFeeSats=result[1],
-                    msg='send transaction requires fee.')
-            # logging.debug('q', color='magenta')
-            result = self.satoriDistribution(
+
+        def sendDirect():
+            txhex = self.satoriDistribution(
                 amountByAddress={
                     self.bridgeAddress: self.bridgeFee,
                     self.burnAddress: amount},
-                memo=f'ethereum:{ethAddress}')
-            # logging.debug('r', result,  color='magenta')
-            if result is None:
-                # logging.debug('s', color='magenta')
+                memo=f'{chain}:{ethAddress}',
+                broadcast=False)
+            if not ofacReportedFn(txid=TxUtils.txhexToTxid(txhex)):
                 return TransactionResult(
-                    result=result,
+                    result=None,
                     success=False,
-                    msg='Send Failed: try again in a few minutes.')
-            # logging.debug('t', color='magenta')
-            return TransactionResult(result=str(result), success=True)
-        except TransactionFailure as e:
-            # logging.debug('v', color='magenta')
+                    msg='Send Failed: OFAC on Report')
+            txid = self.broadcast(txhex)
+            if len(txid) == 64:
+                return TransactionResult(
+                    result=None,
+                    success=True,
+                    msg=txid)
             return TransactionResult(
                 result=None,
                 success=False,
-                msg=f'Send Failed: {e}')
+                msg=f'Send Failed: {txid}')
+
+        def sendIndirect():
+            responseJson = requestSimplePartialFn(network='main')
+            changeAddress = responseJson.get('changeAddress')
+            feeSatsReserved = responseJson.get('feeSatsReserved')
+            completerAddress = responseJson.get('completerAddress')
+            if feeSatsReserved == 0 or completerAddress is None:
+                return TransactionResult(
+                    result='try again',
+                    success=True,
+                    tx=None,
+                    msg='creating partial, need feeSatsReserved.')
+            tx, reportedFeeSats, txhex = self.satoriOnlyBridgePartialSimple(
+                amount=amount,
+                ethAddress=ethAddress,
+                changeAddress=changeAddress,
+                feeSatsReserved=feeSatsReserved,
+                completerAddress=completerAddress)
+            if ( # checking any on of these should suffice in theory...
+                tx is not None and
+                reportedFeeSats is not None and
+                reportedFeeSats > 0
+            ):
+                txid = TxUtils.txhexToTxid(txhex)
+                if not ofacReportedFn(txid):
+                    return TransactionResult(
+                        result=None,
+                        success=False,
+                        msg='Send Failed: OFAC on Report')
+                r = broadcastBridgeSimplePartialFn(
+                    tx=tx,
+                    reportedFeeSats=reportedFeeSats,
+                    feeSatsReserved=feeSatsReserved,
+                    walletId=responseJson.get('partialId'),
+                    network='evrmore')
+                if r.text.startswith('{"code":1,"message":'):
+                    return TransactionResult(
+                        result=None,
+                        success=False,
+                        msg=f'Send Failed: {r.json().get("message")}')
+                elif r.text != '':
+                    return TransactionResult(
+                        result=txid,
+                        success=True,
+                        msg=r.text)
+                else:
+                    return TransactionResult(
+                        result=None,
+                        success=False,
+                        msg='Send Failed: and try again in a few minutes.')
+            return TransactionResult(
+                result=None,
+                success=False,
+                msg='unable to generate transaction')
+
+        ready, partialReady, msg = self.validateForTypicalNeuronBridgeTransaction(
+            amount=amount,
+            ethAddress=ethAddress,
+            chain=chain)
+        if ready:
+            return sendDirect()
+        elif partialReady:
+            return sendIndirect()
+        return TransactionResult(
+            result=None,
+            success=False,
+            msg=f'Send Failed: {msg}')
+
+
+
+    def validateForTypicalNeuronTransaction(
+        self,
+        amount: float,
+        address: str,
+    ) -> TransactionResult:
+        if isinstance(amount, Decimal):
+            amount = float(amount)
+        if amount <= 0:
+            return False, False, f'Satori Transaction bad params: unable to send amount: {amount}'
+        if amount > self.balance.amount:
+            return False, False, f'Satori Transaction bad params: {amount} > {self.balance.amount} '
+        if not Validate.address(address, self.symbol):
+            return False, False, f'Satori Transaction bad params: address: {address}'
+        if self.currency < self.reserve:
+            if amount > self.balance.amount + self.mundoFee:
+                return False, False, f'Satori Transaction bad params: not enough for transaction fees: {amount} > {self.balance.amount} + {self.mundoFee}'
+            return False, True, 'currency < reserve'
+        return True, False, ''
+
+    def validateForTypicalNeuronBridgeTransaction(
+        self,
+        amount: float,
+        ethAddress: str,
+        chain: str = 'base',
+    ) -> tuple[bool, bool, str]: # success, partial-ready, msg
+        if isinstance(amount, Decimal):
+            amount = float(amount)
+        if chain != 'base':
+            return False, False, 'can only bridge to base'
+        if amount <= 0:
+            return False, False, f'Satori Bridge Transaction bad params: unable to send amount: {amount}'
+        if amount > self.maxBridgeAmount:
+            return False, False, 'Satori Bridge Transaction bad params: amount > 100'
+        if not Validate.ethAddress(ethAddress):
+            return False, False, f'Satori Bridge Transaction bad params: eth address: {ethAddress}'
+        if self.balance.amount < amount + self.bridgeFee:
+            return False, False, f'Satori Bridge Transaction bad params: balance too low to pay for bridgeFee {self.balance.amount} < {amount} + {self.bridgeFee}'
+        if self.currency < self.reserve:
+            return False, True, 'currency < reserve'
+        return True, False, ''

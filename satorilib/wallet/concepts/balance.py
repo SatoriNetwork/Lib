@@ -45,41 +45,53 @@ class Balance():
     def __lt__(self, other):
         if isinstance(other, Balance):
             return self.total < other.total
-        elif isinstance(other, (int, float)):  # Handle comparison with numbers
+        elif isinstance(other, int):  # Handle comparison to presumed Sats
             return self.total < other
+        elif isinstance(other, float):  # Handle comparison to presumed Amounts
+            return self.amount < other
         return NotImplemented
 
     def __le__(self, other):
         if isinstance(other, Balance):
             return self.total <= other.total
-        elif isinstance(other, (int, float)):
+        elif isinstance(other, int):
             return self.total <= other
+        elif isinstance(other, float):
+            return self.amount <= other
         return NotImplemented
 
     def __gt__(self, other):
         if isinstance(other, Balance):
             return self.total > other.total
-        elif isinstance(other, (int, float)):
+        elif isinstance(other, int):
             return self.total > other
+        elif isinstance(other, float):
+            return self.amount > other
         return NotImplemented
 
     def __ge__(self, other):
         if isinstance(other, Balance):
             return self.total >= other.total
-        elif isinstance(other, (int, float)):
+        elif isinstance(other, int):
             return self.total >= other
+        elif isinstance(other, float):
+            return self.amount >= other
         return NotImplemented
 
     def __eq__(self, other):
         if isinstance(other, Balance):
             return self.total == other.total
-        elif isinstance(other, (int, float)):
+        elif isinstance(other, int):
             return self.total == other
+        elif isinstance(other, float):
+            return self.amount == other
         return NotImplemented
 
     def __ne__(self, other):
         if isinstance(other, Balance):
             return self.total != other.total
-        elif isinstance(other, (int, float)):
+        elif isinstance(other, int):
             return self.total != other
+        elif isinstance(other, float):
+            return self.amount != other
         return NotImplemented

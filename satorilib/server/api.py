@@ -129,7 +129,6 @@ class CheckinDetails:
     '''
 
     def __init__(self, raw: dict):
-        # thwart
         if 'ERROR' in raw:
             import time
             time.sleep(60*10)

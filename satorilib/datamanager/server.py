@@ -290,13 +290,17 @@ class DataServer:
             try:
                 if request.data is None:
                     return _createResponse(
-                        "error", "No data provided for insert operation"
+                        "error", "No data provided"
                     )
                 data = pd.read_json(StringIO(request.data), orient='split')
                 if request.replace:
                     self.db.deleteTable(request.uuid)
                     self.db.createTable(request.uuid)
-                success = self.db._dataframeToDatabase(request.uuid, data)
+                if request.isSubscription:
+                    success = self.db._addSubDataToDatabase(request.uuid, data)
+                    self.notifySubscribers(request)
+                    return _createResponse("success", "Data added to server database")
+                success = self.db._addDataframeToDatabase(request.uuid, data)
                 return _createResponse(
                     "success" if success else "error",
                     (
@@ -375,12 +379,3 @@ class DataServer:
                 f"Error getting last record before timestamp for stream {uuid}: {e}"
             )
 
-
-async def main():
-    peer1 = DataServer("0.0.0.0", 8080)
-    await peer1.startServer()
-    await asyncio.Future()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())

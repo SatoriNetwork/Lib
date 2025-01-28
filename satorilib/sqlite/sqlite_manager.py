@@ -295,7 +295,69 @@ class SqliteDatabase:
         except Exception as e:
             error(f"Database error converting table {table_uuid} to DataFrame: {e}")
 
-    def _dataframeToDatabase(self, table_uuid: str, df: pd.DataFrame):
+    def _addSubDataToDatabase(self, table_uuid: str, df: pd.DataFrame):
+        """ 
+        This function should do the following :
+            - take in the dataframe that might be a raw data subscription or prediction
+              data published by the engine. 
+            - the dataframe taken as input will have date_time and value
+            - this input combined with others will be used for hashing
+            - the output of the hash will be the new row's id value.
+            - add that to database and then return that row to pass to others.
+            - TODO : should this new id value be passed to others?
+        """
+        try:
+            self.cursor.execute(
+                """
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name=?
+                """, (table_uuid,))
+            if not self.cursor.fetchone():
+                debug(f"Table {table_uuid} does not exist", print=True)
+                self.createTable(table_uuid)
+            required_columns = {'date_time', 'value'}
+            if not all(col in df.columns for col in required_columns):
+                raise ValueError(f"DataFrame must contain columns: {required_columns}")
+            df['value'] = df['value'].astype(float)
+            imported_rows = 0
+            id = hash(df['date_time'], df['value']) # TODO : new hashing method
+            self.cursor.execute(
+                f'''
+                SELECT 1 FROM "{table_uuid}" 
+                WHERE date_time = ? AND value = ? AND id = ?
+                ''', (
+                    df['date_time'],
+                    float(df['value']),
+                    str(id)
+                ))
+            if not self.cursor.fetchone():
+                self.cursor.execute(
+                    f'''
+                    INSERT INTO "{table_uuid}" (date_time, value, id) 
+                    VALUES (?, ?, ?)
+                    ''', (
+                        df['date_time'],
+                        float(df['value']),
+                        str(id)
+                    ))
+                imported_rows += 1
+            self.conn.commit()
+
+            if imported_rows > 0:
+                info(f"Added new record to database {table_uuid}, sorting table")
+                self._sortTableByTimestamp(table_uuid)
+                return True
+            else:
+                info(f"No new data added to table {table_uuid}, skipping sort")    
+        except ValueError as e:
+            error(f"Validation error: {e}")
+            self.conn.rollback()
+        except Exception as e:
+            error(f"Database error converting DataFrame to table {table_uuid}: {e}")
+            self.conn.rollback()
+            return False
+        
+    def _addDataframeToDatabase(self, table_uuid: str, df: pd.DataFrame):
         """ Writes a pandas DataFrame to a specified database table """
         try:
             self.cursor.execute(
@@ -349,6 +411,10 @@ class SqliteDatabase:
             error(f"Database error converting DataFrame to table {table_uuid}: {e}")
             self.conn.rollback()
             return False
+    
+    @staticmethod
+    def hashing():
+        pass
 
 
 if __name__ == "__main__":

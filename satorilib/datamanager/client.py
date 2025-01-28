@@ -245,10 +245,11 @@ class DataClient:
     
     async def passDataToServer(
         self,
-        peerAddr: Tuple[str, int],
+        peerHost: str,
         uuid: str,
+        peerPort: int = 24602,
         method: str = 'insert',
-        isSub: bool = False,
+        isSub: bool = True,
         data: pd.DataFrame = None,
         replace: bool = False,
         fromDate: str = None,
@@ -270,7 +271,7 @@ class DataClient:
                 'data': data,
             }
         )
-        return await self.send(peerAddr, request)
+        return await self.send((peerHost, peerPort), request)
 
     async def sendRequest( 
         self,

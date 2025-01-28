@@ -137,7 +137,7 @@ class EvrmoreWallet(Wallet):
 
     def _checkSatoriValue(self, output: CMutableTxOut, amount: float=None) -> bool:
         '''
-        returns true if the output is a satori output of self.mundoFee
+        returns true if the output is a satori output of amount or self.mundoFee
         '''
         nextOne = False
         for i, x in enumerate(output.scriptPubKey):

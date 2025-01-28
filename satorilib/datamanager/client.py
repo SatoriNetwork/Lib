@@ -279,6 +279,7 @@ class DataClient:
         peerPort: int = 24602,
         uuid: str = None,
         method: str = 'initiate-connection',
+        isSub: bool = False,
         data: pd.DataFrame = None,
         replace: bool = False,
         fromDate: str = None,
@@ -314,6 +315,7 @@ class DataClient:
                 {
                     'method': method,
                     'id': id,
+                    'sub': isSub,
                     'params': {
                         'uuid': uuid,
                         'replace': replace,

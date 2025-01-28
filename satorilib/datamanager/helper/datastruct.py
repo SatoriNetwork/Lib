@@ -81,11 +81,25 @@ class ConnectedPeer:
     def add_publication(self, uuid: str):
         self.publications.append(uuid)
 
-    def remove_subscription(self, uuid: str):
-        self.subscriptions = [x for x in self.subscriptions if x != uuid]
+    def remove_subscription(self, uuid: str) -> bool:
+        """
+        Remove a subscription if it exists.
+        Returns True if the subscription was removed, False if it wasn't found.
+        """
+        if uuid in self.subscriptions:
+            self.subscriptions.remove(uuid)
+            return True
+        return False
 
-    def remove_publication(self, uuid: str):
-        self.publications = [x for x in self.publications if x != uuid]
+    def remove_publication(self, uuid: str) -> bool:
+        """
+        Remove a publication if it exists.
+        Returns True if the publication was removed, False if it wasn't found.
+        """
+        if uuid in self.publications:
+            self.publications.remove(uuid)
+            return True
+        return False
 
 class Message:
     def __init__(self, message: dict):

@@ -6,6 +6,33 @@ import pandas as pd
 from pathlib import Path
 from satorilib.logging import INFO, setup, debug, info, warning, error
 
+
+
+# fix - remove from here.
+import hashlib
+import pandas as pd
+def hashIt(string: str) -> str:
+    # return hashlib.sha256(rowStr.encode()).hexdigest() # 74mb
+    # return hashlib.md5(rowStr.encode()).hexdigest() # 42mb
+    return hashlib.blake2s(
+        string.encode(),
+        digest_size=8).hexdigest()  # 27mb / million rows
+
+
+def historyHashes(df: pd.DataFrame, priorRowHash: str = None) -> pd.DataFrame:
+    ''' creates hashes of every row in the dataframe based on prior hash '''
+    priorRowHash = priorRowHash or ''
+    rowHashes = []
+    for index, row in df.iterrows():
+        rowStr = priorRowHash + str(index) + str(row['value'])
+        rowHash = hashIt(rowStr)
+        rowHashes.append(rowHash)
+        priorRowHash = rowHash
+    df['hash'] = rowHashes
+    return df
+
+
+
 setup(level=INFO)
 
 class SqliteDatabase:
@@ -321,7 +348,7 @@ class SqliteDatabase:
             df['date_time'] = df['date_time'].astype(str)
             df['value'] = df['value'].astype(float)
             imported_rows = 0
-            # id = hash(df['date_time'], df['value']) # TODO : new hashing method
+            df = historyHashes(df)
             id = 'random'
             self.cursor.execute(
                 f'''

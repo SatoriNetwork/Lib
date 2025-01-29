@@ -58,6 +58,10 @@ then it should send that message to it's dataserver so all subscribers to it on 
 stop relying on it for that subscription. it should then restart it's process for the stream or affected streams to find a new provider to subscribe to.
 
 ---
+authentication - data servers should authenticate all clients -
+first get the pubkey of the client and a signed message from them
+then to know if they're local check that against some internal list of pubkeys
+---
 subsume all logic currently used in engine for managing data on disk
 ---
 make sure it's all working together

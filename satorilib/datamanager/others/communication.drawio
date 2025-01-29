@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="Tr3QYgPfv3LOChohxtou" name="Page-1">
-        <mxGraphModel dx="1429" dy="1976" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+        <mxGraphModel dx="1678" dy="2239" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -131,79 +131,87 @@
                 <mxCell id="58" style="edgeStyle=none;html=1;exitX=0.75;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" parent="1" source="30" target="53" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="85" value="A" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="1">
-                    <mxGeometry x="1460" y="1350" width="330" height="480" as="geometry"/>
+                <mxCell id="85" value="A" style="swimlane;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1470" y="1160" width="330" height="480" as="geometry"/>
                 </mxCell>
-                <mxCell id="86" style="edgeStyle=none;html=1;" edge="1" parent="85" source="87" target="91">
+                <mxCell id="86" style="edgeStyle=none;html=1;" parent="85" source="87" target="91" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="87" value="Peer B&lt;br&gt;358148" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="85">
-                    <mxGeometry x="110" y="60" width="120" height="60" as="geometry"/>
+                <mxCell id="87" value="Peer B&lt;br&gt;358148" style="rounded=1;whiteSpace=wrap;html=1;" parent="85" vertex="1">
+                    <mxGeometry x="140" y="130" width="120" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="88" value="peer B&lt;br&gt;24602" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="85">
+                <mxCell id="88" value="peer B&lt;br&gt;24602" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" parent="85" vertex="1">
                     <mxGeometry x="40" y="370" width="80" height="80" as="geometry"/>
                 </mxCell>
-                <mxCell id="89" value="responses&lt;br&gt;subscriptions" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="85">
+                <mxCell id="89" value="responses&lt;br&gt;subscriptions" style="ellipse;whiteSpace=wrap;html=1;" parent="85" vertex="1">
                     <mxGeometry x="165" y="340" width="120" height="80" as="geometry"/>
                 </mxCell>
-                <mxCell id="90" style="edgeStyle=none;html=1;" edge="1" parent="85" source="88" target="89">
+                <mxCell id="90" style="edgeStyle=none;html=1;" parent="85" source="88" target="89" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="224.375" y="240" as="targetPoint"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="91" value="Requests" style="shape=trapezoid;perimeter=trapezoidPerimeter;whiteSpace=wrap;html=1;fixedSize=1;" vertex="1" parent="85">
-                    <mxGeometry y="130" width="120" height="60" as="geometry"/>
+                <mxCell id="91" value="Requests" style="shape=trapezoid;perimeter=trapezoidPerimeter;whiteSpace=wrap;html=1;fixedSize=1;" parent="85" vertex="1">
+                    <mxGeometry x="30" y="200" width="120" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="97" value="Engine for Neuron B (client C)" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="1">
-                    <mxGeometry x="1020" y="1350" width="390" height="510" as="geometry"/>
+                <mxCell id="97" value="Engine for Neuron B (client C)" style="swimlane;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="920" y="1160" width="390" height="510" as="geometry"/>
                 </mxCell>
-                <mxCell id="112" style="edgeStyle=none;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="97" source="98" target="111">
+                <mxCell id="112" style="edgeStyle=none;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;" parent="97" source="98" target="111" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="98" value="DataClient" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="97">
+                <mxCell id="98" value="DataClient" style="swimlane;whiteSpace=wrap;html=1;" parent="97" vertex="1">
                     <mxGeometry x="150" y="40" width="200" height="160" as="geometry"/>
                 </mxCell>
-                <mxCell id="115" value="subscriptions" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="98">
+                <mxCell id="115" value="subscriptions" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="98" vertex="1">
                     <mxGeometry x="60" y="35" width="90" height="30" as="geometry"/>
                 </mxCell>
-                <mxCell id="118" value="producing" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="98">
+                <mxCell id="118" value="producing" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="98" vertex="1">
                     <mxGeometry x="60" y="70" width="80" height="30" as="geometry"/>
                 </mxCell>
-                <mxCell id="111" value="Engine&lt;br&gt;streamModel" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;" vertex="1" parent="97">
+                <mxCell id="111" value="Engine&lt;br&gt;streamModel" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;" parent="97" vertex="1">
                     <mxGeometry x="250" y="280" width="120" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="113" style="edgeStyle=none;html=1;" edge="1" parent="97" source="111" target="118">
+                <mxCell id="113" style="edgeStyle=none;html=1;" parent="97" source="111" target="118" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="150" y="150" as="targetPoint"/>
                         <mxPoint x="220" y="260" as="sourcePoint"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="103" value="DataManager for Neuron B (separate process)" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="1">
-                    <mxGeometry x="590" y="1350" width="390" height="510" as="geometry"/>
+                <mxCell id="103" value="DataManager for Neuron B (separate process)" style="swimlane;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="500" y="1320" width="390" height="510" as="geometry"/>
                 </mxCell>
-                <mxCell id="104" value="DataServer" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="103">
+                <mxCell id="104" value="DataServer" style="swimlane;whiteSpace=wrap;html=1;" parent="103" vertex="1">
                     <mxGeometry x="100" y="100" width="200" height="200" as="geometry"/>
                 </mxCell>
-                <mxCell id="105" value="client C&lt;br&gt;54386" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="104">
+                <mxCell id="105" value="client C&lt;br&gt;54386" style="rounded=1;whiteSpace=wrap;html=1;" parent="104" vertex="1">
                     <mxGeometry x="40" y="40" width="120" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="106" value="Peer A&lt;br&gt;54385" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="104">
+                <mxCell id="106" value="Peer A&lt;br&gt;54385" style="rounded=1;whiteSpace=wrap;html=1;" parent="104" vertex="1">
                     <mxGeometry x="40" y="125" width="120" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="110" value="observations" style="edgeStyle=none;html=1;" edge="1" parent="1" source="87" target="115">
+                <mxCell id="110" value="observations" style="edgeStyle=none;html=1;entryX=1.022;entryY=0.633;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="87" target="115" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1420" y="1170" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="116" style="edgeStyle=none;html=1;entryX=1;entryY=0.25;entryDx=0;entryDy=0;" parent="1" source="115" target="104" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="116" style="edgeStyle=none;html=1;entryX=1;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="115" target="104">
+                <mxCell id="119" style="edgeStyle=none;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="118" target="104" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="119" style="edgeStyle=none;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="118" target="104">
-                    <mxGeometry relative="1" as="geometry"/>
-                </mxCell>
-                <mxCell id="120" value="data server&amp;nbsp;&lt;br&gt;assumes raw real world ds from neuron are available for peers&lt;br&gt;assumes predictive ds from engine are available for peers" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                <mxCell id="120" value="data server&amp;nbsp;&lt;br&gt;assumes raw real world ds from neuron are available for peers&lt;br&gt;assumes predictive ds from engine are available for peers" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
                     <mxGeometry x="605" y="1885" width="360" height="90" as="geometry"/>
                 </mxCell>
-                <mxCell id="121" value="in dataClient&lt;br&gt;when a subscription is setup tell the data server this stream is available&lt;br&gt;when it's torn down tell ds it's not available&lt;br&gt;when disconnect tell ds all affected streams not available&lt;br&gt;when disconnected message tell ds that stream not available" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                <mxCell id="121" value="in dataClient&lt;br&gt;when a subscription is setup tell the data server this stream is available&lt;br&gt;when it's torn down tell ds it's not available&lt;br&gt;when disconnect tell ds all affected streams not available&lt;br&gt;when disconnected message tell ds that stream not available" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
                     <mxGeometry x="990" y="1885" width="450" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="123" style="edgeStyle=none;html=1;" edge="1" parent="1" source="122" target="85">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="122" value="internet&lt;br&gt;GOLD" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="1870" y="1010" width="120" height="60" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>

@@ -27,9 +27,7 @@ class DataServer:
         self.port = port
         self.server = None
         self.connectedClients: dict[Tuple[str, int], ConnectedPeer] = {}
-        self.subscriptions: dict[Subscription, queue.Queue] = {}
         self.pubSubMapping: dict[str, dict] = {}
-        self.responses: dict[str, Message] = {}
         self.db = SqliteDatabase(db_path, db_name)
         self.db.importFromDataFolder()  # can be disabled if new rows are added to the Database and new rows recieved are inside the database
 
@@ -38,8 +36,7 @@ class DataServer:
         return {k:v for k,v in self.connectedClients.items() if v.local}
 
     def availableStreams(self) -> list[str]:
-        # nested_list = [v.publications for v in self.localClients.values()]
-        nested_list = [v.publications + v.subscriptions for v in self.localClients.values()]
+        nested_list = [v.publications for v in self.localClients.values()]
         return [item for sublist in nested_list for item in sublist]
 
     async def startServer(self):
@@ -86,14 +83,14 @@ class DataServer:
                 if cp.websocket == websocket:
                     del self.connectedClients[key]
 
-    async def notifySubscribers(self, msg: Message, streamType: str = 'subscriptions'):
+    async def notifySubscribers(self, msg: Message):
         '''
         is this message something anyone has subscribed to?
         if yes, await self.connected_peers[subscribig_peer].websocket.send(message)
         '''
-        for peerAddr in self.connectedClients.values():
-            if msg.uuid in getattr(self.connectedClients[peerAddr], streamType):
-                await self.connectedClients[peerAddr].websocket.send(msg.to_json())
+        for connectedClient in self.connectedClients.values():
+            if msg.uuid in connectedClient.subscriptions:
+                await connectedClient.websocket.send(msg.to_json())
 
     async def disconnectAllPeers(self):
         """Disconnect from all peers and stop the server"""
@@ -113,11 +110,36 @@ class DataServer:
     ) -> Dict:
         request: Message = Message(json.loads(message))
 
+
+        def _createMessage(
+            status: str,
+            message: str,
+            data: Optional[str] = None,
+            streamInfo: list = None,
+            uuid_override: str = None,
+        ) -> Message:
+            response = {
+                "status": status,
+                "id": request.id,
+                "method": request.method,
+                "message": message,
+                "params": {
+                    "uuid": uuid_override or request.uuid,
+                },
+                "sub": request.sub,
+            }
+            if data is not None:
+                response["data"] = data
+            if streamInfo is not None:
+                response["stream_info"] = streamInfo
+            return Message(response)
+
         def _createResponse(
             status: str,
             message: str,
             data: Optional[str] = None,
             streamInfo: list = None,
+            uuid_override: str = None,
         ) -> Dict:
             response = {
                 "status": status,
@@ -125,7 +147,7 @@ class DataServer:
                 "method": request.method,
                 "message": message,
                 "params": {
-                    "uuid": request.uuid,
+                    "uuid": uuid_override or request.uuid,
                 },
                 "sub": request.sub,
             }
@@ -173,17 +195,48 @@ class DataServer:
                 return _createResponse("inactive", "Subscription not available")
             
         elif request.method == 'stream-inactive' and request.uuid is not None:
-            # TODO : where do we set this right now?
-            # TODO : remember to set isSub as True when sending this request
-            self.connectedClients[peerAddr].remove_subscription(request.uuid)
-            self.connectedClients[peerAddr].remove_publication(self.pubSubMapping[request.uuid]['publicationUuid'])
-            await self.notifySubscribers(_createResponse("inactive", "Subscription Stream inactive"))
+            '''
+            how many connected clients (local) do I have that publish this stream to me?
+            if < 2 then I should remove the stream from my availableStreams: remove from everyone
+            else remove from the peer that sent the request
+            '''
+            publication_uuid = self.pubSubMapping[request.uuid]['publicationUuid']
+            connectedClientsProvidingThisStream = len([request.uuid in localClient.publications for localClient in self.localClients.values()])
+            if connectedClientsProvidingThisStream > 1:
+                self.connectedClients[peerAddr].remove_subscription(request.uuid)
+                self.connectedClients[peerAddr].remove_publication(request.uuid)
+                self.connectedClients[peerAddr].remove_subscription(publication_uuid)
+                self.connectedClients[peerAddr].remove_publication(publication_uuid)
+                await self.notifySubscribers(_createMessage("inactive", "Stream inactive"))
+                # TODO: fix take stream uuid:
+                await self.notifySubscribers(_createMessage("inactive", "Stream inactive", uuid_override=publication_uuid))
+            else:
+                for connectedClient in self.connectedClients.values():
+                    connectedClient.remove_subscription(request.uuid)
+                    connectedClient.remove_publication(request.uuid)
+                    connectedClient.remove_subscription(publication_uuid)
+                    connectedClient.remove_publication(publication_uuid)
+                await self.notifySubscribers(_createResponse("inactive", "Stream inactive"))
+                await self.notifySubscribers(_createResponse("inactive", "Stream inactive", uuid_override=publication_uuid))
             return _createResponse("success", "Message receieved by the server")
         
         elif request.method == 'send-available-subscription':
             return _createResponse("success", "Available streams sent", streamInfo=self.availableStreams())
         
+        
+        
         elif request.method == 'add-available-subscription-streams' and request.uuid is not None:
+            '''
+            from server perspective: 
+
+            local ec - subscribes to a stream from some peer
+            local ec - "add this to the publications that I'm promising to send you, our own server"
+            
+            local server - hangin
+            remote client - says "what streams can you provide?"
+            remote client - says "I want to subscribe to this stream that you promised you can provide"
+
+            '''
             if request.uuid is not None:
                 self.connectedClients[peerAddr].add_subcription(request.uuid)
                 print(self.availableStreams())

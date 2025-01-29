@@ -111,29 +111,6 @@ class DataServer:
         request: Message = Message(json.loads(message))
 
 
-        def _createMessage(
-            status: str,
-            message: str,
-            data: Optional[str] = None,
-            streamInfo: list = None,
-            uuid_override: str = None,
-        ) -> Message:
-            response = {
-                "status": status,
-                "id": request.id,
-                "method": request.method,
-                "message": message,
-                "params": {
-                    "uuid": uuid_override or request.uuid,
-                },
-                "sub": request.sub,
-            }
-            if data is not None:
-                response["data"] = data
-            if streamInfo is not None:
-                response["stream_info"] = streamInfo
-            return Message(response)
-
         def _createResponse(
             status: str,
             message: str,
@@ -207,23 +184,20 @@ class DataServer:
                 self.connectedClients[peerAddr].remove_publication(request.uuid)
                 self.connectedClients[peerAddr].remove_subscription(publication_uuid)
                 self.connectedClients[peerAddr].remove_publication(publication_uuid)
-                await self.notifySubscribers(_createMessage("inactive", "Stream inactive"))
-                # TODO: fix take stream uuid:
-                await self.notifySubscribers(_createMessage("inactive", "Stream inactive", uuid_override=publication_uuid))
+                await self.notifySubscribers(Message(_createResponse("inactive", "Stream inactive")))
+                await self.notifySubscribers(Message(_createResponse("inactive", "Stream inactive", uuid_override=publication_uuid)))
             else:
                 for connectedClient in self.connectedClients.values():
                     connectedClient.remove_subscription(request.uuid)
                     connectedClient.remove_publication(request.uuid)
                     connectedClient.remove_subscription(publication_uuid)
                     connectedClient.remove_publication(publication_uuid)
-                await self.notifySubscribers(_createResponse("inactive", "Stream inactive"))
-                await self.notifySubscribers(_createResponse("inactive", "Stream inactive", uuid_override=publication_uuid))
+                await self.notifySubscribers(Message(_createResponse("inactive", "Stream inactive")))
+                await self.notifySubscribers(Message(_createResponse("inactive", "Stream inactive", uuid_override=publication_uuid)))
             return _createResponse("success", "Message receieved by the server")
         
         elif request.method == 'send-available-subscription':
             return _createResponse("success", "Available streams sent", streamInfo=self.availableStreams())
-        
-        
         
         elif request.method == 'add-available-subscription-streams' and request.uuid is not None:
             '''
@@ -249,28 +223,6 @@ class DataServer:
                 return _createResponse("success", "Publication Stream added")
             return _createResponse("error", "UUID must be provided")
 
-        # if request.isSubscription and request.uuid is not None:
-        #     self.connectedClients[peerAddr].add_subcription(request.uuid)
-        #     return _createResponse(
-        #         "success", f"Observation recieved for {request.uuid}"
-        #     )
-        
-        # elif request.method == 'remove-available-subscription-streams' and request.uuid is not None:
-        #     if request.uuid is not None:
-        #         if request.uuid in self.availableStreams:
-        #             self.connectedClients[peerAddr].remove_subscription(request.uuid)
-        #             # TODO : tell all clients that request.uuid is removed
-        #             await self.notifySubscribers(_createResponse("inactive", "Subscription Stream inactive"))
-        #         return _createResponse("success", "Subscription Stream removed")
-        #     return _createResponse("error", "UUID must be provided")
-        
-        # elif request.method == 'remove-available-publication-streams' and request.uuid is not None:
-        #     if request.uuid is not None:
-        #         self.connectedClients[peerAddr].remove_publication(request.uuid)
-        #         await self.notifySubscribers(_createResponse("inactive", "Publication Stream removed"), 'subscriptions')
-        #         return _createResponse("success", "Publication Stream removed")
-        #     return _createResponse("error", "UUID must be provided")
-        
 
         if request.uuid is None:
             return _createResponse("error", "Missing uuid parameter")

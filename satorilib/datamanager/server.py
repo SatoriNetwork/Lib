@@ -3,16 +3,11 @@ import websockets
 import json
 import queue
 import pandas as pd
-from typing import Dict, Any, Optional, Union, Tuple, Set, List
+from typing import Dict, Any, Optional, Union, Tuple
 from io import StringIO
 from satorilib.logging import INFO, setup, debug, info, warning, error
 from satorilib.sqlite import SqliteDatabase
-from satorilib.datamanager.helper import (
-    Message,
-    ConnectedPeer,
-    Subscription,
-    PeerInfo
-)
+from satorilib.datamanager.helper import Message, ConnectedPeer
 
 
 class DataServer:
@@ -33,22 +28,23 @@ class DataServer:
 
     @property
     def localClients(self) -> dict[Tuple[str, int], ConnectedPeer]:
+        ''' returns dict of clients that have local flag set as True'''
         return {k:v for k,v in self.connectedClients.items() if v.local}
 
     @property
     def availableStreams(self) -> list[str]:
+        ''' returns a list of streams the server publishes or others can subscribe to '''
         return list(set().union(*[v.publications for v in self.localClients.values()]))
 
     async def startServer(self):
-        """Start the WebSocket server"""
+        """ Start the WebSocket server """
         self.server = await websockets.serve(
             self.handleConnection, self.host, self.port
         )
 
     async def handleConnection(self, websocket: websockets.WebSocketServerProtocol):
-        """Handle incoming connections and messages"""
+        """ handle incoming connections and messages """
         peerAddr: Tuple[str, int] = websocket.remote_address
-        debug(f"New connection from {peerAddr}")
         self.connectedClients[peerAddr] = self.connectedClients.get(
             peerAddr, ConnectedPeer(peerAddr, websocket)
         )
@@ -57,7 +53,7 @@ class DataServer:
             async for message in websocket:
                 debug(f"Received request: {message}", print=True)
                 try:
-                    response = await self.handleRequest(peerAddr, websocket, message)
+                    response = await self.handleRequest(peerAddr, message)
                     await self.connectedClients[peerAddr].websocket.send(
                         json.dumps(response)
                     )
@@ -79,8 +75,8 @@ class DataServer:
         except websockets.exceptions.ConnectionClosed:
             error(f"Connection closed with {peerAddr}")
         finally:
-            for key, cp in list(self.connectedClients.items()):
-                if cp.websocket == websocket:
+            for key, peer in list(self.connectedClients.items()):
+                if peer.websocket == websocket:
                     del self.connectedClients[key]
 
     async def notifySubscribers(self, msg: Message):
@@ -93,7 +89,7 @@ class DataServer:
                 await connectedClient.websocket.send(msg.to_json())
 
     async def disconnectAllPeers(self):
-        """Disconnect from all peers and stop the server"""
+        """ disconnect from all peers and stop the server """
         for connectedPeer in self.connectedClients.values():
             await connectedPeer.websocket.close()
         self.connectedClients.clear()
@@ -105,11 +101,11 @@ class DataServer:
     async def handleRequest(
         self,
         peerAddr: Tuple[str, int],
-        websocket: websockets.WebSocketServerProtocol,
         message: str,
-    ) -> Dict:
-        request: Message = Message(json.loads(message))
+    ) -> dict:
+        ''' incoming requests handled according to the method '''
 
+        request: Message = Message(json.loads(message))
 
         def _createResponse(
             status: str,
@@ -149,16 +145,19 @@ class DataServer:
 
         
         if request.method == 'initiate-server-connection':
+            ''' local clients first sends this request to server so the server identifies the client as its local client after auth '''
             # local - TODO: add authentication
             self.connectedClients[peerAddr].local = True
             return _createResponse("success", "Connection established")
         
         elif request.method == 'send-pubsub-map':
+            ''' local neuron client sends the related pub-sub streams recieved from the rendevous server '''
             for sub_uuid, data in request.uuid.items():
                 self.pubSubMapping[sub_uuid] = data
             return _createResponse("success", "Pub-Sub Mapping added in Server")
         
         elif request.method == 'get-pubsub-map':
+            ''' engine data client asks the server for pub-sub map streams to identify related pub-sub streams '''
             streamDict = _convertPeerInfoDict(self.pubSubMapping, True)
             return _createResponse(
                 "success",
@@ -166,8 +165,9 @@ class DataServer:
                 streamInfo=streamDict)
         
         elif request.method == 'confirm-subscription' and request.uuid is not None:
+            ''' client asks the server whether it has the stream its trying to subscribe to in its publication list  '''
             if request.uuid in self.availableStreams():
-                return _createResponse("success", "Subscription confirmed")
+                return _createResponse("success", "Subscription stream available to subscribe to")
             else:
                 return _createResponse("inactive", "Subscription not available")
             
@@ -197,6 +197,7 @@ class DataServer:
             return _createResponse("success", "Message receieved by the server")
         
         elif request.method == 'send-available-subscription':
+            ''' client asks the server to send its publication list to know which stream it can subscribe to '''
             return _createResponse("success", "Available streams sent", streamInfo=self.availableStreams())
         
         elif request.method == 'add-available-subscription-streams' and request.uuid is not None:
@@ -213,13 +214,14 @@ class DataServer:
             '''
             if request.uuid is not None:
                 self.connectedClients[peerAddr].add_subscription(request.uuid)
-                print(self.availableStreams())
                 return _createResponse("success", "Subscription Stream added")
             return _createResponse("error", "UUID must be provided")
         
-        elif request.method == 'add-available-publication-streams' and request.uuid is not None:
+        elif request.method == 'add-to-available-publication-stream' and request.uuid is not None:
+            ''' local client tells the server to add a stream to its publication list since the local client is subscribed to that stream '''
             if request.uuid is not None:
                 self.connectedClients[peerAddr].add_publication(request.uuid)
+                print(self.availableStreams())
                 return _createResponse("success", "Publication Stream added")
             return _createResponse("error", "UUID must be provided")
 
@@ -228,7 +230,8 @@ class DataServer:
             return _createResponse("error", "Missing uuid parameter")
 
         if request.method == 'stream-data':
-            df = await self._getStreamData(request.uuid)
+            ''' sends the whole requested dataframe '''
+            df = self._getStreamData(request.uuid)
             if df is None:
                 return _createResponse(
                     "error", f"No data found for stream {request.uuid}"
@@ -240,18 +243,19 @@ class DataServer:
             )
 
         elif request.method == 'data-in-range':
+            ''' sends requested dataframe of a particulare date range '''
             if not request.fromDate or not request.toDate:
                 return _createResponse(
                     "error", "Missing from_date or to_date parameter"
                 )
 
-            df = await self._getStreamDataByDateRange(
+            df = self._getStreamDataByDateRange(
                 request.uuid, request.fromDate, request.toDate
             )
             if df is None:
                 return _createResponse(
                     "error",
-                    f"No data found for stream {request.uuid} in specified date range",
+                    f"No data found for stream {request.uuid} in specified timestamp range",
                 )
 
             if 'ts' in df.columns:
@@ -263,12 +267,13 @@ class DataServer:
             )
 
         elif request.method == 'record-at-or-before':
+            ''' sends a sinlge row as dataframe of the record before or equal to specified timestamp '''
             try:
                 if request.data is None:
                     return _createResponse("error", "No timestamp data provided")
                 timestamp_df = pd.read_json(StringIO(request.data), orient='split')
                 timestamp = timestamp_df['ts'].iloc[0]
-                df = await self._getLastRecordBeforeTimestamp(
+                df = self._getLastRecordBeforeTimestamp(
                     request.uuid, timestamp
                 )
                 if df is None:
@@ -291,6 +296,7 @@ class DataServer:
 
         # TODO : if its not a subscription how should we handle merging where the id hashing may cause problem ( later stuff )
         elif request.method == 'insert':
+            ''' inserts the dataframe send in request into the database '''
             try:
                 if request.data is None:
                     return _createResponse(
@@ -305,7 +311,7 @@ class DataServer:
                     if request.uuid in self.availableStreams():
                         try:
                             self.db._addSubDataToDatabase(request.uuid, data)
-                            # await self.notifySubscribers(request)
+                            await self.notifySubscribers(request)
                             return _createResponse("success", "Data added to server database")
                         except Exception as e:
                             error("Error adding to database: ", e)
@@ -327,6 +333,7 @@ class DataServer:
                 return _createResponse("error", f"Error inserting data: {str(e)}")
 
         elif request.method == 'delete':
+            ''' request to remove data from the database '''
             try:
                 if request.data is not None:
                     data = pd.read_json(StringIO(request.data), orient='split')
@@ -344,7 +351,7 @@ class DataServer:
         else:
             return _createResponse("error", f"Unknown request type: {request.method}")
 
-    async def _getStreamData(self, uuid: str) -> pd.DataFrame:
+    def _getStreamData(self, uuid: str) -> pd.DataFrame:
         """Get data for a specific stream directly from SQLite database"""
         try:
             df = self.db._databasetoDataframe(uuid)
@@ -355,7 +362,7 @@ class DataServer:
         except Exception as e:
             error(f"Error getting data for stream {uuid}: {e}")
 
-    async def _getStreamDataByDateRange(
+    def _getStreamDataByDateRange(
         self, uuid: str, from_date: str, to_date: str
     ) -> pd.DataFrame:
         """Get stream data within a specific date range (inclusive)"""
@@ -372,7 +379,7 @@ class DataServer:
         except Exception as e:
             error(f"Error getting data for stream {uuid} in date range: {e}")
 
-    async def _getLastRecordBeforeTimestamp(
+    def _getLastRecordBeforeTimestamp(
         self, uuid: str, timestamp: str
     ) -> pd.DataFrame:
         """Get the last record before the specified timestamp (inclusive)"""

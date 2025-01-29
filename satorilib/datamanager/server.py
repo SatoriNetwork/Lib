@@ -37,8 +37,9 @@ class DataServer:
     def localClients(self) -> dict[Tuple[str, int], ConnectedPeer]:
         return {k:v for k,v in self.connectedClients.items() if v.local}
 
-    async def availableStreams(self) -> list[str]:
-        nested_list = [v.publications for v in self.localClients.values()]
+    def availableStreams(self) -> list[str]:
+        # nested_list = [v.publications for v in self.localClients.values()]
+        nested_list = [v.publications + v.subscriptions for v in self.localClients.values()]
         return [item for sublist in nested_list for item in sublist]
 
     async def startServer(self):
@@ -166,7 +167,7 @@ class DataServer:
                 streamInfo=streamDict)
         
         elif request.method == 'confirm-subscription' and request.uuid is not None:
-            if request.uuid in self.availableStreams:
+            if request.uuid in self.availableStreams():
                 return _createResponse("success", "Subscription confirmed")
             else:
                 return _createResponse("inactive", "Subscription not available")
@@ -180,11 +181,12 @@ class DataServer:
             return _createResponse("success", "Message receieved by the server")
         
         elif request.method == 'send-available-subscription':
-            return _createResponse("success", "Available streams sent", streamInfo=self.availableStreams)
+            return _createResponse("success", "Available streams sent", streamInfo=self.availableStreams())
         
         elif request.method == 'add-available-subscription-streams' and request.uuid is not None:
             if request.uuid is not None:
                 self.connectedClients[peerAddr].add_subcription(request.uuid)
+                print(self.availableStreams())
                 return _createResponse("success", "Subscription Stream added")
             return _createResponse("error", "UUID must be provided")
         
@@ -282,6 +284,7 @@ class DataServer:
                     "error", f"Error processing timestamp request: {str(e)}"
                 )
 
+        # TODO : if its not a subscription how should we handle merging where the id hashing may cause problem ( later stuff )
         elif request.method == 'insert':
             try:
                 if request.data is None:
@@ -292,19 +295,29 @@ class DataServer:
                 if request.replace:
                     self.db.deleteTable(request.uuid)
                     self.db.createTable(request.uuid)
+                print(request.uuid in self.availableStreams())
                 if request.isSubscription:
-                    success = self.db._addSubDataToDatabase(request.uuid, data)
-                    await self.notifySubscribers(request)
-                    return _createResponse("success", "Data added to server database")
-                success = self.db._addDataframeToDatabase(request.uuid, data)
-                return _createResponse(
-                    "success" if success else "error",
-                    (
-                        f"Data {'replaced' if request.replace else 'merged'} successfully"
-                        if success
-                        else "Failed to insert data"
-                    ),
-                )
+                    if request.uuid in self.availableStreams():
+                        try:
+                            self.db._addSubDataToDatabase(request.uuid, data)
+                            # await self.notifySubscribers(request)
+                            return _createResponse("success", "Data added to server database")
+                        except Exception as e:
+                            error("Error adding to database: ", e)
+                            return _createResponse("error", "Failed to add data to server database")
+                    else:
+                        print("Here")
+                        return _createResponse("error", "Subcsription not in server list")
+                else:
+                    success = self.db._addDataframeToDatabase(request.uuid, data)
+                    return _createResponse(
+                        "success" if success else "error",
+                        (
+                            f"Data {'replaced' if request.replace else 'merged'} successfully"
+                            if success
+                            else "Failed to insert data"
+                        ),
+                    )
             except Exception as e:
                 return _createResponse("error", f"Error inserting data: {str(e)}")
 

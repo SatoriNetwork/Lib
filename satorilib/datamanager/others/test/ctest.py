@@ -2,6 +2,7 @@
 from satorilib.datamanager.client import DataClient
 from satorilib.datamanager import Message
 import asyncio
+import pandas as pd
 
 # TODO :
 # Test for endpoints
@@ -11,7 +12,7 @@ import asyncio
 # correct response is returned  
 
 async def main():
-    client = DataClient("localhost")
+    client = DataClient("0.0.0.0")
     
     # request = Message({
     #     'method': 'initiate-server-connection',
@@ -19,8 +20,50 @@ async def main():
     #     'params': {'uuid': None}
     # })
 
-    await client.sendRequest('0.0.0.1')
-    await asyncio.sleep(5)
+    # df = pd.DataFrame({
+    #     'date_time': ['2024-10-02 04:30:05.341020'],
+    #     'value': [969.717144],
+    #     'id': ['lololol']
+    #     })
+    
+    df = pd.DataFrame({
+        'date_time': ['2024-10-02 04:30:06.341020'],
+        'value': [969.717144]
+        })
+    
+    # response = await client.subscribe
+    response = await client.sendRequest(
+        '0.0.0.0', 
+        method='initiate-server-connection')
+
+    response = await client.sendRequest(
+        '0.0.0.0', 
+        method='send-available-subscription')
+    
+    print(response.streamInfo)
+
+    response = await client.sendRequest(
+        '0.0.0.0', 
+        method='add-available-subscription-streams',
+        uuid='009bb819-b737-55f5-b4d7-d851316eceae')
+    
+    print(response.status)
+    print(response.message)
+    
+    await asyncio.sleep(10)
+    
+    response = await client.sendRequest(
+        '0.0.0.0', 
+        method='send-available-subscription')
+        # uuid='009bb819-b737-55f5-b4d7-d851316eceae',
+        # data=df)
+    # response = await client.passDataToServer(
+    #     '0.0.0.0', 
+    #     uuid='009bb819-b737-55f5-b4d7-d851316eceae',
+    #     data=df)
+    print(response.status)
+    print(response.streamInfo)
+    # await asyncio.sleep(5)
     
 asyncio.run(main())
 

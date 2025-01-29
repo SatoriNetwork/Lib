@@ -241,6 +241,10 @@ class DataClient:
     ) -> Message:
         ''' passes the dataframe to the server '''
         id = self._generateCallId()
+        try:
+            data = data.to_json(orient='split')
+        except Exception as e:
+            error("Data not found: ", e)
         request = Message(
             {
                 'method': method,

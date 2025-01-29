@@ -318,17 +318,19 @@ class SqliteDatabase:
             required_columns = {'date_time', 'value'}
             if not all(col in df.columns for col in required_columns):
                 raise ValueError(f"DataFrame must contain columns: {required_columns}")
+            df['date_time'] = df['date_time'].astype(str)
             df['value'] = df['value'].astype(float)
             imported_rows = 0
-            id = hash(df['date_time'], df['value']) # TODO : new hashing method
+            # id = hash(df['date_time'], df['value']) # TODO : new hashing method
+            id = 'random'
             self.cursor.execute(
                 f'''
                 SELECT 1 FROM "{table_uuid}" 
                 WHERE date_time = ? AND value = ? AND id = ?
                 ''', (
-                    df['date_time'],
-                    float(df['value']),
-                    str(id)
+                    df['date_time'].values[0],
+                    df['value'].values[0],
+                    id
                 ))
             if not self.cursor.fetchone():
                 self.cursor.execute(
@@ -336,9 +338,9 @@ class SqliteDatabase:
                     INSERT INTO "{table_uuid}" (date_time, value, id) 
                     VALUES (?, ?, ?)
                     ''', (
-                        df['date_time'],
-                        float(df['value']),
-                        str(id)
+                        df['date_time'].values[0],
+                        df['value'].values[0],
+                        id
                     ))
                 imported_rows += 1
             self.conn.commit()
@@ -371,6 +373,7 @@ class SqliteDatabase:
             required_columns = {'date_time', 'value', 'id'}
             if not all(col in df.columns for col in required_columns):
                 raise ValueError(f"DataFrame must contain columns: {required_columns}")
+            df['date_time'] = df['date_time'].astype(str)
             df['value'] = df['value'].astype(float)
             df['id'] = df['id'].astype(str)
 

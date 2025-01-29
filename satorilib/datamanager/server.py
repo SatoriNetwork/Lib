@@ -35,9 +35,9 @@ class DataServer:
     def localClients(self) -> dict[Tuple[str, int], ConnectedPeer]:
         return {k:v for k,v in self.connectedClients.items() if v.local}
 
+    @property
     def availableStreams(self) -> list[str]:
-        nested_list = [v.publications for v in self.localClients.values()]
-        return [item for sublist in nested_list for item in sublist]
+        return list(set().union(*[v.publications for v in self.localClients.values()]))
 
     async def startServer(self):
         """Start the WebSocket server"""
@@ -212,7 +212,7 @@ class DataServer:
 
             '''
             if request.uuid is not None:
-                self.connectedClients[peerAddr].add_subcription(request.uuid)
+                self.connectedClients[peerAddr].add_subscription(request.uuid)
                 print(self.availableStreams())
                 return _createResponse("success", "Subscription Stream added")
             return _createResponse("error", "UUID must be provided")

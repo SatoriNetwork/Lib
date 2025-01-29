@@ -48,14 +48,14 @@ class ConnectedPeer:
         self,
         hostPort: Tuple[str, int],
         websocket: websockets.WebSocketServerProtocol,
-        subscriptions: Union[list[str], None] = None, # the streams that this client subscribes to (from my server)
-        publications: Union[list[str], None] = None, # the streams that this client publishes (to my server)
+        subscriptions: Union[set[str], None] = None, # the streams that this client subscribes to (from my server)
+        publications: Union[set[str], None] = None, # the streams that this client publishes (to my server)
         local: bool = False
     ):
         self.hostPort = hostPort
         self.websocket = websocket
-        self.subscriptions: list[str] = subscriptions or []
-        self.publications: list[str] = publications or []
+        self.subscriptions: set[str] = subscriptions or set()
+        self.publications: set[str] = publications or set()
         self.local = local
         self.stop = asyncio.Event()
 
@@ -75,31 +75,30 @@ class ConnectedPeer:
     def isServer(self):
         return not self.isClient
 
-    def add_subcription(self, uuid: str):
-        self.subscriptions.append(uuid)
+    def add_subscription(self, uuid: str):
+        self.subscriptions.add(uuid)
 
     def add_publication(self, uuid: str):
-        self.publications.append(uuid)
+        self.publications.add(uuid)
 
     def remove_subscription(self, uuid: str) -> bool:
         """
         Remove a subscription if it exists.
         Returns True if the subscription was removed, False if it wasn't found.
         """
-        if uuid in self.subscriptions:
-            self.subscriptions.remove(uuid)
-            return True
-        return False
+        existed = uuid in self.subscriptions
+        self.subscriptions.discard(uuid)
+        return existed
 
     def remove_publication(self, uuid: str) -> bool:
         """
         Remove a publication if it exists.
         Returns True if the publication was removed, False if it wasn't found.
         """
-        if uuid in self.publications:
-            self.publications.remove(uuid)
-            return True
-        return False
+        existed = uuid in self.publications
+        self.publications.discard(uuid)
+        return existed
+        
 
 class Message:
     def __init__(self, message: dict):

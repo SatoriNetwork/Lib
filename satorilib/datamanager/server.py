@@ -177,24 +177,28 @@ class DataServer:
             if < 2 then I should remove the stream from my availableStreams: remove from everyone
             else remove from the peer that sent the request
             '''
-            publication_uuid = self.pubSubMapping[request.uuid]['publicationUuid']
-            connectedClientsProvidingThisStream = len([request.uuid in localClient.publications for localClient in self.localClients.values()])
-            if connectedClientsProvidingThisStream > 1:
-                self.connectedClients[peerAddr].remove_subscription(request.uuid)
-                self.connectedClients[peerAddr].remove_publication(request.uuid)
-                self.connectedClients[peerAddr].remove_subscription(publication_uuid)
-                self.connectedClients[peerAddr].remove_publication(publication_uuid)
-                await self.notifySubscribers(Message(_createResponse("inactive", "Stream inactive")))
-                await self.notifySubscribers(Message(_createResponse("inactive", "Stream inactive", uuid_override=publication_uuid)))
+            publication_uuid = self.pubSubMapping.get(request.uuid, {}).get('publicationUuid')
+            if publication_uuid is not None:
+                connectedClientsProvidingThisStream = len([request.uuid in localClient.publications for localClient in self.localClients.values()])
+                if connectedClientsProvidingThisStream > 1:
+                    self.connectedClients[peerAddr].remove_subscription(request.uuid)
+                    self.connectedClients[peerAddr].remove_publication(request.uuid)
+                    self.connectedClients[peerAddr].remove_subscription(publication_uuid)
+                    self.connectedClients[peerAddr].remove_publication(publication_uuid)
+                    await self.notifySubscribers(Message(_createResponse("inactive", "Stream inactive")))
+                    await self.notifySubscribers(Message(_createResponse("inactive", "Stream inactive", uuid_override=publication_uuid)))
+                else:
+                    for connectedClient in self.connectedClients.values():
+                        connectedClient.remove_subscription(request.uuid)
+                        connectedClient.remove_publication(request.uuid)
+                        connectedClient.remove_subscription(publication_uuid)
+                        connectedClient.remove_publication(publication_uuid)
+                    await self.notifySubscribers(Message(_createResponse("inactive", "Stream inactive")))
+                    await self.notifySubscribers(Message(_createResponse("inactive", "Stream inactive", uuid_override=publication_uuid)))
+                return _createResponse("success", "Message receieved by the server")
             else:
-                for connectedClient in self.connectedClients.values():
-                    connectedClient.remove_subscription(request.uuid)
-                    connectedClient.remove_publication(request.uuid)
-                    connectedClient.remove_subscription(publication_uuid)
-                    connectedClient.remove_publication(publication_uuid)
-                await self.notifySubscribers(Message(_createResponse("inactive", "Stream inactive")))
-                await self.notifySubscribers(Message(_createResponse("inactive", "Stream inactive", uuid_override=publication_uuid)))
-            return _createResponse("success", "Message receieved by the server")
+                return _createResponse("error", "Requested uuid is not present in the server")
+
         
         elif request.method == 'send-available-subscription':
             ''' client asks the server to send its publication list to know which stream it can subscribe to '''

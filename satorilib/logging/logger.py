@@ -2,7 +2,9 @@
 import sys
 import logging
 from typing import Union, Callable
+from contextlib import contextmanager
 from satorilib.utils import colored, colors, styles
+
 
 DEBUG = logging.DEBUG
 INFO = logging.INFO
@@ -10,6 +12,20 @@ WARNING = logging.WARNING
 ERROR = logging.ERROR
 CRITICAL = logging.CRITICAL
 
+
+@contextmanager
+def logLevel(level: int = logging.DEBUG):
+    logger = logging.getLogger()
+    previous_level = logger.level
+    logger.setLevel(level)
+    try:
+        yield
+    finally:
+        logger.setLevel(previous_level)  # Restore previous level
+
+# Usage:
+#with logLevel(logging.INFO):
+#    pending_block = self.web3.eth.get_block('pending', full_transactions=True)
 
 class ColoredFormatter(logging.Formatter):
     DEFAULT_COLOR_MAP = {

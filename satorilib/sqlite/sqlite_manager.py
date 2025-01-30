@@ -103,9 +103,9 @@ class SqliteDatabase:
         try:
             self.cursor.execute(f'''
                 CREATE TABLE IF NOT EXISTS "{table_uuid}" (
-                    date_time TIMESTAMP PRIMARY KEY NOT NULL,
+                    ts TIMESTAMP PRIMARY KEY NOT NULL,
                     value NUMERIC(20, 10) NOT NULL,
-                    id TEXT NOT NULL
+                    hash TEXT NOT NULL
                 )
             ''')
             self.conn.commit()
@@ -125,12 +125,12 @@ class SqliteDatabase:
         try:
             action = action.lower()
             if action == 'insert':
-                self.cursor.execute(f'SELECT date_time FROM "{table_uuid}" WHERE date_time = ?', (data['date_time'],))
+                self.cursor.execute(f'SELECT ts FROM "{table_uuid}" WHERE ts = ?', (data.index,))
                 existing = self.cursor.fetchone()
                 if existing:
                     raise sqlite3.IntegrityError(f"Record with timestamp {existing[0]} already exists")
                 cols = ', '.join(data.keys())
-                placeholders = ', '.join(['?' for _ in data])
+                placeholders = ', '.join(['?' for idx in data])
                 self.cursor.execute(f'INSERT INTO "{table_uuid}" ({cols}) VALUES ({placeholders})', list(data.values()))
                 self.conn.commit()
                 debug(f"Inserted new record into table {table_uuid}")
@@ -139,11 +139,11 @@ class SqliteDatabase:
                     raise ValueError("Timestamp is required for update operations")
                 sets = ', '.join([f"{k} = ?" for k in data.keys()])
                 values = list(data.values()) + [timestamp]
-                self.cursor.execute(f'UPDATE "{table_uuid}" SET {sets} WHERE date_time = ?', values)
+                self.cursor.execute(f'UPDATE "{table_uuid}" SET {sets} WHERE ts = ?', values)
             elif action == 'delete':
                 if not timestamp:
                     raise ValueError("Timestamp is required for delete operations")
-                self.cursor.execute(f'DELETE FROM "{table_uuid}" WHERE date_time = ?', (timestamp,))
+                self.cursor.execute(f'DELETE FROM "{table_uuid}" WHERE ts = ?', (timestamp,))
             else:
                 error("Invalid choice, choose from : Insert, Update, Delete")
 
@@ -166,16 +166,16 @@ class SqliteDatabase:
             self.cursor.execute(f'DROP TABLE IF EXISTS "{temp_table}"')
             self.cursor.execute(f'''
                 CREATE TABLE "{temp_table}" (
-                    date_time TIMESTAMP PRIMARY KEY NOT NULL,
+                    ts TIMESTAMP PRIMARY KEY NOT NULL,
                     value NUMERIC(20, 10) NOT NULL,
-                    id TEXT NOT NULL
+                    hash TEXT NOT NULL
                 )
             ''')
             self.cursor.execute(
                 f'''
-                INSERT INTO "{temp_table}" (date_time, value, id)
-                SELECT date_time, value, id FROM "{table_uuid}"
-                ORDER BY date_time ASC
+                INSERT INTO "{temp_table}" (ts, value, hash)
+                SELECT ts, value, hash FROM "{table_uuid}"
+                ORDER BY ts ASC
             ''')
             self.cursor.execute(f'DROP TABLE IF EXISTS "{table_uuid}"')
             self.cursor.execute(f'ALTER TABLE "{temp_table}" RENAME TO "{table_uuid}"')
@@ -190,7 +190,7 @@ class SqliteDatabase:
     def importCSVFromDataFolder(self, folder_metadata: dict, table_uuids: str):
         """ 
         Scan all folders in data directory and import their CSV files
-        Assumes CSV files have no headers and columns are in order: timestamp, value, id 
+        Assumes CSV files have no headers and columns are in order: timestamp, value, hash 
         """
 
         if not os.path.exists(self.data_dir):
@@ -207,14 +207,14 @@ class SqliteDatabase:
                 continue
             for csv_file in csv_files:
                 try:
-                    df = pd.read_csv(csv_file, header=None, names=['date_time', 'value', 'id'])
-                    for _, row in df.iterrows():
+                    df = pd.read_csv(csv_file, index_col=0, header=None, names=['value', 'hash'])
+                    for idx, row in df.iterrows():
                         self.cursor.execute(
                             f'''
-                            SELECT 1 FROM "{table_name}" WHERE date_time = ? AND value = ? AND id = ?
-                            ''', (row['date_time'], float(row['value']), str(row['id'])))
+                            SELECT 1 FROM "{table_name}" WHERE ts = ? AND value = ? AND hash = ?
+                            ''', (idx, float(row['value']), str(row['hash'])))
                         if not self.cursor.fetchone():
-                            self.cursor.execute(f'INSERT INTO "{table_name}" (date_time, value, id) VALUES (?, ?, ?)', (row['date_time'], float(row['value']), str(row['id'])))
+                            self.cursor.execute(f'INSERT INTO "{table_name}" (ts, value, hash) VALUES (?, ?, ?)', (idx, float(row['value']), str(row['hash'])))
                     self.conn.commit()
                     imported_count += 1
                 except Exception as e:
@@ -229,27 +229,27 @@ class SqliteDatabase:
             stream_dict = self._parseReadme(Path(readme_path))
             table_uuid = generateUUID(stream_dict)
             self.createTable(table_uuid)
-            df = pd.read_csv(csv_path, header=None, names=['date_time', 'value', 'id'])
+            df = pd.read_csv(csv_path, index_col=0, header=None, names=['value', 'hash'])
             imported_rows = 0
-            for _, row in df.iterrows():
+            for idx, row in df.iterrows():
                 self.cursor.execute(
                     f'''
                     SELECT 1 FROM "{table_uuid}" 
-                    WHERE date_time = ? AND value = ? AND id = ?
+                    WHERE ts = ? AND value = ? AND hash = ?
                     ''', (
-                        row['date_time'], 
+                        idx, 
                         float(row['value']), 
-                        str(row['id'])
+                        str(row['hash'])
                     ))
                 if not self.cursor.fetchone():
                     self.cursor.execute(
                         f'''
-                        INSERT INTO "{table_uuid}" (date_time, value, id) 
+                        INSERT INTO "{table_uuid}" (ts, value, hash) 
                         VALUES (?, ?, ?)
                         ''', (
-                            row['date_time'],
+                            idx,
                             float(row['value']),
-                            str(row['id'])
+                            str(row['hash'])
                         ))
                     imported_rows += 1
             self.conn.commit()
@@ -267,9 +267,9 @@ class SqliteDatabase:
         try:
             df = pd.read_sql_query(
                 f'''
-                SELECT date_time, value, id 
+                SELECT ts, value, hash 
                 FROM "{table_uuid}" 
-                ORDER BY date_time
+                ORDER BY ts
                 ''', self.conn)
             
             if df.empty:
@@ -312,9 +312,9 @@ class SqliteDatabase:
                 raise ValueError(f"Table {table_uuid} does not exist")
             df = pd.read_sql_query(
                 f"""
-                SELECT date_time, value, id 
+                SELECT ts, value, hash 
                 FROM "{table_uuid}"
-                ORDER BY date_time
+                ORDER BY ts
                 """, self.conn)
             return df
         except ValueError as e:
@@ -327,11 +327,11 @@ class SqliteDatabase:
         This function should do the following :
             - take in the dataframe that might be a raw data subscription or prediction
               data published by the engine. 
-            - the dataframe taken as input will have date_time and value
+            - the dataframe taken as input will have ts and value
             - this input combined with others will be used for hashing
-            - the output of the hash will be the new row's id value.
+            - the output of the hash will be the new row's hash value.
             - add that to database and then return that row to pass to others.
-            - TODO : should this new id value be passed to others?
+            - TODO : should this new hash value be passed to others?
         """
         try:
             self.cursor.execute(
@@ -342,32 +342,32 @@ class SqliteDatabase:
             if not self.cursor.fetchone():
                 debug(f"Table {table_uuid} does not exist", print=True)
                 self.createTable(table_uuid)
-            required_columns = {'date_time', 'value'}
+            required_columns = {'value'}
             if not all(col in df.columns for col in required_columns):
                 raise ValueError(f"DataFrame must contain columns: {required_columns}")
-            df['date_time'] = df['date_time'].astype(str)
+            df.index = df.index.astype(str)
             df['value'] = df['value'].astype(float)
             imported_rows = 0
             df = historyHashes(df)
-            id = 'random'
+            hash = 'random'
             self.cursor.execute(
                 f'''
                 SELECT 1 FROM "{table_uuid}" 
-                WHERE date_time = ? AND value = ? AND id = ?
+                WHERE ts = ? AND value = ? AND hash = ?
                 ''', (
-                    df['date_time'].values[0],
+                    df.index[0],
                     df['value'].values[0],
-                    id
+                    hash
                 ))
             if not self.cursor.fetchone():
                 self.cursor.execute(
                     f'''
-                    INSERT INTO "{table_uuid}" (date_time, value, id) 
+                    INSERT INTO "{table_uuid}" (ts, value, hash) 
                     VALUES (?, ?, ?)
                     ''', (
-                        df['date_time'].values[0],
+                        df.index[0],
                         df['value'].values[0],
-                        id
+                        hash
                     ))
                 imported_rows += 1
             self.conn.commit()
@@ -397,33 +397,33 @@ class SqliteDatabase:
             if not self.cursor.fetchone():
                 debug(f"Table {table_uuid} does not exist", print=True)
                 self.createTable(table_uuid)
-            required_columns = {'date_time', 'value', 'id'}
+            required_columns = {'value', 'hash'}
             if not all(col in df.columns for col in required_columns):
                 raise ValueError(f"DataFrame must contain columns: {required_columns}")
-            df['date_time'] = df['date_time'].astype(str)
+            df.index = df.index.astype(str)
             df['value'] = df['value'].astype(float)
-            df['id'] = df['id'].astype(str)
+            df['hash'] = df['hash'].astype(str)
 
             imported_rows = 0
-            for _, row in df.iterrows():
+            for idx, row in df.iterrows():
                 self.cursor.execute(
                     f'''
                     SELECT 1 FROM "{table_uuid}" 
-                    WHERE date_time = ? AND value = ? AND id = ?
+                    WHERE ts = ? AND value = ? AND hash = ?
                     ''', (
-                        row['date_time'],
+                        idx,
                         float(row['value']),
-                        str(row['id'])
+                        str(row['hash'])
                     ))
                 if not self.cursor.fetchone():
                     self.cursor.execute(
                         f'''
-                        INSERT INTO "{table_uuid}" (date_time, value, id) 
+                        INSERT INTO "{table_uuid}" (ts, value, hash) 
                         VALUES (?, ?, ?)
                         ''', (
-                            row['date_time'],
+                            idx,
                             float(row['value']),
-                            str(row['id'])
+                            str(row['hash'])
                         ))
                     imported_rows += 1
             self.conn.commit()

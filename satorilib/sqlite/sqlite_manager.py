@@ -19,7 +19,7 @@ def hashIt(string: str) -> str:
         digest_size=8).hexdigest()  # 27mb / million rows
 
 
-def historyHashes(df: pd.DataFrame, priorRowHash: str = None) -> pd.DataFrame:
+def historyHashesForSqlite(df: pd.DataFrame, priorRowHash: str = None) -> pd.DataFrame:
     ''' creates hashes of every row in the dataframe based on prior hash '''
     priorRowHash = priorRowHash or ''
     rowHashes = []
@@ -322,7 +322,7 @@ class SqliteDatabase:
         except Exception as e:
             error(f"Database error converting table {table_uuid} to DataFrame: {e}")
 
-    def _addSubDataToDatabase(self, table_uuid: str, df: pd.DataFrame):
+    def _addSubDataToDatabase(self, table_uuid: str, newDf: pd.DataFrame):
         """ 
         This function should do the following :
             - take in the dataframe that might be a raw data subscription or prediction
@@ -342,42 +342,42 @@ class SqliteDatabase:
             if not self.cursor.fetchone():
                 debug(f"Table {table_uuid} does not exist", print=True)
                 self.createTable(table_uuid)
+
+            existingDf = pd.read_sql_query(
+                f"""
+                SELECT ts, value, hash 
+                FROM "{table_uuid}"
+                ORDER BY ts
+                """, 
+                self.conn,
+                index_col='ts'
+            )
+            priorRowHash = existingDf['hash'].iloc[-1] if not existingDf.empty else ''
             required_columns = {'value'}
-            if not all(col in df.columns for col in required_columns):
+            if not all(col in newDf.columns for col in required_columns):
                 raise ValueError(f"DataFrame must contain columns: {required_columns}")
-            df.index = df.index.astype(str)
-            df['value'] = df['value'].astype(float)
-            imported_rows = 0
-            df = historyHashes(df)
-            hash = 'random'
-            self.cursor.execute(
-                f'''
-                SELECT 1 FROM "{table_uuid}" 
-                WHERE ts = ? AND value = ? AND hash = ?
-                ''', (
-                    df.index[0],
-                    df['value'].values[0],
-                    hash
-                ))
-            if not self.cursor.fetchone():
+            
+            combinedDf = pd.concat([existingDf, newDf])
+            newDfAfterHash = historyHashesForSqlite(combinedDf, priorRowHash)
+            newDfAfterHash.index = newDfAfterHash.index.astype(str)
+            newDfAfterHash['value'] = newDfAfterHash['value'].astype(float)
+            newDfAfterHash['hash'] = newDfAfterHash['hash'].astype(str)
+            self.cursor.execute(f'DELETE FROM "{table_uuid}"')
+            self.conn.commit()
+            for idx, row in newDfAfterHash.iterrows():
                 self.cursor.execute(
                     f'''
                     INSERT INTO "{table_uuid}" (ts, value, hash) 
                     VALUES (?, ?, ?)
                     ''', (
-                        df.index[0],
-                        df['value'].values[0],
-                        hash
+                        idx,
+                        row['value'],
+                        row['hash']
                     ))
-                imported_rows += 1
             self.conn.commit()
-
-            if imported_rows > 0:
-                info(f"Added new record to database {table_uuid}, sorting table")
-                self._sortTableByTimestamp(table_uuid)
-                return True
-            else:
-                info(f"No new data added to table {table_uuid}, skipping sort")    
+            info(f"Added new record to database {table_uuid}, sorting table")
+            self._sortTableByTimestamp(table_uuid)
+            return True
         except ValueError as e:
             error(f"Validation error: {e}")
             self.conn.rollback()

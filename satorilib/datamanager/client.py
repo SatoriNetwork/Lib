@@ -175,14 +175,13 @@ class DataClient:
         uuid: str,
         peerPort: int = 24602,
         publicationUuid: Union[str, None] = None,
-        method: str = DataServerApi.subscribe,
         callback: Union[callable, None] = None,
     ) -> Message:
         ''' creates a subscription request '''
         if publicationUuid is not None:
             self.publications[uuid] = publicationUuid
         self._saveStreamInServer(uuid, publicationUuid)
-        subscription = Subscription(method, uuid, callback=callback)
+        subscription = Subscription(uuid, callback=callback)
         self.subscriptions[subscription] = queue.Queue()
         return await self.send((peerHost, peerPort), Message(DataServerApi.createSubscriptionRequest(uuid=uuid)))
     

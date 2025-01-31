@@ -1,6 +1,7 @@
 from typing import Union
 from enum import Enum
 import pandas as pd
+import time
 
 
 class DataClientApi(Enum):
@@ -26,13 +27,17 @@ class DataServerApi(Enum):
     deleteStreamData = 'stream/data/delete'
     unknown = 'unknown'
     
+    @staticmethod
+    def _generateCallId() -> str:
+        return str(time.time())
+        
     def fromString(self, method: str) -> 'DataServerApi':
         ''' convert a string to a DataServerApi '''
         for api in DataServerApi:
             if api.value == method:
                 return api
         #raise ValueError(f'Invalid method: {method}')
-        return api.unknown
+        return DataServerApi.unknown
     
     def remote(self) -> bool:
         ''' endpoints that can be called remotely '''
@@ -45,24 +50,102 @@ class DataServerApi(Enum):
             DataServerApi.getStreamDataByRange,
             DataServerApi.getStreamObservationByTime]
     
-    def createSubscriptionRequest(
+    def createRequest(
         self,
-        uuid: str,
+        uuid: str = None,
         data: pd.DataFrame = None,
         replace: bool = False,
         fromDate: str = None,
         toDate: str = None,
+        isSub: bool = False,
+    #     rawMsg: Message = None,
     ) -> dict:
-        ''' creates a subscription request '''
         return {
-                'method': DataServerApi.subscribe,
+                'method': self,
                 'id': self._generateCallId(),
-                'sub': False,
+                'sub': isSub,
                 'params': {
                     'uuid': uuid,
                     'replace': replace,
                     'from_ts': fromDate,
                     'to_ts': toDate,
                 },
-                'data': data,
+                'data': data.to_json() if data is not None else None,
             }
+    
+    # def createSubscriptionRequest(
+    #     self,
+    #     uuid: str,
+    #     data: pd.DataFrame = None,
+    #     replace: bool = False,
+    #     fromDate: str = None,
+    #     toDate: str = None,
+    # ) -> dict:
+    #     return {
+    #             'method': self,
+    #             'id': self._generateCallId(),
+    #             'sub': False,
+    #             'params': {
+    #                 'uuid': uuid,
+    #                 'replace': replace,
+    #                 'from_ts': fromDate,
+    #                 'to_ts': toDate,
+    #             },
+    #             'data': data,
+    #         }
+    
+    # def passObservationRequest(
+    #     self,
+    #     uuid: str,
+    #     data: pd.DataFrame,
+    # ) -> dict:
+    #     return {
+    #             'method': self,
+    #             'id': self._generateCallId(),
+    #             'sub': True,
+    #             'params': {
+    #                 'uuid': uuid,
+    #                 'replace': False,
+    #                 'from_ts': None,
+    #                 'to_ts': None,
+    #             },
+    #             'data': data.to_json(orient='split'),
+    #         }
+    
+    # def authenticationRequest(
+    #     self,
+    # ) -> dict:
+    #     return {
+    #             'method': self,
+    #             'id': self._generateCallId(),
+    #             'sub': False,
+    #             'params': {
+    #                 'uuid': None,
+    #                 'replace': False,
+    #                 'from_ts': None,
+    #                 'to_ts': None,
+    #             },
+    #             'data': None,
+    #         }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

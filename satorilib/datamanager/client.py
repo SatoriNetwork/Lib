@@ -48,10 +48,6 @@ class DataClient:
                 return s
         return subscription
 
-    @staticmethod
-    def _generateCallId() -> str:
-        return str(time.time())
-        
     async def handlePeerMessage(self, message: Message) -> None:
         ''' pass to server, modify owner's state, modify our state '''
         await self.handleMessageForOwner(message)
@@ -64,20 +60,6 @@ class DataClient:
         except Exception as e:
             error('Error sending message to server : ', e)
         
-        # NOTES
-        # dc holds a list of subscriptions (active)
-        # ds should just keep an up-to-date copy of that list (should it though? shouldn't we just have one source of truth?)
-        #   - n dc has a list of streams it subscribes to (like engine predictions) and it publishes (relays from the real world)
-        #   - engine dc has a list of streams it subscribe to and publishes
-        #   - 4 list of active streams: n s variable, n publish variable, e s variable, e publish variable
-            # this should probably change
-            # we want to pass the message to the server for two purposes
-            #  - so it can notify it's subscribers
-            #  - and also so it can save the data properly
-            # so we should just pass it and let it handle it.
-                    # look at the message - see if it's special (like 'stream no longer active')
-        # if stream no longer active, remove the subscription from the list (that involves telling the server we have removed it)
-
     async def handleMessageForOwner(self, message: Message) -> None:
         ''' modiy state of engine data client '''
         if message.isSubscription:
@@ -183,14 +165,81 @@ class DataClient:
         self._saveStreamInServer(uuid, publicationUuid)
         subscription = Subscription(uuid, callback=callback)
         self.subscriptions[subscription] = queue.Queue()
-        return await self.send((peerHost, peerPort), Message(DataServerApi.createSubscriptionRequest(uuid=uuid)))
+        return await self.send((peerHost, peerPort), Message(DataServerApi.subscribe.createRequest(uuid=uuid))) # should we set isSub as True?
     
-    # should we need this?
-    # def resubscribe(self):
-    #    if self.connected():
-    #        for subscription in self.subscriptions.keys():
-    #            self.subscribe(subscription.method, *subscription.params)
-    
+    async def passDataToServer(
+        self,
+        uuid: str,
+        data: pd.DataFrame
+    ) -> Message:
+        ''' sends the observation/prediction data to the server '''
+        return await self.send((self.serverHostPort), DataServerApi.insertStreamData.createRequest(uuid=uuid, data=data))
+
+    async def authenticateNeuronClient(self) -> Message:
+        ''' neuron client tells the server that it is its own neuron client ( authentication done on the client side ) '''
+        return await self.send((self.serverHostPort), DataServerApi.isLocalNeuronClient.createRequest())
+
+    async def authenticateEngineClient(self) -> Message:
+        ''' engine client tells the server that it is its own engine client ( authentication done on the client side ) '''
+        return await self.send((self.serverHostPort), DataServerApi.isLocalEngineClient.createRequest())
+
+    # async def sendRequest( 
+    #     self,
+    #     peerHost: str,
+    #     peerPort: int = 24602,
+    #     uuid: str = None,
+    #     method: str = 'initiate-connection',
+    #     isSub: bool = False,
+    #     data: pd.DataFrame = None,
+    #     replace: bool = False,
+    #     fromDate: str = None,
+    #     toDate: str = None,
+    #     rawMsg: Message = None,
+    # ) -> Message:
+
+    #     id = self._generateCallId()
+
+    #     if method == 'data-in-range' and data is not None:
+    #         if 'from_ts' in data.columns and 'to_ts' in data.columns:
+    #             fromDate = data['from_ts'].iloc[0]
+    #             toDate = data['to_ts'].iloc[0]
+    #         else:
+    #             raise ValueError(
+    #                 'DataFrame must contain "from_ts" and "to_ts" columns for date range queries'
+    #             )
+    #     elif method == 'record-at-or-before':
+    #         if data is None:
+    #             raise ValueError(
+    #                 'DataFrame with timestamp is required for last record before requests'
+    #             )
+    #         elif 'ts' not in data.columns:
+    #             raise ValueError(
+    #                 'DataFrame must contain "ts" column for last record before requests'
+    #             )
+
+    #     if data is not None:
+    #         data = data.to_json(orient='split')
+
+    #     if rawMsg is None:
+    #         request = Message(
+    #             {
+    #                 'method': method,
+    #                 'id': id,
+    #                 'sub': isSub,
+    #                 'params': {
+    #                     'uuid': uuid,
+    #                     'replace': replace,
+    #                     'from_ts': fromDate,
+    #                     'to_ts': toDate,
+    #                 },
+    #                 'data': data,
+    #             }
+    #         )
+    #     else:
+    #         request = rawMsg
+
+    #     return await self.send((peerHost, peerPort), request)
+
     async def _saveStreamInServer(self, subUuid: str, pubUuid: Union[str, None] = None) -> None:
         ''' tells the server to save the subscription and publication streams '''
         try:
@@ -202,97 +251,6 @@ class DataClient:
                 await self.sendRequest(self.serverHostPort, uuid=pubUuid, method='add-available-publication-streams')
             except Exception as e:
                 error("Unable to send request to server : ", e)
-    
-    async def passDataToServer(
-        self,
-        uuid: str,
-        data: pd.DataFrame,
-        peerHost: str = None,
-        peerPort: int = 24602,
-        method: str = DataServerApi.insertStreamData,
-        isSub: bool = True,
-        replace: bool = False,
-        fromDate: str = None,
-        toDate: str = None,
-    ) -> Message:
-        ''' passes the dataframe to the server '''
-        id = self._generateCallId()
-        try:
-            data = data.to_json(orient='split')
-        except Exception as e:
-            error("Data not found: ", e)
-        request = Message(
-            {
-                'method': method,
-                'id': id,
-                'sub': isSub,
-                'params': {
-                    'uuid': uuid,
-                    'replace': replace,
-                    'from_ts': fromDate,
-                    'to_ts': toDate,
-                },
-                'data': data,
-            }
-        )
-        return await self.send((peerHost, peerPort), request)
-
-    async def sendRequest( 
-        self,
-        peerHost: str,
-        peerPort: int = 24602,
-        uuid: str = None,
-        method: str = 'initiate-connection',
-        isSub: bool = False,
-        data: pd.DataFrame = None,
-        replace: bool = False,
-        fromDate: str = None,
-        toDate: str = None,
-        rawMsg: Message = None,
-    ) -> Message:
-
-        id = self._generateCallId()
-
-        if method == 'data-in-range' and data is not None:
-            if 'from_ts' in data.columns and 'to_ts' in data.columns:
-                fromDate = data['from_ts'].iloc[0]
-                toDate = data['to_ts'].iloc[0]
-            else:
-                raise ValueError(
-                    'DataFrame must contain "from_ts" and "to_ts" columns for date range queries'
-                )
-        elif method == 'record-at-or-before':
-            if data is None:
-                raise ValueError(
-                    'DataFrame with timestamp is required for last record before requests'
-                )
-            elif 'ts' not in data.columns:
-                raise ValueError(
-                    'DataFrame must contain "ts" column for last record before requests'
-                )
-
-        if data is not None:
-            data = data.to_json(orient='split')
-
-        if rawMsg is None:
-            request = Message(
-                {
-                    'method': method,
-                    'id': id,
-                    'sub': isSub,
-                    'params': {
-                        'uuid': uuid,
-                        'replace': replace,
-                        'from_ts': fromDate,
-                        'to_ts': toDate,
-                    },
-                    'data': data,
-                }
-            )
-        else:
-            request = rawMsg
-
-        return await self.send((peerHost, peerPort), request)
 
     # Note : in-case we need a separate a listener for the internal data server
     # async def connectToServer(self):
@@ -316,3 +274,19 @@ class DataClient:
 
     # async def disconnectServer(self) -> None:
     #     await self.serverWs.close()
+
+
+    # handleMessageForServer()
+        # NOTES
+        # dc holds a list of subscriptions (active)
+        # ds should just keep an up-to-date copy of that list (should it though? shouldn't we just have one source of truth?)
+        #   - n dc has a list of streams it subscribes to (like engine predictions) and it publishes (relays from the real world)
+        #   - engine dc has a list of streams it subscribe to and publishes
+        #   - 4 list of active streams: n s variable, n publish variable, e s variable, e publish variable
+            # this should probably change
+            # we want to pass the message to the server for two purposes
+            #  - so it can notify it's subscribers
+            #  - and also so it can save the data properly
+            # so we should just pass it and let it handle it.
+                    # look at the message - see if it's special (like 'stream no longer active')
+        # if stream no longer active, remove the subscription from the list (that involves telling the server we have removed it)

@@ -9,13 +9,14 @@ from satorilib.logging import INFO, setup, debug, info, warning, error
 from satorilib.datamanager.helper import Message, ConnectedPeer, Subscription
 
 class DataClient:
-    def __init__(self, serverHostPort: str):
-        self.serverHostPort: str = serverHostPort
+
+    def __init__(self, serverHost: str):
+        self.serverPort = 24602
+        self.serverHostPort: Tuple[str, int] = serverHost, self.serverPort
         self.peers: Dict[Tuple[str, int], ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
         self.publications: dict[str, str] = {} # {uuid, publication uuid}
         self.responses: dict[str, Message] = {}
-
 
     async def connectToPeer(self, peerHost: str, peerPort: int = 24602):
         '''Connect to other Peers'''
@@ -31,7 +32,6 @@ class DataClient:
             debug(f'Connected to peer at {uri}', print=True)
         except Exception as e:
             error(f'Failed to connect to peer at {uri}: {e}')
-
     
     async def listenToPeer(self, peer: ConnectedPeer):
         try:
@@ -50,7 +50,6 @@ class DataClient:
     @staticmethod
     def _generateCallId() -> str:
         return str(time.time())
-
         
     async def handlePeerMessage(self, message: Message) -> None:
         ''' pass to server, modify owner's state, modify our state '''
@@ -137,7 +136,7 @@ class DataClient:
     async def disconnect(self, peer: ConnectedPeer) -> None:
         peer.stop.set()
         await peer.websocket.close()
-        del peer
+        del self.peers[peer.hostPort]
 
     async def disconnectAll(self):
         '''Disconnect from all peers and stop the server'''
@@ -152,11 +151,12 @@ class DataClient:
 
     async def send(
         self,
-        peerAddr: Tuple[str, int],
         request: Message,
+        peerAddr: Tuple[str, int] = None,
         sendOnly: bool = False,
     ) -> Message:
         '''Send a request to a specific peer'''
+        peerAddr = peerAddr or self.serverHostPort
         await self.connect(peerAddr)
         try:
             await self.peers[peerAddr].websocket.send(request.to_json())
@@ -167,7 +167,6 @@ class DataClient:
         except Exception as e:
             error(f'Error sending request to peer: {e}')
             return {'status': 'error', 'message': str(e)}
-
 
     async def subscribe(
         self,
@@ -225,13 +224,12 @@ class DataClient:
                 await self.sendRequest(self.serverHostPort, uuid=pubUuid, method='add-available-publication-streams')
             except Exception as e:
                 error("Unable to send request to server : ", e)
-
     
     async def passDataToServer(
         self,
-        peerHost: str,
         uuid: str,
         data: pd.DataFrame,
+        peerHost: str = None,
         peerPort: int = 24602,
         method: str = 'insert',
         isSub: bool = True,

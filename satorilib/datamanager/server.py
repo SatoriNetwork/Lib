@@ -204,7 +204,7 @@ class DataServer:
             ''' client asks the server to send its publication list to know which stream it can subscribe to '''
             return _createResponse("success", "Available streams sent", streamInfo=self.availableStreams())
         
-        elif request.method == 'add-available-subscription-streams' and request.uuid is not None:
+        elif request.method == 'subscribe' and request.uuid is not None:
             '''
             from server perspective: 
 

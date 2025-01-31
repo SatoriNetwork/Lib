@@ -101,6 +101,7 @@ class ConnectedPeer:
         
 
 class Message:
+
     def __init__(self, message: dict):
         """
         Initialize Message object with a dictionary containing message data

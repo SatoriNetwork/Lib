@@ -315,7 +315,9 @@ class SqliteDatabase:
                 SELECT ts, value, hash 
                 FROM "{table_uuid}"
                 ORDER BY ts
-                """, self.conn)
+                """, 
+                self.conn,
+                index_col='ts')
             return df
         except ValueError as e:
             error(f"Table error: {e}")

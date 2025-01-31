@@ -3,6 +3,7 @@ from satorilib.datamanager.client import DataClient
 from satorilib.datamanager import Message
 import asyncio
 import pandas as pd
+from io import StringIO
 
 # TODO :
 # Test for endpoints
@@ -14,6 +15,12 @@ import pandas as pd
 async def main():
     client = DataClient("0.0.0.0")
     
+    # request = Message({
+    #     'method': 'initiate-server-connection',
+    #     'id': client._generateCallId(),
+    #     'params': {'uuid': None}
+    # })
+
     # request = Message({
     #     'method': 'initiate-server-connection',
     #     'id': client._generateCallId(),
@@ -34,35 +41,39 @@ async def main():
     # response = await client.subscribe
     response = await client.sendRequest(
         '0.0.0.0', 
-        method='initiate-server-connection')
+        method='stream-data',
+        uuid='04145e3c-ce99-5ef0-879f-9730e012aa26')
+    
+    finalForm = pd.read_json(StringIO(response.data), orient='split')
+    print(finalForm)
 
-    response = await client.sendRequest(
-        '0.0.0.0', 
-        method='send-available-subscription')
+    # response = await client.sendRequest(
+    #     '0.0.0.0', 
+    #     method='send-available-subscription')
     
-    print(response.streamInfo)
+    # print(response.streamInfo)
 
-    response = await client.sendRequest(
-        '0.0.0.0', 
-        method='add-available-subscription-streams',
-        uuid='009bb819-b737-55f5-b4d7-d851316eceae')
+    # response = await client.sendRequest(
+    #     '0.0.0.0', 
+    #     method='add-available-subscription-streams',
+    #     uuid='009bb819-b737-55f5-b4d7-d851316eceae')
     
-    print(response.status)
-    print(response.message)
+    # print(response.status)
+    # print(response.message)
     
-    await asyncio.sleep(10)
+    # await asyncio.sleep(10)
     
-    response = await client.sendRequest(
-        '0.0.0.0', 
-        method='send-available-subscription')
+    # response = await client.sendRequest(
+    #     '0.0.0.0', 
+    #     method='send-available-subscription')
         # uuid='009bb819-b737-55f5-b4d7-d851316eceae',
         # data=df)
     # response = await client.passDataToServer(
     #     '0.0.0.0', 
     #     uuid='009bb819-b737-55f5-b4d7-d851316eceae',
     #     data=df)
-    print(response.status)
-    print(response.streamInfo)
+    # print(response.status)
+    # print(response.streamInfo)
     # await asyncio.sleep(5)
     
 asyncio.run(main())

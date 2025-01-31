@@ -1,5 +1,6 @@
 from typing import Union
 from enum import Enum
+import pandas as pd
 
 
 class DataClientApi(Enum):
@@ -43,3 +44,25 @@ class DataServerApi(Enum):
             DataServerApi.getAvailableSubscriptions,
             DataServerApi.getStreamDataByRange,
             DataServerApi.getStreamObservationByTime]
+    
+    def createSubscriptionRequest(
+        self,
+        uuid: str,
+        data: pd.DataFrame = None,
+        replace: bool = False,
+        fromDate: str = None,
+        toDate: str = None,
+    ) -> dict:
+        ''' creates a subscription request '''
+        return {
+                'method': DataServerApi.subscribe,
+                'id': self._generateCallId(),
+                'sub': False,
+                'params': {
+                    'uuid': uuid,
+                    'replace': replace,
+                    'from_ts': fromDate,
+                    'to_ts': toDate,
+                },
+                'data': data,
+            }

@@ -79,7 +79,7 @@ class DataServer:
                 if peer.websocket == websocket:
                     del self.connectedClients[key]
 
-    async def notifySubscribers(self, msg: Message):
+    async def updateSubscribers(self, msg: Message):
         '''
         is this message something anyone has subscribed to?
         if yes, await self.connected_peers[subscribig_peer].websocket.send(message)
@@ -185,16 +185,16 @@ class DataServer:
                     self.connectedClients[peerAddr].remove_publication(request.uuid)
                     self.connectedClients[peerAddr].remove_subscription(publication_uuid)
                     self.connectedClients[peerAddr].remove_publication(publication_uuid)
-                    await self.notifySubscribers(Message(_createResponse("inactive", "Stream inactive")))
-                    await self.notifySubscribers(Message(_createResponse("inactive", "Stream inactive", uuid_override=publication_uuid)))
+                    await self.updateSubscribers(Message(_createResponse("inactive", "Stream inactive")))
+                    await self.updateSubscribers(Message(_createResponse("inactive", "Stream inactive", uuid_override=publication_uuid)))
                 else:
                     for connectedClient in self.connectedClients.values():
                         connectedClient.remove_subscription(request.uuid)
                         connectedClient.remove_publication(request.uuid)
                         connectedClient.remove_subscription(publication_uuid)
                         connectedClient.remove_publication(publication_uuid)
-                    await self.notifySubscribers(Message(_createResponse("inactive", "Stream inactive")))
-                    await self.notifySubscribers(Message(_createResponse("inactive", "Stream inactive", uuid_override=publication_uuid)))
+                    await self.updateSubscribers(Message(_createResponse("inactive", "Stream inactive")))
+                    await self.updateSubscribers(Message(_createResponse("inactive", "Stream inactive", uuid_override=publication_uuid)))
                 return _createResponse("success", "Message receieved by the server")
             else:
                 return _createResponse("error", "Requested uuid is not present in the server")
@@ -315,7 +315,7 @@ class DataServer:
                     if request.uuid in self.availableStreams():
                         try:
                             self.db._addSubDataToDatabase(request.uuid, data)
-                            await self.notifySubscribers(request)
+                            await self.updateSubscribers(request)
                             return _createResponse("success", "Data added to server database")
                         except Exception as e:
                             error("Error adding to database: ", e)

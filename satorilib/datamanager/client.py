@@ -7,6 +7,7 @@ import pandas as pd
 from typing import Dict, Any, Union, Tuple, Set
 from satorilib.logging import INFO, setup, debug, info, warning, error
 from satorilib.datamanager.helper import Message, ConnectedPeer, Subscription
+from api import DataServerApi
 
 class DataClient:
 
@@ -170,42 +171,20 @@ class DataClient:
 
     async def subscribe(
         self,
-        peerAddr: Tuple[str, int],
+        peerHost: str,
         uuid: str,
+        peerPort: int = 24602,
         publicationUuid: Union[str, None] = None,
-        method: str = 'subscribe',
+        method: str = DataServerApi.subscribe,
         callback: Union[callable, None] = None,
-        data: pd.DataFrame = None,
-        replace: bool = False,
-        fromDate: str = None,
-        toDate: str = None,
     ) -> Message:
-        '''
-        creates a subscription request
-        '''
+        ''' creates a subscription request '''
         if publicationUuid is not None:
             self.publications[uuid] = publicationUuid
-        
-        self.saveStreamInServer(uuid, publicationUuid)
-
-        id = self._generateCallId()
+        self._saveStreamInServer(uuid, publicationUuid)
         subscription = Subscription(method, uuid, callback=callback)
         self.subscriptions[subscription] = queue.Queue()
-        request = Message(
-            {
-                'method': method,
-                'id': id,
-                'sub': False,
-                'params': {
-                    'uuid': uuid,
-                    'replace': replace,
-                    'from_ts': fromDate,
-                    'to_ts': toDate,
-                },
-                'data': data,
-            }
-        )
-        return await self.send(peerAddr, request)
+        return await self.send((peerHost, peerPort), Message(DataServerApi.createSubscriptionRequest(uuid=uuid)))
     
     # should we need this?
     # def resubscribe(self):
@@ -213,7 +192,7 @@ class DataClient:
     #        for subscription in self.subscriptions.keys():
     #            self.subscribe(subscription.method, *subscription.params)
     
-    async def saveStreamInServer(self, subUuid: str, pubUuid: Union[str, None] = None) -> None:
+    async def _saveStreamInServer(self, subUuid: str, pubUuid: Union[str, None] = None) -> None:
         ''' tells the server to save the subscription and publication streams '''
         try:
             await self.sendRequest(self.serverHostPort, uuid=subUuid, method='add-available-subscription-streams')
@@ -231,7 +210,7 @@ class DataClient:
         data: pd.DataFrame,
         peerHost: str = None,
         peerPort: int = 24602,
-        method: str = 'insert',
+        method: str = DataServerApi.insertStreamData,
         isSub: bool = True,
         replace: bool = False,
         fromDate: str = None,

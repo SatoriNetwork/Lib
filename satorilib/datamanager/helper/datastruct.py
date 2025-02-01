@@ -50,13 +50,16 @@ class ConnectedPeer:
         websocket: websockets.WebSocketServerProtocol,
         subscriptions: Union[set[str], None] = None, # the streams that this client subscribes to (from my server)
         publications: Union[set[str], None] = None, # the streams that this client publishes (to my server)
-        local: bool = False
+        # local: bool = False,
+        isNeuron: bool = False,
+        isEngine: bool = False
     ):
         self.hostPort = hostPort
         self.websocket = websocket
         self.subscriptions: set[str] = subscriptions or set()
         self.publications: set[str] = publications or set()
-        self.local = local
+        self.isNeuron = isNeuron
+        self.isEngine = isEngine
         self.stop = asyncio.Event()
 
     @property
@@ -74,6 +77,10 @@ class ConnectedPeer:
     @property
     def isServer(self):
         return not self.isClient
+    
+    @property
+    def isLocal(self) -> bool:
+        return self.isEngine or self.isNeuron
 
     def add_subscription(self, uuid: str):
         self.subscriptions.add(uuid)
@@ -108,10 +115,22 @@ class Message:
         """
         self.message = message
 
-    def to_dict(self) -> dict:
+    def to_dict(self, isResponse: bool = False) -> dict:
         """
         Convert the Message instance back to a dictionary
         """
+        if isResponse:
+            return {
+            'status': self.status,
+            'message': self.senderMsg,
+            'id': self.id,
+            # 'sub': self.sub,
+            # 'params': {
+            #     'uuid': self.uuid,
+            # },
+            'data': self.data,
+            'stream_info': self.streamInfo
+        }
         return {
             'method': self.method,
             'id': self.id,
@@ -139,6 +158,11 @@ class Message:
     def streamInfo(self) -> str:
         """Get the method"""
         return self.message.get('stream_info')
+
+    @property
+    def senderMsg(self) -> str:
+        """Get the method"""
+        return self.message.get('message')
     
     @property
     def id(self) -> str:

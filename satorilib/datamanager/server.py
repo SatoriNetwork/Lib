@@ -3,11 +3,12 @@ import websockets
 import json
 import queue
 import pandas as pd
-from typing import Dict, Any, Optional, Union, Tuple
+from typing import Any, Union
 from io import StringIO
 from satorilib.logging import INFO, setup, debug, info, warning, error
 from satorilib.sqlite import SqliteDatabase
 from satorilib.datamanager.helper import Message, ConnectedPeer
+from satorilib.datamanager.api import DataServerApi 
 
 
 class DataServer:
@@ -21,15 +22,16 @@ class DataServer:
         self.host = host
         self.port = port
         self.server = None
-        self.connectedClients: dict[Tuple[str, int], ConnectedPeer] = {}
+        self.connectedClients: dict[tuple[str, int], ConnectedPeer] = {}
         self.pubSubMapping: dict[str, dict] = {}
         self.db = SqliteDatabase(db_path, db_name)
         self.db.importFromDataFolder()  # can be disabled if new rows are added to the Database and new rows recieved are inside the database
 
     @property
-    def localClients(self) -> dict[Tuple[str, int], ConnectedPeer]:
+    def localClients(self) -> dict[tuple[str, int], ConnectedPeer]:
         ''' returns dict of clients that have local flag set as True'''
-        return {k:v for k,v in self.connectedClients.items() if v.local}
+        # return {k:v for k,v in self.connectedClients.items() if v.local}
+        return {k:v for k,v in self.connectedClients.items() if v.isLocal}
 
     @property
     def availableStreams(self) -> list[str]:
@@ -44,7 +46,7 @@ class DataServer:
 
     async def handleConnection(self, websocket: websockets.WebSocketServerProtocol):
         """ handle incoming connections and messages """
-        peerAddr: Tuple[str, int] = websocket.remote_address
+        peerAddr: tuple[str, int] = websocket.remote_address
         self.connectedClients[peerAddr] = self.connectedClients.get(
             peerAddr, ConnectedPeer(peerAddr, websocket)
         )
@@ -100,20 +102,19 @@ class DataServer:
 
     async def handleRequest(
         self,
-        peerAddr: Tuple[str, int],
+        peerAddr: tuple[str, int],
         message: str,
     ) -> dict:
         ''' incoming requests handled according to the method '''
 
         request: Message = Message(json.loads(message))
-
         def _createResponse(
             status: str,
             message: str,
-            data: Optional[str] = None,
+            data: Union[str, None] = None,
             streamInfo: list = None,
             uuid_override: str = None,
-        ) -> Dict:
+        ) -> dict:
             response = {
                 "status": status,
                 "id": request.id,
@@ -143,12 +144,20 @@ class DataServer:
                     }
             return convertedData
 
-        
-        if request.method == 'initiate-server-connection':
-            ''' local clients first sends this request to server so the server identifies the client as its local client after auth '''
+        if request.method == DataServerApi.isLocalNeuronClient.value:
+            # local - TODO: add authentication
+            self.connectedClients[peerAddr].isNeuron = True
+            return DataServerApi.statusSuccess.createSuccessResponse('Authenticated as Neuron client', request.id)
+
+        elif request.method == DataServerApi.isLocalEngineClient.value:
+            print('here')
             # local - TODO: add authentication
             self.connectedClients[peerAddr].local = True
-            return _createResponse("success", "Connection established")
+            return DataServerApi.statusSuccess.createSuccessResponse('Authenticated as Neuron client', request.id)
+        
+        # if request.method == 'initiate-server-connection':
+        #     ''' local clients first sends this request to server so the server identifies the client as its local client after auth '''
+        #     return _createResponse("success", "Connection established")
         
         elif request.method == 'send-pubsub-map':
             ''' local neuron client sends the related pub-sub streams recieved from the rendevous server '''
@@ -352,8 +361,8 @@ class DataServer:
                     )
             except Exception as e:
                 return _createResponse("error", f"Error deleting data: {str(e)}")
-        else:
-            return _createResponse("error", f"Unknown request type: {request.method}")
+            
+        return DataServerApi.unknown.createUnknownResponse(request.id)
 
     def _getStreamData(self, uuid: str) -> pd.DataFrame:
         """Get data for a specific stream directly from SQLite database"""

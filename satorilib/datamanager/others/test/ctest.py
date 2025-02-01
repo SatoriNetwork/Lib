@@ -20,10 +20,12 @@ async def main():
         'value': [969.717144]
         })
     
-    response = await client.insertStreamData('04145e3c-ce99-5ef0-879f-9730e012aa26', df)
+    response = await client.isLocalNeuronClient()
+    print(response.to_dict(True))
+    # response = await client.insertStreamData('04145e3c-ce99-5ef0-879f-9730e012aa26', df)
     
-    finalForm = pd.read_json(StringIO(response.data), orient='split')
-    print(finalForm)
+    # finalForm = pd.read_json(StringIO(response.data), orient='split')
+    # print(finalForm)
     
     # response = await client.sendRequest(
     #     '0.0.0.0', 

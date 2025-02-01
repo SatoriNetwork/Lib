@@ -7,7 +7,7 @@ import pandas as pd
 from typing import Dict, Any, Union, Tuple, Set
 from satorilib.logging import INFO, setup, debug, info, warning, error
 from satorilib.datamanager.helper import Message, ConnectedPeer, Subscription
-from api import DataServerApi
+from satorilib.datamanager.api import DataServerApi
 
 class DataClient:
 
@@ -128,8 +128,8 @@ class DataClient:
 
     async def send(
         self,
+        peerAddr: Tuple[str, int],
         request: Message,
-        peerAddr: Tuple[str, int] = None,
         sendOnly: bool = False,
     ) -> Message:
         '''Send a request to a specific peer'''
@@ -161,55 +161,55 @@ class DataClient:
     
     async def insertStreamData(self, uuid: str, data: pd.DataFrame) -> Message:
         ''' sends the observation/prediction data to the server '''
-        return await self.send((self.serverHostPort), DataServerApi.insertStreamData.createRequest(uuid, data))
+        return await self.send((self.serverHostPort), Message(DataServerApi.insertStreamData.createRequest(uuid, data)))
 
     async def isLocalNeuronClient(self) -> Message:
         ''' neuron client tells the server that it is its own neuron client ( authentication done on the client side ) '''
-        return await self.send((self.serverHostPort), DataServerApi.isLocalNeuronClient.createRequest())
+        return await self.send((self.serverHostPort), Message(DataServerApi.isLocalNeuronClient.createRequest()))
 
     async def isLocalEngineClient(self) -> Message:
         ''' engine client tells the server that it is its own engine client ( authentication done on the client side ) '''
-        return await self.send((self.serverHostPort), DataServerApi.isLocalEngineClient.createRequest())
+        return await self.send((self.serverHostPort), Message(DataServerApi.isLocalEngineClient.createRequest()))
 
     async def setPubsubMap(self, uuid: dict) -> Message:
         ''' neuron local client gives the server pub/sub mapping info '''
-        return await self.send((self.serverHostPort), DataServerApi.setPubsubMap.createRequest(uuid))
+        return await self.send((self.serverHostPort), Message(DataServerApi.setPubsubMap.createRequest(uuid)))
 
     async def getPubsubMap(self, peerHost) -> Message:
         ''' engine local client gets pub/sub mapping info from the server '''
-        return await self.send((peerHost, self.serverPort), DataServerApi.getPubsubMap.createRequest())
+        return await self.send((peerHost, self.serverPort), Message(DataServerApi.getPubsubMap.createRequest()))
 
     async def isStreamActive(self, peerHost: str, uuid: str) -> Message:
         ''' checks if the source server has an active stream the client is trying to subscribe to '''
-        return await self.send((peerHost, self.serverPort), DataServerApi.isStreamActive.createRequest(uuid))
+        return await self.send((peerHost, self.serverPort), Message(DataServerApi.isStreamActive.createRequest(uuid)))
 
     async def getRemoteStreamData(self, peerHost: str, uuid: str)  -> Message:
         ''' request for data from external server '''
-        return await self.send((peerHost, self.serverPort), DataServerApi.getStreamData.createRequest(uuid))
+        return await self.send((peerHost, self.serverPort), Message(DataServerApi.getStreamData.createRequest(uuid)))
 
     async def getLocalStreamData(self, uuid: str)  -> Message:
         ''' request for data from local server '''
-        return await self.send((self.serverHostPort), DataServerApi.getStreamData.createRequest(uuid))
+        return await self.send((self.serverHostPort), Message(DataServerApi.getStreamData.createRequest(uuid)))
 
     async def getAvailableSubscriptions(self, peerHost: str)  -> Message:
         ''' get from external server its list of available subscriptions '''
-        return await self.send((peerHost, self.serverPort), DataServerApi.getAvailableSubscriptions.createRequest())
+        return await self.send((peerHost, self.serverPort), Message(DataServerApi.getAvailableSubscriptions.createRequest()))
 
     async def addActiveStream(self, uuid: str)  -> Message:
         ''' After confirming a stream is active, its send to its own server for adding it to its available streams '''
-        return await self.send((self.serverHostPort), DataServerApi.addActiveStream.createRequest(uuid))
+        return await self.send((self.serverHostPort), Message(DataServerApi.addActiveStream.createRequest(uuid)))
 
     async def getStreamDataByRange(self, peerHost: str, uuid: str)  -> Message:
         ''' request for data thats in a specific timestamp range  '''
-        return await self.send((peerHost, self.serverPort), DataServerApi.getStreamDataByRange.createRequest(uuid))
+        return await self.send((peerHost, self.serverPort), Message(DataServerApi.getStreamDataByRange.createRequest(uuid)))
 
     async def getStreamObservationByTime(self, peerHost: str, uuid: str)  -> Message:
         ''' request for row equal to or before a timestamp  '''
-        return await self.send((peerHost, self.serverPort), DataServerApi.getStreamObservationByTime.createRequest(uuid))
+        return await self.send((peerHost, self.serverPort), Message(DataServerApi.getStreamObservationByTime.createRequest(uuid)))
 
     async def deleteStreamData(self, uuid: str)  -> Message:
         ''' request to delete data from its own server '''
-        return await self.send((self.serverHostPort), DataServerApi.deleteStreamData.createRequest(uuid))
+        return await self.send((self.serverHostPort), Message(DataServerApi.deleteStreamData.createRequest(uuid)))
 
     async def _addStreamToServer(self, subUuid: str, pubUuid: Union[str, None] = None) -> None:
         ''' Updates server's available streams with local client's subscriptions and predictions streams '''

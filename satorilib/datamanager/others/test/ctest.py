@@ -15,6 +15,21 @@ from io import StringIO
 async def main():
     client = DataClient("0.0.0.0")
     
+    df = pd.DataFrame({
+        'date_time': ['2024-10-02 04:30:06.341020'],
+        'value': [969.717144]
+        })
+    
+    response = await client.insertStreamData('04145e3c-ce99-5ef0-879f-9730e012aa26', df)
+    
+    finalForm = pd.read_json(StringIO(response.data), orient='split')
+    print(finalForm)
+    
+    # response = await client.sendRequest(
+    #     '0.0.0.0', 
+    #     method='stream-data',
+    #     uuid='04145e3c-ce99-5ef0-879f-9730e012aa26')
+
     # request = Message({
     #     'method': 'initiate-server-connection',
     #     'id': client._generateCallId(),
@@ -33,19 +48,6 @@ async def main():
     #     'id': ['lololol']
     #     })
     
-    df = pd.DataFrame({
-        'date_time': ['2024-10-02 04:30:06.341020'],
-        'value': [969.717144]
-        })
-    
-    # response = await client.subscribe
-    response = await client.sendRequest(
-        '0.0.0.0', 
-        method='stream-data',
-        uuid='04145e3c-ce99-5ef0-879f-9730e012aa26')
-    
-    finalForm = pd.read_json(StringIO(response.data), orient='split')
-    print(finalForm)
 
     # response = await client.sendRequest(
     #     '0.0.0.0', 

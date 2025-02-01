@@ -58,10 +58,9 @@ class DataServerApi(Enum):
         fromDate: Union[str, None] = None,
         toDate: Union[str, None] = None,
         isSub: bool = False,
-    #     rawMsg: Message = None,
     ) -> dict:
         return {
-                'method': self,
+                'method': self.value,
                 'id': self._generateCallId(),
                 'sub': isSub,
                 'params': {
@@ -72,80 +71,3 @@ class DataServerApi(Enum):
                 },
                 'data': data.to_json() if data is not None else None,
             }
-    
-    # def createSubscriptionRequest(
-    #     self,
-    #     uuid: str,
-    #     data: pd.DataFrame = None,
-    #     replace: bool = False,
-    #     fromDate: str = None,
-    #     toDate: str = None,
-    # ) -> dict:
-    #     return {
-    #             'method': self,
-    #             'id': self._generateCallId(),
-    #             'sub': False,
-    #             'params': {
-    #                 'uuid': uuid,
-    #                 'replace': replace,
-    #                 'from_ts': fromDate,
-    #                 'to_ts': toDate,
-    #             },
-    #             'data': data,
-    #         }
-    
-    # def passObservationRequest(
-    #     self,
-    #     uuid: str,
-    #     data: pd.DataFrame,
-    # ) -> dict:
-    #     return {
-    #             'method': self,
-    #             'id': self._generateCallId(),
-    #             'sub': True,
-    #             'params': {
-    #                 'uuid': uuid,
-    #                 'replace': False,
-    #                 'from_ts': None,
-    #                 'to_ts': None,
-    #             },
-    #             'data': data.to_json(orient='split'),
-    #         }
-    
-    # def authenticationRequest(
-    #     self,
-    # ) -> dict:
-    #     return {
-    #             'method': self,
-    #             'id': self._generateCallId(),
-    #             'sub': False,
-    #             'params': {
-    #                 'uuid': None,
-    #                 'replace': False,
-    #                 'from_ts': None,
-    #                 'to_ts': None,
-    #             },
-    #             'data': None,
-    #         }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

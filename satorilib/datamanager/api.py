@@ -52,11 +52,11 @@ class DataServerApi(Enum):
     
     def createRequest(
         self,
-        uuid: str = None,
-        data: pd.DataFrame = None,
+        uuid: Union[str, dict, None] = None,
+        data: Union[pd.DataFrame, None] = None,
         replace: bool = False,
-        fromDate: str = None,
-        toDate: str = None,
+        fromDate: Union[str, None] = None,
+        toDate: Union[str, None] = None,
         isSub: bool = False,
     #     rawMsg: Message = None,
     ) -> dict:

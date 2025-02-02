@@ -75,13 +75,13 @@ class DataServerApi(Enum):
                 'data': data.to_json() if data is not None else None,
             }
 
-    def createSuccessResponse(
+    def createResponse(
         self,
         serverMsg: str,
         id: int,
-        uuid: Union[str, dict, list, None] = None,
+        # uuid: Union[str, dict, list, None] = None,
         data: Union[pd.DataFrame, None] = None,
-        streamInfo: Union[list, None] = None
+        streamInfo: Union[dict, list, None] = None
         # isSub: bool = False,
     ) -> dict:
         return {
@@ -93,25 +93,4 @@ class DataServerApi(Enum):
                 # },
                 'data': data.to_json() if data is not None else None,
                 'stream_info': streamInfo
-            }
-
-    def createFailedResponse(
-        self,
-        serverMsg: str,
-        id: int,
-    ) -> dict:
-        return {
-                'status': self.value,
-                'Message': serverMsg,
-                'id': id,
-            }
-
-    def createUnknownResponse(
-        self,
-        id: int,
-    ) -> dict:
-        return {
-                'status': self.value,
-                'Message': 'Unknown request type',
-                'id': id,
             }

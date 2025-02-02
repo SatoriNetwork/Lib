@@ -18,6 +18,7 @@ class DataClient:
         self.subscriptions: dict[Subscription, queue.Queue] = {}
         self.publications: dict[str, str] = {} # {subUuid, publicationUuid}
         self.responses: dict[str, Message] = {}
+        self.running = False
 
     async def connectToPeer(self, peerHost: str, peerPort: int = 24602):
         '''Connect to other Peers'''
@@ -27,21 +28,54 @@ class DataClient:
             self.peers[(peerHost, peerPort)] = ConnectedPeer(
                 (peerHost, peerPort), websocket
             )
-            asyncio.create_task(
+            self.peers[(peerHost, peerPort)].listener = asyncio.create_task(
                 self.listenToPeer(self.peers[(peerHost, peerPort)])
             )
             debug(f'Connected to peer at {uri}', print=True)
         except Exception as e:
             error(f'Failed to connect to peer at {uri}: {e}')
     
+    # async def listenToPeer(self, peer: ConnectedPeer):
+    #     ''' Handles receiving messages from a individual peer '''
+    #     try:
+    #         while True:
+    #             async for raw_msg in peer.websocket:
+    #                 print("rm", raw_msg)
+    #                 message = Message(json.loads(raw_msg))
+    #                 asyncio.create_task(self.handlePeerMessage(message))
+    #                 # await self.handlePeerMessage(message)
+
     async def listenToPeer(self, peer: ConnectedPeer):
-        ''' Handles receiving messages from a individual peer '''
+        ''' Handles receiving messages from an individual peer '''
         try:
-            async for raw_msg in peer.websocket:
+            while True:
+                raw_msg = await peer.websocket.recv()
+                print("rm", raw_msg)
                 message = Message(json.loads(raw_msg))
-                asyncio.create_task(self.handlePeerMessage(message))
+                asyncio.create_task(self.handlePeerMessage(message))  # Process async
         except websockets.exceptions.ConnectionClosed:
+            #print(f"Connection to {peer.hostPort} closed, attempting to reconnect...")
+            #await self.connectToPeer(peer.hostPort[0], peer.hostPort[1])  # Reconnect
+            print("Closed")
             self.disconnect(peer)
+        except Exception as e:
+            error(f"Unexpected error in listenToPeer: {e}")
+            self.disconnect(peer)
+
+
+    async def _keepAlive(self):
+        """Keep the client running and maintain connections"""
+        self.running = True
+        while self.running:
+            try:
+                await asyncio.sleep(1)
+            except Exception as e:
+                error(f"Error in keep_alive: {e}")
+
+    # async def stop(self):
+    #     """Stop the client gracefully"""
+    #     self.running = False
+    #     await self.disconnectAll()
 
     async def handlePeerMessage(self, message: Message) -> None:
         ''' pass to server, modify owner's state, modify self state '''

@@ -4,6 +4,7 @@ from satorilib.datamanager import Message
 import asyncio
 import pandas as pd
 from io import StringIO
+import time
 
 # TODO :
 # Test for endpoints
@@ -12,16 +13,52 @@ from io import StringIO
 # if client state needs change
 # correct response is returned  
 
+# async def main():
+# client = DataClient("0.0.0.0")
+# df = pd.DataFrame({
+#     'date_time': ['2024-10-02 04:30:06.341020'],
+#     'value': [969.717144]
+#     })
+
+# await client.isLocalEngineClient()
+# time.sleep(10)
+# await asyncio.sleep(10)
+
+async def diff():
+    print('diff')
+
 async def main():
     client = DataClient("0.0.0.0")
-    
     df = pd.DataFrame({
         'date_time': ['2024-10-02 04:30:06.341020'],
         'value': [969.717144]
         })
+
+
+    await client.isLocalEngineClient()
+    # print('waiting for 6 seconds')
+    # time.sleep(6)
+    # print('waiting for 6 seconds')
+    # await diff()
+    # time.sleep(10)
+    # print('done')
+    # await diff()
     
-    response = await client.isLocalNeuronClient()
-    print(response.to_dict(True))
+    #print('waited for 10 seconds')
+    #await asyncio.Event().wait()
+    #await asyncio.Future()
+    #await asyncio.sleep(10)
+    # asyncio.create_task(client._keepAlive())
+    #await client.isLocalEngineClient()
+
+    # try:
+    #     # Keep running until interrupted
+    #     while True:
+    #         await asyncio.sleep(5)
+    # except KeyboardInterrupt:
+    #     # Clean shutdown
+    #     await client.disconnectAll()
+    # print(response.to_dict(True))
     # response = await client.insertStreamData('04145e3c-ce99-5ef0-879f-9730e012aa26', df)
     
     # finalForm = pd.read_json(StringIO(response.data), orient='split')

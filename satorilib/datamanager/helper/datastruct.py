@@ -36,11 +36,32 @@ class Subscription:
             return None
         return await self.shortLivedCallback(self, *args, **kwargs)
 
+
 class PeerInfo:
 
     def __init__(self, subscribersIp: list, publishersIp: list):
         self.subscribersIp = subscribersIp
         self.publishersIp = publishersIp
+
+
+class Peer:
+    def __init__(self, ip: str, port: int) -> None:
+        self.ip = ip
+        self.port = port
+    
+    def __eq__(self, value: 'Peer') -> bool:
+        return self.ip == value.ip and self.port == value.port
+
+    def __str__(self) -> str:
+        return str(self.asTuple)
+
+    def __repr__(self) -> str:
+        return self.ip, self.port
+
+    @property
+    def asTuple(self) -> tuple[str, int]:
+        return self.__repr__()
+
 
 class ConnectedPeer:
 
@@ -52,7 +73,7 @@ class ConnectedPeer:
         publications: Union[set[str], None] = None, # the streams that this client publishes (to my server)
         # local: bool = False,
         isNeuron: bool = False,
-        isEngine: bool = False
+        isEngine: bool = False,
     ):
         self.hostPort = hostPort
         self.websocket = websocket
@@ -60,6 +81,7 @@ class ConnectedPeer:
         self.publications: set[str] = publications or set()
         self.isNeuron = isNeuron
         self.isEngine = isEngine
+        self.listener = None
         self.stop = asyncio.Event()
 
     @property
@@ -81,7 +103,7 @@ class ConnectedPeer:
     @property
     def isLocal(self) -> bool:
         return self.isEngine or self.isNeuron
-
+    
     def add_subscription(self, uuid: str):
         self.subscriptions.add(uuid)
 

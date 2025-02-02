@@ -1,1 +1,1 @@
-from .datastruct import Message, ConnectedPeer, Subscription, PeerInfo
+from .datastruct import Message, ConnectedPeer, Subscription, PeerInfo, Peer

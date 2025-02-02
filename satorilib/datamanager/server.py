@@ -1,14 +1,14 @@
 import asyncio
 import websockets
 import json
-import queue
 import pandas as pd
 from typing import Any, Union
 from io import StringIO
 from satorilib.logging import INFO, setup, debug, info, warning, error
 from satorilib.sqlite import SqliteDatabase
-from satorilib.datamanager.helper import Message, ConnectedPeer
+from satorilib.datamanager.helper import Message, Peer, ConnectedPeer
 from satorilib.datamanager.api import DataServerApi 
+from satorilib.datamanager.api import DataClientApi
 
 
 class DataServer:
@@ -21,16 +21,15 @@ class DataServer:
     ):
         self.host = host
         self.port = port
-        self.server = None
-        self.connectedClients: dict[tuple[str, int], ConnectedPeer] = {}
+        self.server = None # TODO : avoid
+        self.connectedClients: dict[Peer, ConnectedPeer] = {}
         self.pubSubMapping: dict[str, dict] = {}
         self.db = SqliteDatabase(db_path, db_name)
         self.db.importFromDataFolder()  # can be disabled if new rows are added to the Database and new rows recieved are inside the database
 
     @property
-    def localClients(self) -> dict[tuple[str, int], ConnectedPeer]:
+    def localClients(self) -> dict[Peer, ConnectedPeer]:
         ''' returns dict of clients that have local flag set as True'''
-        # return {k:v for k,v in self.connectedClients.items() if v.local}
         return {k:v for k,v in self.connectedClients.items() if v.isLocal}
 
     @property
@@ -46,7 +45,7 @@ class DataServer:
 
     async def handleConnection(self, websocket: websockets.WebSocketServerProtocol):
         """ handle incoming connections and messages """
-        peerAddr: tuple[str, int] = websocket.remote_address
+        peerAddr: Peer = Peer(*websocket.remote_address) # TODO : see the data structure again
         self.connectedClients[peerAddr] = self.connectedClients.get(
             peerAddr, ConnectedPeer(peerAddr, websocket)
         )
@@ -56,6 +55,41 @@ class DataServer:
                 debug(f"Received request: {message}", print=True)
                 try:
                     response = await self.handleRequest(peerAddr, message)
+                    await self.connectedClients[peerAddr].websocket.send(
+                        json.dumps(response)
+                    )
+                    await asyncio.sleep(5)
+                    response = {
+                        'method': DataClientApi.streamObservation.value,
+                    }
+                    await self.connectedClients[peerAddr].websocket.send(
+                        json.dumps(response)
+                    )
+                    await asyncio.sleep(5)
+                    response = {
+                        'method': DataClientApi.streamObservation.value,
+                    }
+                    await self.connectedClients[peerAddr].websocket.send(
+                        json.dumps(response)
+                    )
+                    await asyncio.sleep(5)
+                    response = {
+                        'method': DataClientApi.streamObservation.value,
+                    }
+                    await self.connectedClients[peerAddr].websocket.send(
+                        json.dumps(response)
+                    )
+                    await asyncio.sleep(5)
+                    response = {
+                        'method': DataClientApi.streamObservation.value,
+                    }
+                    await self.connectedClients[peerAddr].websocket.send(
+                        json.dumps(response)
+                    )
+                    await asyncio.sleep(5)
+                    response = {
+                        'method': DataClientApi.streamObservation.value,
+                    }
                     await self.connectedClients[peerAddr].websocket.send(
                         json.dumps(response)
                     )
@@ -102,7 +136,7 @@ class DataServer:
 
     async def handleRequest(
         self,
-        peerAddr: tuple[str, int],
+        peerAddr: Peer,
         message: str,
     ) -> dict:
         ''' incoming requests handled according to the method '''

@@ -3,7 +3,7 @@ from satorilib.logging import debug, error
 from satorilib.sqlite import SqliteDatabase
 
 
-class DataServer:
+class DataManager:
     def __init__(
         self,
         db_path: str = "../data",

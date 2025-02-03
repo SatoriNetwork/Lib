@@ -35,47 +35,18 @@ class DataClient:
         except Exception as e:
             error(f'Failed to connect to peer at {uri}: {e}')
     
-    # async def listenToPeer(self, peer: ConnectedPeer):
-    #     ''' Handles receiving messages from a individual peer '''
-    #     try:
-    #         while True:
-    #             async for raw_msg in peer.websocket:
-    #                 print("rm", raw_msg)
-    #                 message = Message(json.loads(raw_msg))
-    #                 asyncio.create_task(self.handlePeerMessage(message))
-    #                 # await self.handlePeerMessage(message)
-
     async def listenToPeer(self, peer: ConnectedPeer):
         ''' Handles receiving messages from an individual peer '''
         try:
             while True:
                 raw_msg = await peer.websocket.recv()
-                print("rm", raw_msg)
                 message = Message(json.loads(raw_msg))
                 asyncio.create_task(self.handlePeerMessage(message))  # Process async
         except websockets.exceptions.ConnectionClosed:
-            #print(f"Connection to {peer.hostPort} closed, attempting to reconnect...")
-            #await self.connectToPeer(peer.hostPort[0], peer.hostPort[1])  # Reconnect
-            print("Closed")
             self.disconnect(peer)
         except Exception as e:
             error(f"Unexpected error in listenToPeer: {e}")
             self.disconnect(peer)
-
-
-    async def _keepAlive(self):
-        """Keep the client running and maintain connections"""
-        self.running = True
-        while self.running:
-            try:
-                await asyncio.sleep(1)
-            except Exception as e:
-                error(f"Error in keep_alive: {e}")
-
-    # async def stop(self):
-    #     """Stop the client gracefully"""
-    #     self.running = False
-    #     await self.disconnectAll()
 
     async def handlePeerMessage(self, message: Message) -> None:
         ''' pass to server, modify owner's state, modify self state '''
@@ -257,101 +228,3 @@ class DataClient:
             except Exception as e:
                 error("Unable to send request to server : ", e)
 
-
-# TODO : clean after confirmation
-    # async def sendRequest( 
-    #     self,
-    #     peerHost: str,
-    #     peerPort: int = 24602,
-    #     uuid: str = None,
-    #     method: str = 'initiate-connection',
-    #     isSub: bool = False,
-    #     data: pd.DataFrame = None,
-    #     replace: bool = False,
-    #     fromDate: str = None,
-    #     toDate: str = None,
-    #     rawMsg: Message = None,
-    # ) -> Message:
-
-    #     id = self._generateCallId()
-
-    #     if method == 'data-in-range' and data is not None:
-    #         if 'from_ts' in data.columns and 'to_ts' in data.columns:
-    #             fromDate = data['from_ts'].iloc[0]
-    #             toDate = data['to_ts'].iloc[0]
-    #         else:
-    #             raise ValueError(
-    #                 'DataFrame must contain "from_ts" and "to_ts" columns for date range queries'
-    #             )
-    #     elif method == 'record-at-or-before':
-    #         if data is None:
-    #             raise ValueError(
-    #                 'DataFrame with timestamp is required for last record before requests'
-    #             )
-    #         elif 'ts' not in data.columns:
-    #             raise ValueError(
-    #                 'DataFrame must contain "ts" column for last record before requests'
-    #             )
-
-    #     if data is not None:
-    #         data = data.to_json(orient='split')
-
-    #     if rawMsg is None:
-    #         request = Message(
-    #             {
-    #                 'method': method,
-    #                 'id': id,
-    #                 'sub': isSub,
-    #                 'params': {
-    #                     'uuid': uuid,
-    #                     'replace': replace,
-    #                     'from_ts': fromDate,
-    #                     'to_ts': toDate,
-    #                 },
-    #                 'data': data,
-    #             }
-    #         )
-    #     else:
-    #         request = rawMsg
-
-    #     return await self.send((peerHost, peerPort), request)
-
-
-    # Note : in-case we need a separate a listener for the internal data server
-    # async def connectToServer(self):
-    #     '''Connects to our own Server'''
-    #     uri = f'ws://{self.serverHostPort}:{24602}'
-    #     try:
-    #         self.serverWs = await websockets.connect(uri)
-    #         asyncio.create_task(self.listenToServer())
-    #         debug(f'Connected to Server at {uri}', print=True)
-    #     except Exception as e:
-    #         error(f'Failed to connect to peer at {uri}: {e}')
-            
-    # async def listenToServer(self):
-    #     ''' listens to our own server '''
-    #     try:
-    #         async for raw_msg in self.serverWs:
-    #             message = Message(json.loads(raw_msg))
-    #             asyncio.create_task(self.handleServerMessage(message))
-    #     except websockets.exceptions.ConnectionClosed:
-    #         self.disconnectServer()
-
-    # async def disconnectServer(self) -> None:
-    #     await self.serverWs.close()
-
-
-    # handleMessageForServer()
-        # NOTES
-        # dc holds a list of subscriptions (active)
-        # ds should just keep an up-to-date copy of that list (should it though? shouldn't we just have one source of truth?)
-        #   - n dc has a list of streams it subscribes to (like engine predictions) and it publishes (relays from the real world)
-        #   - engine dc has a list of streams it subscribe to and publishes
-        #   - 4 list of active streams: n s variable, n publish variable, e s variable, e publish variable
-            # this should probably change
-            # we want to pass the message to the server for two purposes
-            #  - so it can notify it's subscribers
-            #  - and also so it can save the data properly
-            # so we should just pass it and let it handle it.
-                    # look at the message - see if it's special (like 'stream no longer active')
-        # if stream no longer active, remove the subscription from the list (that involves telling the server we have removed it)

@@ -39,8 +39,7 @@ class DataClient:
         ''' Handles receiving messages from an individual peer '''
         try:
             while True:
-                raw_msg = await peer.websocket.recv()
-                message = Message(json.loads(raw_msg))
+                message = Message(json.loads(await peer.websocket.recv()))
                 asyncio.create_task(self.handlePeerMessage(message))  # Process async
         except websockets.exceptions.ConnectionClosed:
             self.disconnect(peer)

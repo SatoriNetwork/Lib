@@ -240,9 +240,6 @@ class DataServer:
                 if request.data is None:
                     return DataServerApi.statusFail.createResponse('No data provided', request.id)
                 data = pd.read_json(StringIO(request.data), orient='split')
-                if request.replace:
-                    self.dataManager.db.deleteTable(request.uuid)
-                    self.dataManager.db.createTable(request.uuid)
                 if request.isSubscription:
                     if request.uuid in self.availableStreams():
                         self.dataManager.db._addSubDataToDatabase(request.uuid, data)
@@ -250,11 +247,13 @@ class DataServer:
                         return DataServerApi.statusSuccess.createResponse('Data added to server database', request.id)
                     else:
                         return DataServerApi.statusFail.createResponse('Subcsription not in server list', request.id)
-                else:
-                    if self.dataManager.db._addDataframeToDatabase(request.uuid, data):
-                        return DataServerApi.statusSuccess.createResponse('Data added to dataframe', request.id)
+                if request.replace:
+                    self.dataManager.db.deleteTable(request.uuid)
+                    self.dataManager.db.createTable(request.uuid)
+                self.dataManager.db._addDataframeToDatabase(request.uuid, data)
+                return DataServerApi.statusSuccess.createResponse('Data added to dataframe', request.id)
             except Exception as e:
-                return DataServerApi.statusFail.createResponse('Failed to add data to dataframe', request.id)
+                return DataServerApi.statusFail.createResponse(e, request.id)
 
         elif request.method == DataServerApi.isStreamActive.value:
             ''' client asks the server whether it has the stream its trying to subscribe to in its publication list  '''

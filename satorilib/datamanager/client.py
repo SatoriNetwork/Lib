@@ -163,9 +163,9 @@ class DataClient:
         self.subscriptions[subscription] = queue.Queue()
         return await self.send((peerHost, self.serverPort), Message(DataServerApi.subscribe.createRequest(uuid))) # should we set isSub as True?
     
-    async def insertStreamData(self, uuid: str, data: pd.DataFrame) -> Message:
+    async def insertStreamData(self, uuid: str, data: pd.DataFrame, replace: bool = False, isSub: bool = False) -> Message:
         ''' sends the observation/prediction data to the server '''
-        return await self.send((self.serverHostPort), Message(DataServerApi.insertStreamData.createRequest(uuid, data)))
+        return await self.send((self.serverHostPort), Message(DataServerApi.insertStreamData.createRequest(uuid, data, replace, isSub=isSub)))
 
     async def isLocalNeuronClient(self) -> Message:
         ''' neuron client tells the server that it is its own neuron client ( authentication done on the client side ) '''
@@ -186,6 +186,10 @@ class DataClient:
     async def isStreamActive(self, peerHost: str, uuid: str) -> Message:
         ''' checks if the source server has an active stream the client is trying to subscribe to '''
         return await self.send((peerHost, self.serverPort), Message(DataServerApi.isStreamActive.createRequest(uuid)))
+
+    async def streamInactive(self, uuid: str) -> Message:
+        ''' tells the server that a particular stream is not active anymore '''
+        return await self.send((self.serverHostPort), Message(DataServerApi.streamInactive.createRequest(uuid)))
 
     async def getRemoteStreamData(self, peerHost: str, uuid: str)  -> Message:
         ''' request for data from external server '''

@@ -54,6 +54,9 @@ class Peer:
 
     def __str__(self) -> str:
         return str(self.asTuple)
+    
+    def __hash__(self) -> int:
+        return hash((self.ip, self.port))
 
     def __repr__(self) -> str:
         return self.ip, self.port
@@ -71,7 +74,6 @@ class ConnectedPeer:
         websocket: websockets.WebSocketServerProtocol,
         subscriptions: Union[set[str], None] = None, # the streams that this client subscribes to (from my server)
         publications: Union[set[str], None] = None, # the streams that this client publishes (to my server)
-        # local: bool = False,
         isNeuron: bool = False,
         isEngine: bool = False,
     ):

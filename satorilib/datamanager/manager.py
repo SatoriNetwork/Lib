@@ -6,7 +6,7 @@ from satorilib.sqlite import SqliteDatabase
 class DataManager:
     def __init__(
         self,
-        db_path: str = "../data",
+        db_path: str = "../../data",
         db_name: str = "data.db",
     ):
         self.pubSubMapping: dict[str, dict] = {}

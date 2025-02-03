@@ -40,11 +40,11 @@ class DataServer:
 
     async def handleConnection(self, websocket: websockets.WebSocketServerProtocol):
         """ handle incoming connections and messages """
-        peerAddr: Peer = Peer(*websocket.remote_address) # TODO : see the data structure again
+        peerAddr: Peer = Peer(*websocket.remote_address)
         self.connectedClients[peerAddr] = self.connectedClients.get(
             peerAddr, ConnectedPeer(peerAddr, websocket)
         )
-        debug("Connected peers:", self.connectedClients, print=True)
+        debug("Connected peer:", peerAddr, print=True)
         try:
             async for message in websocket:
                 debug(f"Received request: {message}", print=True)

@@ -24,8 +24,8 @@ import time
 # time.sleep(10)
 # await asyncio.sleep(10)
 
-async def diff():
-    print('diff')
+# async def diff():
+#     print('diff')
 
 async def main():
     client = DataClient("0.0.0.0")
@@ -35,7 +35,8 @@ async def main():
         })
 
 
-    await client.isLocalEngineClient()
+    response = await client.isLocalEngineClient()
+    print(response.to_dict(True))
     # print('waiting for 6 seconds')
     # time.sleep(6)
     # print('waiting for 6 seconds')

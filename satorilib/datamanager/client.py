@@ -179,9 +179,9 @@ class DataClient:
         ''' neuron local client gives the server pub/sub mapping info '''
         return await self.send((self.serverHostPort), Message(DataServerApi.setPubsubMap.createRequest(uuid)))
 
-    async def getPubsubMap(self, peerHost) -> Message:
+    async def getPubsubMap(self, peerHost: str = None) -> Message:
         ''' engine local client gets pub/sub mapping info from the server '''
-        return await self.send((peerHost, self.serverPort), Message(DataServerApi.getPubsubMap.createRequest()))
+        return await self.send((peerHost, self.serverPort) if peerHost else None, Message(DataServerApi.getPubsubMap.createRequest()))
 
     async def isStreamActive(self, peerHost: str, uuid: str) -> Message:
         ''' checks if the source server has an active stream the client is trying to subscribe to '''

@@ -62,9 +62,9 @@ class DataClient:
     async def handleMessageForOwner(self, message: Message) -> None:
         ''' update state for the calling client '''
         if message.isSubscription:
-            await self.handleMessageForServer(message)
+            # await self.handleMessageForServer(message) # TODO : fix this
             subscription = self._findSubscription(
-                subscription=Subscription(message.method, message.uuid)
+                subscription=Subscription(message.uuid)
             )
             q = self.subscriptions.get(subscription)
             if isinstance(q, queue.Queue):
@@ -159,7 +159,7 @@ class DataClient:
         if publicationUuid is not None:
             self.publications[uuid] = publicationUuid
         self._addStreamToServer(uuid, publicationUuid) 
-        subscription = Subscription(uuid, callback=callback)
+        subscription = Subscription(uuid, callback)
         self.subscriptions[subscription] = queue.Queue()
         return await self.send((peerHost, self.serverPort), Message(DataServerApi.subscribe.createRequest(uuid))) # should we set isSub as True?
     

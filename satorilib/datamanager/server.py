@@ -141,7 +141,7 @@ class DataServer:
 
         elif request.method == DataServerApi.isStreamActive.value:
             ''' client asks the server whether it has the stream its trying to subscribe to in its publication list  '''
-            if request.uuid in self.availableStreams():
+            if request.uuid in self.availableStreams:
                 return DataServerApi.statusSuccess.createResponse('Subscription stream available to subscribe to', request.id)
             else:
                 return DataServerApi.statusFail.createResponse('Subscription not available', request.id)
@@ -172,7 +172,7 @@ class DataServer:
 
         elif request.method == DataServerApi.getAvailableSubscriptions.value:
             ''' client asks the server to send its publication list to know which stream it can subscribe to '''
-            return DataServerApi.statusSuccess.createResponse('Available streams fetched', request.id, streamInfo=self.availableStreams())
+            return DataServerApi.statusSuccess.createResponse('Available streams fetched', request.id, streamInfo=self.availableStreams)
 
         elif request.method == DataServerApi.subscribe.value:
             ''' client tells the server it wants to subscribe so the server can add to its subscribers '''
@@ -195,9 +195,9 @@ class DataServer:
             ''' fetches the whole requested dataframe '''
             try:
                 df = self.dataManager.getStreamData(request.uuid)
-                if not df.empty():
+                if df.empty:
                     return DataServerApi.statusFail.createResponse('No data found for stream', request.id)
-                return DataServerApi.statusSuccess.createResponse('data fetched for the stream', request.id, df.to_json(orient='split') )
+                return DataServerApi.statusSuccess.createResponse('data fetched for the stream', request.id, df)
             except Exception as e:
                 return DataServerApi.statusFail.createResponse('Failed to fetch data', request.id)
 
@@ -209,11 +209,11 @@ class DataServer:
                 df = self.dataManager.getStreamDataByDateRange(
                     request.uuid, request.fromDate, request.toDate
                 )
-                if not df.empty():
+                if df.empty:
                     return DataServerApi.statusFail.createResponse('No data found for stream in specified timestamp range', request.id)
                 if 'ts' in df.columns:
                     df['ts'] = df['ts'].astype(str)
-                return DataServerApi.statusSuccess.createResponse('data fetched for stream in specified date range', request.id, df.to_json(orient='split'))
+                return DataServerApi.statusSuccess.createResponse('data fetched for stream in specified date range', request.id, df)
             except Exception as e:
                 return DataServerApi.statusFail.createResponse('Failed to fetch data', request.id)
 
@@ -226,38 +226,39 @@ class DataServer:
                 df = self.dataManager.getLastRecordBeforeTimestamp(
                     request.uuid, timestamp
                 )
-                if not df.empty():
+                if df.empty:
                     return DataServerApi.statusFail.createResponse('No records found before timestamp for stream', request.id)
                 if 'ts' in df.columns:
                     df['ts'] = df['ts'].astype(str)
-                return DataServerApi.statusSuccess.createResponse('records found before timestamp for stream', request.id, df.to_json(orient='split'))
+                return DataServerApi.statusSuccess.createResponse('records found before timestamp for stream', request.id, df)
             except Exception as e:
                 return DataServerApi.statusFail.createResponse('Failed to fetch data', request.id)
 
         elif request.method == DataServerApi.insertStreamData.value:
             ''' inserts the dataframe send in request into the database '''
-            try:
-                if request.data is None:
-                    return DataServerApi.statusFail.createResponse('No data provided', request.id)
-                data = pd.read_json(StringIO(request.data), orient='split')
-                if request.isSubscription:
-                    if request.uuid in self.availableStreams():
-                        self.dataManager.db._addSubDataToDatabase(request.uuid, data)
-                        await self.updateSubscribers(request)
-                        return DataServerApi.statusSuccess.createResponse('Data added to server database', request.id)
-                    else:
-                        return DataServerApi.statusFail.createResponse('Subcsription not in server list', request.id)
-                if request.replace:
-                    self.dataManager.db.deleteTable(request.uuid)
-                    self.dataManager.db.createTable(request.uuid)
-                self.dataManager.db._addDataframeToDatabase(request.uuid, data)
-                return DataServerApi.statusSuccess.createResponse('Data added to dataframe', request.id)
-            except Exception as e:
-                return DataServerApi.statusFail.createResponse(e, request.id)
+            # try:
+            if request.data is None:
+                return DataServerApi.statusFail.createResponse('No data provided', request.id)
+            # data = pd.read_json(StringIO(request.data), orient='split')
+            data = pd.read_json(StringIO(request.data))
+            if request.isSubscription: # TODO : Handle prediction data differently
+                # if request.uuid in self.availableStreams:
+                self.dataManager.db._addSubDataToDatabase(request.uuid, data)
+                await self.updateSubscribers(request)
+                return DataServerApi.statusSuccess.createResponse('Data added to server database', request.id)
+                # else:
+                #     return DataServerApi.statusFail.createResponse('Subscription not in server list', request.id)
+            if request.replace:
+                self.dataManager.db.deleteTable(request.uuid)
+                self.dataManager.db.createTable(request.uuid)
+            self.dataManager.db._addDataframeToDatabase(request.uuid, data)
+            return DataServerApi.statusSuccess.createResponse('Data added to dataframe', request.id)
+            # except Exception as e:
+                # return DataServerApi.statusFail.createResponse(e, request.id)
 
         elif request.method == DataServerApi.isStreamActive.value:
             ''' client asks the server whether it has the stream its trying to subscribe to in its publication list  '''
-            if request.uuid in self.availableStreams():
+            if request.uuid in self.availableStreams:
                 return DataServerApi.statusSuccess.createResponse('Subscription stream available to subscribe to', request.id)
             else:
                 return DataServerApi.statusFail.createResponse('Subscription not available', request.id)

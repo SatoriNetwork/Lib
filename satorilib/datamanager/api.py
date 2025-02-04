@@ -91,6 +91,6 @@ class DataServerApi(Enum):
                 # 'params': {
                 #     'uuid': uuid,
                 # },
-                'data': data.to_json() if data is not None else None,
+                'data': data.to_json(orient='split') if data is not None else None,
                 'stream_info': streamInfo
             }

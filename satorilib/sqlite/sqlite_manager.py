@@ -325,17 +325,8 @@ class SqliteDatabase:
             error(f"Database error converting table {table_uuid} to DataFrame: {e}")
 
     def _addSubDataToDatabase(self, table_uuid: str, newDf: pd.DataFrame):
-        """ 
-        This function should do the following :
-            - take in the dataframe that might be a raw data subscription or prediction
-              data published by the engine. 
-            - the dataframe taken as input will have ts and value
-            - this input combined with others will be used for hashing
-            - the output of the hash will be the new row's hash value.
-            - add that to database and then return that row to pass to others.
-            - TODO : should this new hash value be passed to others?
-        """
         try:
+            # Check if table exists
             self.cursor.execute(
                 """
                 SELECT name FROM sqlite_master 
@@ -345,6 +336,12 @@ class SqliteDatabase:
                 debug(f"Table {table_uuid} does not exist", print=True)
                 self.createTable(table_uuid)
 
+            # Validate required columns
+            required_columns = {'value'}
+            if not all(col in newDf.columns for col in required_columns):
+                raise ValueError(f"DataFrame must contain columns: {required_columns}")
+
+            # Read existing data
             existingDf = pd.read_sql_query(
                 f"""
                 SELECT ts, value, hash 
@@ -354,38 +351,47 @@ class SqliteDatabase:
                 self.conn,
                 index_col='ts'
             )
-            priorRowHash = existingDf['hash'].iloc[-1] if not existingDf.empty else ''
-            required_columns = {'value'}
-            if not all(col in newDf.columns for col in required_columns):
-                raise ValueError(f"DataFrame must contain columns: {required_columns}")
             
+            priorRowHash = existingDf['hash'].iloc[-1] if not existingDf.empty else ''
+            
+            # Combine and deduplicate data
             combinedDf = pd.concat([existingDf, newDf])
+            combinedDf = combinedDf[~combinedDf.index.duplicated(keep='last')]  # Keep latest value for duplicate timestamps
+            
+            # Generate new hashes
             newDfAfterHash = historyHashesForSqlite(combinedDf, priorRowHash)
+            
+            # Prepare data types
             newDfAfterHash.index = newDfAfterHash.index.astype(str)
             newDfAfterHash['value'] = newDfAfterHash['value'].astype(float)
             newDfAfterHash['hash'] = newDfAfterHash['hash'].astype(str)
-            self.cursor.execute(f'DELETE FROM "{table_uuid}"')
-            self.conn.commit()
-            for idx, row in newDfAfterHash.iterrows():
-                self.cursor.execute(
+            
+            # Transaction for database updates
+            with self.conn:  # This creates a transaction
+                self.cursor.execute(f'DELETE FROM "{table_uuid}"')
+                
+                # Use executemany for better performance
+                data = [(idx, row['value'], row['hash']) 
+                    for idx, row in newDfAfterHash.iterrows()]
+                self.cursor.executemany(
                     f'''
                     INSERT INTO "{table_uuid}" (ts, value, hash) 
                     VALUES (?, ?, ?)
-                    ''', (
-                        idx,
-                        row['value'],
-                        row['hash']
-                    ))
-            self.conn.commit()
-            info(f"Added new record to database {table_uuid}, sorting table")
-            self._sortTableByTimestamp(table_uuid)
+                    ''', data)
+                
+                info(f"Added new records to database {table_uuid}, sorting table")
+                self._sortTableByTimestamp(table_uuid)
+                
             return True
+
+        except sqlite3.IntegrityError as e:
+            error(f"Database integrity error for table {table_uuid}: {e}")
+            return False
         except ValueError as e:
             error(f"Validation error: {e}")
-            self.conn.rollback()
+            return False
         except Exception as e:
             error(f"Database error converting DataFrame to table {table_uuid}: {e}")
-            self.conn.rollback()
             return False
         
     def _addDataframeToDatabase(self, table_uuid: str, df: pd.DataFrame):

@@ -236,25 +236,21 @@ class DataServer:
 
         elif request.method == DataServerApi.insertStreamData.value:
             ''' inserts the dataframe send in request into the database '''
-            # try:
-            if request.data is None:
-                return DataServerApi.statusFail.createResponse('No data provided', request.id)
-            # data = pd.read_json(StringIO(request.data), orient='split')
-            data = pd.read_json(StringIO(request.data))
-            if request.isSubscription: # TODO : Handle prediction data differently
-                # if request.uuid in self.availableStreams:
-                self.dataManager.db._addSubDataToDatabase(request.uuid, data)
-                await self.updateSubscribers(request)
-                return DataServerApi.statusSuccess.createResponse('Data added to server database', request.id)
-                # else:
-                #     return DataServerApi.statusFail.createResponse('Subscription not in server list', request.id)
-            if request.replace:
-                self.dataManager.db.deleteTable(request.uuid)
-                self.dataManager.db.createTable(request.uuid)
-            self.dataManager.db._addDataframeToDatabase(request.uuid, data)
-            return DataServerApi.statusSuccess.createResponse('Data added to dataframe', request.id)
-            # except Exception as e:
-                # return DataServerApi.statusFail.createResponse(e, request.id)
+            try:
+                if request.data is None:
+                    return DataServerApi.statusFail.createResponse('No data provided', request.id)
+                data = pd.read_json(StringIO(request.data))
+                if request.isSubscription: 
+                    self.dataManager.db._addSubDataToDatabase(request.uuid, data)
+                    await self.updateSubscribers(request)
+                    return DataServerApi.statusSuccess.createResponse('Data added to server database', request.id)
+                if request.replace:
+                    self.dataManager.db.deleteTable(request.uuid)
+                    self.dataManager.db.createTable(request.uuid)
+                self.dataManager.db._addDataframeToDatabase(request.uuid, data)
+                return DataServerApi.statusSuccess.createResponse('Data added to dataframe', request.id)
+            except Exception as e:
+                return DataServerApi.statusFail.createResponse(e, request.id)
 
         elif request.method == DataServerApi.isStreamActive.value:
             ''' client asks the server whether it has the stream its trying to subscribe to in its publication list  '''

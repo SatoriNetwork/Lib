@@ -326,7 +326,6 @@ class SqliteDatabase:
 
     def _addSubDataToDatabase(self, table_uuid: str, newDf: pd.DataFrame):
         try:
-            # Check if table exists
             self.cursor.execute(
                 """
                 SELECT name FROM sqlite_master 
@@ -335,13 +334,9 @@ class SqliteDatabase:
             if not self.cursor.fetchone():
                 debug(f"Table {table_uuid} does not exist", print=True)
                 self.createTable(table_uuid)
-
-            # Validate required columns
             required_columns = {'value'}
             if not all(col in newDf.columns for col in required_columns):
                 raise ValueError(f"DataFrame must contain columns: {required_columns}")
-
-            # Read existing data
             existingDf = pd.read_sql_query(
                 f"""
                 SELECT ts, value, hash 
@@ -353,24 +348,15 @@ class SqliteDatabase:
             )
             
             priorRowHash = existingDf['hash'].iloc[-1] if not existingDf.empty else ''
-            
-            # Combine and deduplicate data
             combinedDf = pd.concat([existingDf, newDf])
-            combinedDf = combinedDf[~combinedDf.index.duplicated(keep='last')]  # Keep latest value for duplicate timestamps
-            
-            # Generate new hashes
+            combinedDf = combinedDf[~combinedDf.index.duplicated(keep='last')] 
             newDfAfterHash = historyHashesForSqlite(combinedDf, priorRowHash)
-            
-            # Prepare data types
             newDfAfterHash.index = newDfAfterHash.index.astype(str)
             newDfAfterHash['value'] = newDfAfterHash['value'].astype(float)
             newDfAfterHash['hash'] = newDfAfterHash['hash'].astype(str)
-            
-            # Transaction for database updates
-            with self.conn:  # This creates a transaction
+
+            with self.conn:  
                 self.cursor.execute(f'DELETE FROM "{table_uuid}"')
-                
-                # Use executemany for better performance
                 data = [(idx, row['value'], row['hash']) 
                     for idx, row in newDfAfterHash.iterrows()]
                 self.cursor.executemany(
@@ -378,10 +364,8 @@ class SqliteDatabase:
                     INSERT INTO "{table_uuid}" (ts, value, hash) 
                     VALUES (?, ?, ?)
                     ''', data)
-                
                 info(f"Added new records to database {table_uuid}, sorting table")
                 self._sortTableByTimestamp(table_uuid)
-                
             return True
 
         except sqlite3.IntegrityError as e:

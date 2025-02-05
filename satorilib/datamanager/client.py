@@ -55,14 +55,20 @@ class DataClient:
     async def handleMessageForServer(self, message: Message) -> None:
         ''' update server about subscription or if the stream is inactive, so it can notify other subscribers '''
         try:
-            await self.sendRequest(self.serverHostPort, rawMsg=message) # TODO : fix?
+            response = await self.insertStreamData(
+                uuid=message.uuid,
+                data=message.data,
+                isSub=True 
+            )
+            if response.status != DataServerApi.statusSuccess:
+                raise Exception(response.senderMsg)
         except Exception as e:
-            error('Error sending message to server : ', e)
+            error('Unable to set data in server: ', e)
         
     async def handleMessageForOwner(self, message: Message) -> None:
         ''' update state for the calling client '''
         if message.isSubscription:
-            # await self.handleMessageForServer(message) # TODO : fix this
+            # await self.handleMessageForServer(message) # TODO : for remote subscriptions enable otherwise we skip this
             subscription = self._findSubscription(
                 subscription=Subscription(message.uuid)
             )

@@ -20,6 +20,15 @@ class DataClient:
         self.responses: dict[str, Message] = {}
         self.running = False
 
+    def isConnected(
+        self, 
+        host: Union[str, None] = None, 
+        port: Union[int, None] = None
+    )-> bool: 
+        host = host or self.serverHostPort[0]
+        port = port or self.serverPort
+        return self.peers.get((host, port)) is not None
+
     async def connectToPeer(self, peerHost: str, peerPort: int = 24602):
         '''Connect to other Peers'''
         uri = f'ws://{peerHost}:{peerPort}'
@@ -40,16 +49,16 @@ class DataClient:
         try:
             while True:
                 message = Message(json.loads(await peer.websocket.recv()))
-                asyncio.create_task(self.handlePeerMessage(message))  # Process async
+                asyncio.create_task(self.handlePeerMessage(message, peer))  # Process async
         except websockets.exceptions.ConnectionClosed:
             self.disconnect(peer)
         except Exception as e:
             error(f"Unexpected error in listenToPeer: {e}")
             self.disconnect(peer)
 
-    async def handlePeerMessage(self, message: Message) -> None:
+    async def handlePeerMessage(self, message: Message, peer: ConnectedPeer) -> None:
         ''' pass to server, modify owner's state, modify self state '''
-        await self.handleMessageForOwner(message)
+        await self.handleMessageForOwner(message, peer)
         await self.handleMessageForSelf(message)
 
     async def handleMessageForServer(self, message: Message) -> None:
@@ -65,10 +74,11 @@ class DataClient:
         except Exception as e:
             error('Unable to set data in server: ', e)
         
-    async def handleMessageForOwner(self, message: Message) -> None:
+    async def handleMessageForOwner(self, message: Message, peer: ConnectedPeer) -> None:
         ''' update state for the calling client '''
         if message.isSubscription:
-            # await self.handleMessageForServer(message) # TODO : for remote subscriptions enable otherwise we skip this
+            if peer.hostPort != self.serverHostPort:
+                await self.handleMessageForServer(message) # TODO : for remote subscriptions enable otherwise we skip this
             subscription = self._findSubscription(
                 subscription=Subscription(message.uuid)
             )

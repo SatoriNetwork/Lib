@@ -451,6 +451,7 @@ class StreamOverview:
                     if k != "streamId" and k != "pinned"
                 },
                 **{
+                    "uuid": self.streamId.uuid,
                     "pinned": 1 if self.pinned else 0,
                     "hashed": self.hashed,
                     "source": self.streamId.source,

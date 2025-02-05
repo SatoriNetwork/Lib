@@ -149,9 +149,9 @@ class Message:
             'message': self.senderMsg,
             'id': self.id,
             # 'sub': self.sub,
-            # 'params': {
-            #     'uuid': self.uuid,
-            # },
+            'params': {
+                'uuid': self.uuid,
+            },
             'data': self.data,
             'stream_info': self.streamInfo
         }

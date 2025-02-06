@@ -27,7 +27,17 @@ class DataClient:
     )-> bool: 
         host = host or self.serverHostPort[0]
         port = port or self.serverPort
-        return self.peers.get((host, port)) is not None
+        peer = self.peers.get((host, port))
+        if peer is None:
+            return False
+        if peer.websocket is None or peer.websocket.closed:
+            return False
+        if peer.listener is None or peer.listener.done():
+            return False
+        if peer.stop.is_set():
+            return False
+        return True
+        # return self.peers.get((host, port)) is not None
 
     async def connectToPeer(self, peerHost: str, peerPort: int = 24602):
         '''Connect to other Peers'''

@@ -411,22 +411,6 @@ class SatoriServerClient(object):
             return response.json().get('success'), response.json().get('result')
         return False, ''
 
-    def minedToVault(self) -> Union[bool, None]:
-        '''  '''
-        try:
-            response = self._makeAuthenticatedCall(
-                function=requests.get,
-                endpoint='/mine_to_vault/status')
-            if response.status_code > 399:
-                return None
-            if response.text in ['', 'null', 'None', 'NULL']:
-                return False
-        except Exception as e:
-            logging.warning(
-                'unable to determine status of Mine-To-Vault feature due to connection timeout; try again Later.', e, color='yellow')
-            return None
-        return True
-
     def mineToAddressStatus(self) -> Union[str, None]:
         ''' get reward address '''
         try:
@@ -578,59 +562,6 @@ class SatoriServerClient(object):
                 'unable to register vault address due to connection timeout; try again Later.', e, color='yellow')
             return False, ''
 
-    def enableMineToVault(
-        self,
-        walletSignature: Union[str, bytes],
-        vaultSignature: Union[str, bytes],
-        vaultPubkey: str,
-        address: str,
-    ) -> tuple[bool, str]:
-        ''' removes a stream from the server '''
-        if isinstance(walletSignature, bytes):
-            walletSignature = walletSignature.decode()
-        if isinstance(vaultSignature, bytes):
-            vaultSignature = vaultSignature.decode()
-        try:
-            response = self._makeAuthenticatedCall(
-                function=requests.post,
-                endpoint='/mine_to_vault/enable',
-                payload=json.dumps({
-                    'walletSignature': walletSignature,
-                    'vaultSignature': vaultSignature,
-                    'vaultPubkey': vaultPubkey,
-                    'address': address}))
-            return response.status_code < 400, response.text
-        except Exception as e:
-            logging.warning(
-                'unable to enable status of Mine-To-Vault feature due to connection timeout; try again Later.', e, color='yellow')
-            return False, ''
-
-    def disableMineToVault(
-        self,
-        walletSignature: Union[str, bytes],
-        vaultSignature: Union[str, bytes],
-        vaultPubkey: str,
-        address: str,
-    ) -> tuple[bool, str]:
-        ''' removes a stream from the server '''
-        if isinstance(walletSignature, bytes):
-            walletSignature = walletSignature.decode()
-        if isinstance(vaultSignature, bytes):
-            vaultSignature = vaultSignature.decode()
-        try:
-            response = self._makeAuthenticatedCall(
-                function=requests.post,
-                endpoint='/mine_to_vault/disable',
-                payload=json.dumps({
-                    'walletSignature': walletSignature,
-                    'vaultSignature': vaultSignature,
-                    'vaultPubkey': vaultPubkey,
-                    'address': address}))
-            return response.status_code < 400, response.text
-        except Exception as e:
-            logging.warning(
-                'unable to disable status of Mine-To-Vault feature due to connection timeout; try again Later.', e, color='yellow')
-            return False, ''
 
     def fetchWalletStatsDaily(self) -> str:
         ''' gets wallet stats '''

@@ -325,6 +325,8 @@ class SqliteDatabase:
             error(f"Database error converting table {table_uuid} to DataFrame: {e}")
 
     def _addSubDataToDatabase(self, table_uuid: str, newDf: pd.DataFrame):
+        # TODO : pull the last hash value and use rowStr = priorRowHash + str(index) + str(row['value'])
+        # TODO : if hash already exists then skip just append the sent hash
         try:
             self.cursor.execute(
                 """
@@ -366,7 +368,7 @@ class SqliteDatabase:
                     ''', data)
                 info(f"Added new records to database {table_uuid}, sorting table")
                 self._sortTableByTimestamp(table_uuid)
-            return True
+            return True # TODO : return the dataframe with just the one observation
 
         except sqlite3.IntegrityError as e:
             error(f"Database integrity error for table {table_uuid}: {e}")

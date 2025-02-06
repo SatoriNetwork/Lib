@@ -242,6 +242,10 @@ class DataServer:
                 data = pd.read_json(StringIO(request.data))
                 if request.isSubscription: 
                     self.dataManager.db._addSubDataToDatabase(request.uuid, data)
+                    # TODO: use the data generated from adding to database (contains hash)
+                    # data = self.dataManager.db._addSubDataToDatabase(request.uuid, data)
+                    # request.data = data.to_json(orient='split')
+                    # TODO: LATER investigate more efficient ways to send dataframes over the wire
                     await self.updateSubscribers(request)
                     return DataServerApi.statusSuccess.createResponse('Data added to server database', request.id)
                 if request.replace:

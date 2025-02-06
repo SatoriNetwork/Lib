@@ -261,8 +261,12 @@ class Wallet(WalletBase):
 
     @property
     def account(self) -> 'eth_account.Account':
-        from satorilib.wallet.ethereum.wallet import EthereumWallet
-        return EthereumWallet.generateAccount(self._entropy)
+        try:
+            from satorilib.wallet.ethereum.wallet import EthereumWallet
+            return EthereumWallet.generateAccount(self._entropy)
+        except Exception as e:
+            logging.error(e)
+            return None
 
     @property
     def ethAddress(self) -> str:
@@ -1313,7 +1317,7 @@ class Wallet(WalletBase):
         if amount <= 0:
             raise TransactionFailure(
                 'Satori Bridge Transaction bad params: amount <= 0')
-        if amount > 100:
+        if amount > self.maxBridgeAmount:
             raise TransactionFailure(
                 'Satori Bridge Transaction bad params: amount > 100')
         if not Validate.ethAddress(ethAddress):

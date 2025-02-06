@@ -36,8 +36,9 @@ websockets==10.4 # import websocket; websocket.WebSocket()
 pycryptodome==3.20.0
 
 # needed for ethereum wallet functions
-eth-account==0.12.3
-eth-keys==0.5.1
+eth-account==0.13.4
+eth-keys==0.6.1
+web3==7.7.0
 
 # for api validation
 marshmallow==3.22.0

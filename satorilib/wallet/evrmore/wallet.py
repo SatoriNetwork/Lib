@@ -104,6 +104,18 @@ class EvrmoreWallet(Wallet):
         # SATORI/TEST 15dd33886452c02d58b500903441b81128ef0d21dd22502aa684c002b37880fe
         return 'df745a3ee1050a9557c3b449df87bdd8942980dff365f7f5a93bc10cb1080188'
 
+    @property
+    def ethaddress(self) -> Union[str, None]:
+        try:
+            account = self.account
+            return (
+                account.checksum_address
+                if hasattr(account, 'checksum_address') else None
+            ) or account.address
+        except Exception as e:
+            logging.error(e)
+            return None
+
     # signature ###############################################################
 
     def sign(self, message: str):

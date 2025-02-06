@@ -52,7 +52,8 @@ class DataClient:
             )
             debug(f'Connected to peer at {uri}', print=True)
         except Exception as e:
-            error(f'Failed to connect to peer at {uri}: {e}')
+            # error(f'Failed to connect to peer at {uri}: {e}')
+            pass
     
     async def listenToPeer(self, peer: ConnectedPeer):
         ''' Handles receiving messages from an individual peer '''
@@ -172,7 +173,7 @@ class DataClient:
             response = await self.listenForResponse(request.id)
             return response
         except Exception as e:
-            error(f'Error sending request to peer: {e}')
+            # error(f'Error sending request to peer: {e}')
             return {'status': 'error', 'message': str(e)}
 
     async def subscribe(

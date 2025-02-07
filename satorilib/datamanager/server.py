@@ -1,5 +1,4 @@
 import websockets
-import json
 import pandas as pd
 from typing import Any, Union
 from io import StringIO
@@ -47,7 +46,7 @@ class DataServer:
         debug("Connected peer:", peerAddr, print=True)
         try:
             async for message in websocket:
-                debug(f"Received request: {message}", print=True)
+                debug(f"Received request: {Message.fromBytes(message).to_dict()}", print=True)
                 response = Message(await self.handleRequest(peerAddr, message)).toBytes(True)
                 await self.connectedClients[peerAddr].websocket.send(response)
         except websockets.exceptions.ConnectionClosed:
@@ -64,7 +63,7 @@ class DataServer:
         '''
         for connectedClient in self.connectedClients.values():
             if msg.uuid in connectedClient.subscriptions:
-                await connectedClient.websocket.send(msg.to_json())
+                await connectedClient.websocket.send(msg.toBytes())
 
     async def disconnectAllPeers(self):
         """ disconnect from all peers and stop the server """
@@ -244,7 +243,7 @@ class DataServer:
                                         'id': request.id,
                                         'sub': request.sub,
                                         'params': {'uuid': request.uuid},
-                                        'data': Message._serializeDataframe(dataForSubscribers)
+                                        'data': dataForSubscribers
                                     })
                     await self.updateSubscribers(updatedMessage)
                     return DataServerApi.statusSuccess.createResponse('Data added to server database', request.id)

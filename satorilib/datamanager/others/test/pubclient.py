@@ -5,6 +5,7 @@ import asyncio
 import pandas as pd
 from io import StringIO
 import time
+import pyarrow as pa
 
 # TODO :
 # Test for endpoints
@@ -33,10 +34,16 @@ async def main():
         'date_time': ['2024-10-02 04:30:06.341020'],
         'value': [969.717144]
         })
+    df['date_time'] = pd.to_datetime(df['date_time'])
+    df.set_index('date_time', inplace=True)
+    # serialized_data  = pa.Table.from_pandas(df).serialize()
+    response: Message = await client.insertStreamData('04145e3c-ce99-5ef0-879f-9730e012aa26', df, isSub=True)
+    print(response.senderMsg)
 
+asyncio.run(main())
 
-    response = await client.isLocalEngineClient()
-    print(response.to_dict(True))
+    # response = await client.isLocalEngineClient()
+    # print(response.to_dict(True))
     # print('waiting for 6 seconds')
     # time.sleep(6)
     # print('waiting for 6 seconds')
@@ -60,7 +67,6 @@ async def main():
     #     # Clean shutdown
     #     await client.disconnectAll()
     # print(response.to_dict(True))
-    # response = await client.insertStreamData('04145e3c-ce99-5ef0-879f-9730e012aa26', df)
     
     # finalForm = pd.read_json(StringIO(response.data), orient='split')
     # print(finalForm)
@@ -118,9 +124,6 @@ async def main():
     # print(response.streamInfo)
     # await asyncio.sleep(5)
     
-asyncio.run(main())
-
-
 # endpoints to test in order
 
 # 'initiate-server-connection'

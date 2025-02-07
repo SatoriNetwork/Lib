@@ -5,32 +5,7 @@ from satorilib.utils import generateUUID
 import pandas as pd
 from pathlib import Path
 from satorilib.logging import INFO, setup, debug, info, warning, error
-
-
-
-# fix - remove from here.
 import hashlib
-import pandas as pd
-def hashIt(string: str) -> str:
-    # return hashlib.sha256(rowStr.encode()).hexdigest() # 74mb
-    # return hashlib.md5(rowStr.encode()).hexdigest() # 42mb
-    return hashlib.blake2s(
-        string.encode(),
-        digest_size=8).hexdigest()  # 27mb / million rows
-
-
-def historyHashesForSqlite(df: pd.DataFrame, priorRowHash: str = None) -> pd.DataFrame:
-    ''' creates hashes of every row in the dataframe based on prior hash '''
-    priorRowHash = priorRowHash or ''
-    rowHashes = []
-    for index, row in df.iterrows():
-        rowStr = priorRowHash + str(index) + str(row['value'])
-        rowHash = hashIt(rowStr)
-        rowHashes.append(rowHash)
-        priorRowHash = rowHash
-    df['hash'] = rowHashes
-    return df
-
 
 
 setup(level=INFO)
@@ -325,8 +300,6 @@ class SqliteDatabase:
             error(f"Database error converting table {table_uuid} to DataFrame: {e}")
 
     def _addSubDataToDatabase(self, table_uuid: str, newDf: pd.DataFrame):
-        # TODO : pull the last hash value and use rowStr = priorRowHash + str(index) + str(row['value'])
-        # TODO : if hash already exists then skip just append the sent hash
         try:
             self.cursor.execute(
                 """
@@ -336,49 +309,46 @@ class SqliteDatabase:
             if not self.cursor.fetchone():
                 debug(f"Table {table_uuid} does not exist", print=True)
                 self.createTable(table_uuid)
-            required_columns = {'value'}
-            if not all(col in newDf.columns for col in required_columns):
-                raise ValueError(f"DataFrame must contain columns: {required_columns}")
-            existingDf = pd.read_sql_query(
+
+            if not all(col in newDf.columns for col in ["hash", "value"]):
+                if 'value' not in newDf.columns:
+                    return pd.DataFrame()
+                    # raise ValueError("DataFrame must contain 'value' column")
+                    
+                result = pd.read_sql_query(
+                    f"""
+                    SELECT hash 
+                    FROM "{table_uuid}"
+                    ORDER BY ts DESC
+                    LIMIT 1
+                    """,
+                    self.conn
+                )
+                prior_hash = str(result.iloc[0]['hash']) if not result.empty else ''
+                newDf.index = newDf.index.astype(str)
+                newDf['value'] = newDf['value'].astype(float)
+                newDf['hash'] = self.hashIt(prior_hash + str(newDf.index[0]) + str(newDf['value'].iloc[0]))
+
+            self.cursor.execute(
                 f"""
-                SELECT ts, value, hash 
-                FROM "{table_uuid}"
-                ORDER BY ts
-                """, 
-                self.conn,
-                index_col='ts'
+                INSERT INTO "{table_uuid}" (ts, value, hash)
+                VALUES (?, ?, ?)
+                """,
+                (
+                    newDf.index[0],             
+                    newDf['value'].iloc[0], 
+                    newDf['hash'].iloc[0]
+                )
             )
-            
-            priorRowHash = existingDf['hash'].iloc[-1] if not existingDf.empty else ''
-            combinedDf = pd.concat([existingDf, newDf])
-            combinedDf = combinedDf[~combinedDf.index.duplicated(keep='last')] 
-            newDfAfterHash = historyHashesForSqlite(combinedDf, priorRowHash)
-            newDfAfterHash.index = newDfAfterHash.index.astype(str)
-            newDfAfterHash['value'] = newDfAfterHash['value'].astype(float)
-            newDfAfterHash['hash'] = newDfAfterHash['hash'].astype(str)
+            self.conn.commit()
+            info(f"Added new records to database {table_uuid}")
+            self._sortTableByTimestamp(table_uuid) # TODO : do we need to sort the table
+            return newDf 
 
-            with self.conn:  
-                self.cursor.execute(f'DELETE FROM "{table_uuid}"')
-                data = [(idx, row['value'], row['hash']) 
-                    for idx, row in newDfAfterHash.iterrows()]
-                self.cursor.executemany(
-                    f'''
-                    INSERT INTO "{table_uuid}" (ts, value, hash) 
-                    VALUES (?, ?, ?)
-                    ''', data)
-                info(f"Added new records to database {table_uuid}, sorting table")
-                self._sortTableByTimestamp(table_uuid)
-            return True # TODO : return the dataframe with just the one observation
-
-        except sqlite3.IntegrityError as e:
-            error(f"Database integrity error for table {table_uuid}: {e}")
-            return False
-        except ValueError as e:
-            error(f"Validation error: {e}")
-            return False
         except Exception as e:
-            error(f"Database error converting DataFrame to table {table_uuid}: {e}")
-            return False
+                self.conn.rollback()
+                error(f"Error adding data to database: ",e)
+                return newDf
         
     def _addDataframeToDatabase(self, table_uuid: str, df: pd.DataFrame):
         """ Writes a pandas DataFrame to a specified database table """
@@ -435,13 +405,15 @@ class SqliteDatabase:
             error(f"Database error converting DataFrame to table {table_uuid}: {e}")
             self.conn.rollback()
             return False
-    
+
     @staticmethod
-    def hashing():
-        pass
+    def hashIt(string: str) -> str:
+        return hashlib.blake2s(
+            string.encode(),
+            digest_size=8).hexdigest() 
+    
 
-
-if __name__ == "__main__":
-    db = SqliteDatabase()
+# if __name__ == "__main__":
+#     db = SqliteDatabase()
 
 

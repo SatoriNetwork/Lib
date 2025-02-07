@@ -2,6 +2,9 @@ from typing import Union, Tuple
 import websockets
 import asyncio
 import json
+import pandas as pd
+import pyarrow as pa
+from satorilib.datamanager.api import DataServerApi
 
 
 class Subscription:
@@ -172,6 +175,64 @@ class Message:
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict())
+    
+    def toBytes(self, response: bool = False) -> bytes:
+        """Convert Message to PyArrow bytes for sending over websocket"""
+        message_dict = self.to_dict(response)
+        if isinstance(message_dict.get('data'), pd.DataFrame):
+            message_dict['data'] = self._serializeDataframe(message_dict['data'])
+        table = pa.Table.from_pydict({
+            k: [v] for k, v in message_dict.items()
+        })
+        sink = pa.BufferOutputStream()
+        with pa.ipc.new_stream(sink, table.schema) as writer:
+            writer.write(table)
+        return sink.getvalue().to_pybytes()
+    
+    @classmethod
+    def fromBytes(cls, byte_data: bytes) -> 'Message':
+        """Create Message from PyArrow bytes received from websocket"""
+        reader = pa.ipc.open_stream(pa.BufferReader(byte_data))
+        table = reader.read_all()
+        message_dict = {}
+        for k, v in table.to_pydict().items():
+            value = v[0]  
+            if k == 'data' and isinstance(value, bytes):
+                try:
+                    message_dict[k] = cls._deserializeDataframe(value)
+                except Exception as e:
+                    message_dict[k] = value
+            elif hasattr(value, 'as_py'):
+                message_dict[k] = value.as_py()
+            else:
+                message_dict[k] = value
+        return cls(message_dict)
+    
+    @staticmethod
+    def _serializeDataframe(df: pd.DataFrame) -> Union[bytes, None]:
+        """Serialize DataFrame using PyArrow IPC with proper error handling"""
+        if df is None:
+            return None
+        try:
+            sink = pa.BufferOutputStream()
+            table = pa.Table.from_pandas(df)
+            with pa.ipc.new_stream(sink, table.schema) as writer:
+                writer.write(table)
+            return sink.getvalue().to_pybytes()
+        except Exception as e:
+            raise ValueError(f"Failed to serialize DataFrame: {str(e)}")
+
+    @staticmethod
+    def _deserializeDataframe(data: bytes) -> Union[pd.DataFrame, None]:
+        """Deserialize DataFrame from PyArrow IPC format"""
+        if data is None:
+            return None
+        try:
+            reader = pa.ipc.open_stream(pa.BufferReader(data))
+            table = reader.read_all()
+            return table.to_pandas()
+        except Exception as e:
+            raise ValueError(f"Failed to deserialize DataFrame: {str(e)}")
 
     @property
     def method(self) -> str:

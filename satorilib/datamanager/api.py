@@ -72,7 +72,7 @@ class DataServerApi(Enum):
                     'from_ts': fromDate,
                     'to_ts': toDate,
                 },
-                'data': data.to_json() if data is not None else None,
+                'data': data,
             }
 
     def createResponse(
@@ -91,6 +91,7 @@ class DataServerApi(Enum):
                 # 'params': {
                 #     'uuid': uuid,
                 # },
-                'data': data.to_json(orient='split') if data is not None else None,
+                'data': data,
                 'stream_info': streamInfo
             }
+    

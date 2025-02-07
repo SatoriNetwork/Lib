@@ -48,10 +48,8 @@ class DataServer:
         try:
             async for message in websocket:
                 debug(f"Received request: {message}", print=True)
-                response = await self.handleRequest(peerAddr, message)
-                await self.connectedClients[peerAddr].websocket.send(
-                    json.dumps(response)
-                )
+                response = Message(await self.handleRequest(peerAddr, message)).toBytes(True)
+                await self.connectedClients[peerAddr].websocket.send(response)
         except websockets.exceptions.ConnectionClosed:
             error(f"Connection closed with {peerAddr}")
         finally:
@@ -114,7 +112,7 @@ class DataServer:
                 convertedData[subUuid] = data
             return convertedData
 
-        request: Message = Message(json.loads(message))
+        request: Message = Message.fromBytes(message)
         
         if request.method == DataServerApi.isLocalNeuronClient.value:
             ''' local neuron client sends this request to server so the server identifies the client as its local client after auth '''
@@ -222,7 +220,7 @@ class DataServer:
             try:
                 if request.data is None:
                     return DataServerApi.statusFail.createResponse('No timestamp data provided', request.id)
-                timestamp = pd.read_json(StringIO(request.data), orient='split')['ts'].iloc[0]
+                timestamp = request.data['ts'].iloc[0]
                 df = self.dataManager.getLastRecordBeforeTimestamp(
                     request.uuid, timestamp
                 )
@@ -239,14 +237,16 @@ class DataServer:
             try:
                 if request.data is None:
                     return DataServerApi.statusFail.createResponse('No data provided', request.id)
-                data = pd.read_json(StringIO(request.data))
                 if request.isSubscription: 
-                    self.dataManager.db._addSubDataToDatabase(request.uuid, data)
-                    # TODO: use the data generated from adding to database (contains hash)
-                    # data = self.dataManager.db._addSubDataToDatabase(request.uuid, data)
-                    # request.data = data.to_json(orient='split')
-                    # TODO: LATER investigate more efficient ways to send dataframes over the wire
-                    await self.updateSubscribers(request)
+                    dataForSubscribers = self.dataManager.db._addSubDataToDatabase(request.uuid, request.data)
+                    updatedMessage = Message({
+                                        'method': request.method,
+                                        'id': request.id,
+                                        'sub': request.sub,
+                                        'params': {'uuid': request.uuid},
+                                        'data': Message._serializeDataframe(dataForSubscribers)
+                                    })
+                    await self.updateSubscribers(updatedMessage)
                     return DataServerApi.statusSuccess.createResponse('Data added to server database', request.id)
                 if request.replace:
                     self.dataManager.db.deleteTable(request.uuid)
@@ -254,6 +254,7 @@ class DataServer:
                 self.dataManager.db._addDataframeToDatabase(request.uuid, data)
                 return DataServerApi.statusSuccess.createResponse('Data added to dataframe', request.id)
             except Exception as e:
+                # error(e)
                 return DataServerApi.statusFail.createResponse(e, request.id)
 
         elif request.method == DataServerApi.isStreamActive.value:
@@ -267,8 +268,7 @@ class DataServer:
             ''' request to remove data from the database '''
             try:
                 if request.data is not None:
-                    data = pd.read_json(StringIO(request.data), orient='split')
-                    timestamps = data['ts'].tolist()
+                    timestamps = request.data['ts'].tolist()
                     for ts in timestamps:
                         self.dataManager.db.editTable('delete', request.uuid, timestamp=ts)
                     return DataServerApi.statusSuccess.createResponse('Delete operation completed', request.id)

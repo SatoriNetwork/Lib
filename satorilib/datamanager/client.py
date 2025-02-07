@@ -59,13 +59,13 @@ class DataClient:
         ''' Handles receiving messages from an individual peer '''
         try:
             while True:
-                message = Message(json.loads(await peer.websocket.recv()))
+                message = Message.fromBytes(await peer.websocket.recv())
                 asyncio.create_task(self.handlePeerMessage(message, peer))  # Process async
-        except websockets.exceptions.ConnectionClosed:
-            self.disconnect(peer)
+        # except websockets.exceptions.ConnectionClosed:
+        #     self.disconnect(peer)
         except Exception as e:
             error(f"Unexpected error in listenToPeer: {e}")
-            self.disconnect(peer)
+            await self.disconnect(peer)
 
     async def handlePeerMessage(self, message: Message, peer: ConnectedPeer) -> None:
         ''' pass to server, modify owner's state, modify self state '''
@@ -149,7 +149,7 @@ class DataClient:
     async def disconnectAll(self):
         ''' Disconnect from all peers and stop the server '''
         for connectedPeer in self.peers.values():
-            self.disconnect(connectedPeer)
+            await self.disconnect(connectedPeer)
         info('Disconnected from all peers and stopped server')
 
     async def connect(self, peerAddr: Tuple[str, int]) -> Dict:
@@ -167,7 +167,7 @@ class DataClient:
         peerAddr = peerAddr or self.serverHostPort
         await self.connect(peerAddr)
         try:
-            await self.peers[peerAddr].websocket.send(request.to_json())
+            await self.peers[peerAddr].websocket.send(request.toBytes())
             if sendOnly:
                 return None
             response = await self.listenForResponse(request.id)

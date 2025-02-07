@@ -25,7 +25,7 @@ class EvrmoreWallet(Wallet):
         'electrum1-mainnet.evrmorecoin.org:50002',
         'electrum2-mainnet.evrmorecoin.org:50002',
         '1-electrum.satorinet.ie:50002', #WilQSL
-        'evr-electrum.wutup.io:50002', #Kasvot Växt
+        #'evr-electrum.wutup.io:50002', #Kasvot Växt
     ]
 
     electrumxServersWithoutSSL: list[str] = [

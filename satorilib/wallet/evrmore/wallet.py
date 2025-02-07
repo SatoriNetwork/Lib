@@ -42,14 +42,24 @@ class EvrmoreWallet(Wallet):
     def createElectrumxConnection(
         persistent: bool = False,
         hostPort: str = None,
-        hostPorts: list[str] = None
+        hostPorts: list[str] = None,
+        retry: int = 0,
     ) -> Electrumx:
-        hostPort = hostPort or random.choice(
-            hostPorts or EvrmoreWallet.electrumxServers)
-        return Electrumx(
-            persistent=persistent,
-            host=hostPort.split(':')[0],
-            port=int(hostPort.split(':')[1]))
+        hostports = hostPorts or EvrmoreWallet.electrumxServersWithoutSSL
+        hostPort = hostPort or random.choice(hostports)
+        try:
+            return Electrumx(
+                persistent=persistent,
+                host=hostPort.split(':')[0],
+                port=int(hostPort.split(':')[1]))
+        except Exception as e:
+            logging.error(e)
+            if retry < len(hostPorts):
+                return EvrmoreWallet.createElectrumxConnection(
+                    persistent=persistent,
+                    hostports=hostports,
+                    retry=retry+1)
+            raise e
 
     def __init__(
         self,

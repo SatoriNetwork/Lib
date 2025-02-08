@@ -35,8 +35,8 @@ class DataManager:
                 return pd.DataFrame()
             from_ts = pd.to_datetime(from_date)
             to_ts = pd.to_datetime(to_date)
-            df['ts'] = pd.to_datetime(df['ts'])
-            filtered_df = df[(df['ts'] >= from_ts) & (df['ts'] <= to_ts)]
+            df.index = pd.to_datetime(df.index)
+            filtered_df = df[(df.index >= from_ts) & (df.index <= to_ts)]
             return filtered_df if not filtered_df.empty else pd.DataFrame()
         except Exception as e:
             error(f"Error getting data for stream {uuid} in date range: {e}")
@@ -50,11 +50,11 @@ class DataManager:
             if df is None or df.empty:
                 return pd.DataFrame()
             ts = pd.to_datetime(timestamp)
-            df['ts'] = pd.to_datetime(df['ts'])
-            if not df.loc[df['ts'] == ts].empty:  # First check for exact match
-                return df.loc[df['ts'] == ts]
+            df.index = pd.to_datetime(df.index)
+            if not df.loc[df.index == ts].empty:  # First check for exact match
+                return df.loc[df.index == ts]
             before_ts = df.loc[
-                df['ts'] < ts
+                df.index < ts
             ]  # check for timestamp before specified timestamp
             return before_ts.iloc[[-1]] if not before_ts.empty else pd.DataFrame()
         except Exception as e:

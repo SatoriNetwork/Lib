@@ -234,17 +234,17 @@ class DataClient:
         ''' After confirming a stream is active, its send to its own server for adding it to its available streams '''
         return await self.send((self.serverHostPort), Message(DataServerApi.addActiveStream.createRequest(uuid)))
 
-    async def getStreamDataByRange(self, peerHost: str, uuid: str)  -> Message:
+    async def getStreamDataByRange(self, peerHost: str, uuid: str, fromDate: str, toDate: str)  -> Message:
         ''' request for data thats in a specific timestamp range  '''
-        return await self.send((peerHost, self.serverPort), Message(DataServerApi.getStreamDataByRange.createRequest(uuid)))
+        return await self.send((peerHost, self.serverPort), Message(DataServerApi.getStreamDataByRange.createRequest(uuid, fromDate=fromDate, toDate=toDate)))
 
-    async def getStreamObservationByTime(self, peerHost: str, uuid: str)  -> Message:
+    async def getStreamObservationByTime(self, peerHost: str, uuid: str, toDate: str)  -> Message:
         ''' request for row equal to or before a timestamp  '''
-        return await self.send((peerHost, self.serverPort), Message(DataServerApi.getStreamObservationByTime.createRequest(uuid)))
+        return await self.send((peerHost, self.serverPort), Message(DataServerApi.getStreamObservationByTime.createRequest(uuid, toDate=toDate)))
 
-    async def deleteStreamData(self, uuid: str)  -> Message:
+    async def deleteStreamData(self, uuid: str, data: pd.DataFrame)  -> Message:
         ''' request to delete data from its own server '''
-        return await self.send((self.serverHostPort), Message(DataServerApi.deleteStreamData.createRequest(uuid)))
+        return await self.send((self.serverHostPort), Message(DataServerApi.deleteStreamData.createRequest(uuid, data)))
 
     async def _addStreamToServer(self, subUuid: str, pubUuid: Union[str, None] = None) -> None:
         ''' Updates server's available streams with local client's subscriptions and predictions streams '''

@@ -201,7 +201,7 @@ class DataServer:
         elif request.method == DataServerApi.getStreamDataByRange.value:
             ''' fetches dataframe of a particulare date range '''
             try:
-                if not request.fromDate or not request.toDate:
+                if not isinstance(request.fromDate, str) or not isinstance(request.toDate, str):
                     return DataServerApi.statusFail.createResponse('Missing from_date or to_date parameter', request.id)
                 df = self.dataManager.getStreamDataByDateRange(
                     request.uuid, request.fromDate, request.toDate
@@ -217,11 +217,10 @@ class DataServer:
         elif request.method == DataServerApi.getStreamObservationByTime.value:
             ''' fetches a sinlge row as dataframe of the record before or equal to specified timestamp '''
             try:
-                if request.data is None:
+                if not isinstance(request.toDate, str):
                     return DataServerApi.statusFail.createResponse('No timestamp data provided', request.id)
-                timestamp = request.data['ts'].iloc[0]
                 df = self.dataManager.getLastRecordBeforeTimestamp(
-                    request.uuid, timestamp
+                    request.uuid, request.toDate
                 )
                 if df.empty:
                     return DataServerApi.statusFail.createResponse('No records found before timestamp for stream', request.id)
@@ -248,7 +247,7 @@ class DataServer:
                 if request.replace:
                     self.dataManager.db.deleteTable(request.uuid)
                     self.dataManager.db.createTable(request.uuid)
-                self.dataManager.db._addDataframeToDatabase(request.uuid, data)
+                self.dataManager.db._addDataframeToDatabase(request.uuid, request.data)
                 return DataServerApi.statusSuccess.createResponse('Data added to dataframe', request.id)
             except Exception as e:
                 # error(e)
@@ -265,7 +264,7 @@ class DataServer:
             ''' request to remove data from the database '''
             try:
                 if request.data is not None:
-                    timestamps = request.data['ts'].tolist()
+                    timestamps = request.data.index.tolist()
                     for ts in timestamps:
                         self.dataManager.db.editTable('delete', request.uuid, timestamp=ts)
                     return DataServerApi.statusSuccess.createResponse('Delete operation completed', request.id)

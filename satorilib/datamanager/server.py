@@ -239,8 +239,6 @@ class DataServer:
                 if request.isSubscription: 
                     dataForSubscribers = self.dataManager.db._addSubDataToDatabase(request.uuid, request.data)
                     updatedMessage = Message({
-                                        'method': request.method,
-                                        'id': request.id,
                                         'sub': request.sub,
                                         'params': {'uuid': request.uuid},
                                         'data': dataForSubscribers

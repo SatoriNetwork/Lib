@@ -7,7 +7,8 @@ from satorilib.datamanager.helper import Message, Peer, ConnectedPeer, Identity
 from satorilib.datamanager.manager import DataManager
 from satorilib.datamanager.api import DataServerApi
 
-
+# from satorilib.wallet.evrmore.identity import EvrmoreIdentity
+# identity = EvrmoreIdentity(walletPath='/Satori/Neuron/wallet/wallet.yaml')
 
 class DataServer:
     def __init__(
@@ -36,8 +37,9 @@ class DataServer:
     async def startServer(self):
         """ Start the WebSocket server """
         self.server = await websockets.serve(
-            self.handleConnection, self.host, self.port
-        )
+            self.handleConnection,
+            self.host,
+            self.port)
 
     async def handleConnection(self, websocket: websockets.WebSocketServerProtocol):
         """ handle incoming connections and messages """

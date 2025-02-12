@@ -6,13 +6,17 @@ import queue
 import pandas as pd
 from typing import Dict, Any, Union, Tuple, Set
 from satorilib.logging import INFO, setup, debug, info, warning, error
+from satorilib.datamanager.helper import Identity
 from satorilib.datamanager.helper import Message, ConnectedPeer, Subscription
 from satorilib.datamanager.api import DataServerApi
 
+
+
 class DataClient:
 
-    def __init__(self, serverHost: str):
+    def __init__(self, serverHost: str, identity: Identity = None):
         self.serverPort = 24602
+        self.identity = identity
         self.serverHostPort: Tuple[str, int] = serverHost, self.serverPort
         self.peers: Dict[Tuple[str, int], ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
@@ -21,10 +25,10 @@ class DataClient:
         self.running = False
 
     def isConnected(
-        self, 
-        host: Union[str, None] = None, 
+        self,
+        host: Union[str, None] = None,
         port: Union[int, None] = None
-    )-> bool: 
+    )-> bool:
         host = host or self.serverHostPort[0]
         port = port or self.serverPort
         peer = self.peers.get((host, port))
@@ -54,7 +58,7 @@ class DataClient:
         except Exception as e:
             # error(f'Failed to connect to peer at {uri}: {e}')
             pass
-    
+
     async def listenToPeer(self, peer: ConnectedPeer):
         ''' Handles receiving messages from an individual peer '''
         try:
@@ -78,13 +82,13 @@ class DataClient:
             response = await self.insertStreamData(
                 uuid=message.uuid,
                 data=message.data,
-                isSub=True 
+                isSub=True
             )
             if response.status != DataServerApi.statusSuccess:
                 raise Exception(response.senderMsg)
         except Exception as e:
             error('Unable to set data in server: ', e)
-        
+
     async def handleMessageForOwner(self, message: Message, peer: ConnectedPeer) -> None:
         ''' update state for the calling client '''
         if message.isSubscription:
@@ -99,7 +103,7 @@ class DataClient:
             await subscription(message)
         elif message.isResponse:
             self.responses[message.id] = message
-    
+
     async def handleMessageForSelf(self, message: Message) -> None:
         ''' modify self state '''
         if message.status == 'inactive':
@@ -185,23 +189,42 @@ class DataClient:
         ''' sends a subscription request to external source to recieve subscription updates '''
         if publicationUuid is not None:
             self.publications[uuid] = publicationUuid
-        self._addStreamToServer(uuid, publicationUuid) 
+        self._addStreamToServer(uuid, publicationUuid)
         subscription = Subscription(uuid, callback)
         self.subscriptions[subscription] = queue.Queue()
         return await self.send((peerHost, self.serverPort), Message(DataServerApi.subscribe.createRequest(uuid))) # should we set isSub as True?
-    
+
     async def insertStreamData(self, uuid: str, data: pd.DataFrame, replace: bool = False, isSub: bool = False) -> Message:
         ''' sends the observation/prediction data to the server '''
         return await self.send((self.serverHostPort), Message(DataServerApi.insertStreamData.createRequest(uuid, data, replace, isSub=isSub)))
 
-    async def authenticate(self, authDict) -> Message:
+    async def authenticate1(self, auth: dict[str, str]) -> Message:
         ''' client initiates the auth process
             auth = {
             'client_pubkey': xxxx,
             'client_challenge': x2x3,
-            }  
+            }
         '''
-        return await self.send((self.serverHostPort), Message(DataServerApi.initAuthenticate.createRequest(auth=authDict)))
+        return await self.send((self.serverHostPort), Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
+
+    async def authenticate2(self, response: dict[str, str]) -> Message:
+        ''' client initiates the auth process
+            auth = {
+                'client_pubkey': xxxx,
+                'client_signature': x2x3,
+            }
+        '''
+        verified = self.idenity.verify(
+            msg=response.get('server_challange', ''),
+            sig=response.get('server_signature', ''),
+            pubkey=response.get('server_pubkey', None),
+            address=response.get('server_address', None))
+        if verified:
+            auth = {
+                'client_pubkey': self.identity.pubkey,
+                'client_address': self.identity.address,
+                'client_signature': self.identity.sign(response.get('server_challenge', ''))}
+        return await self.send((self.serverHostPort), Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
 
     async def isLocalNeuronClient(self) -> Message:
         ''' neuron client tells the server that it is its own neuron client ( authentication done on the client side ) '''
@@ -266,4 +289,3 @@ class DataClient:
                 await self.addActiveStream(uuid=pubUuid)
             except Exception as e:
                 error("Unable to send request to server : ", e)
-

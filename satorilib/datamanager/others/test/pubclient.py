@@ -3,9 +3,6 @@ from satorilib.datamanager.client import DataClient
 from satorilib.datamanager import Message
 import asyncio
 import pandas as pd
-from io import StringIO
-import time
-import pyarrow as pa
 
 # TODO :
 # Test for endpoints

@@ -156,6 +156,7 @@ class Message:
                 'uuid': self.uuid,
             },
             'data': self.data,
+            'authentication': self.auth,
             'stream_info': self.streamInfo
         }
         return {
@@ -170,6 +171,7 @@ class Message:
                 'to_ts': self.toDate,
             },
             'data': self.data,
+            'authentication': self.auth,
             'stream_info': self.streamInfo
         }
 
@@ -233,6 +235,11 @@ class Message:
             return table.to_pandas()
         except Exception as e:
             raise ValueError(f"Failed to deserialize DataFrame: {str(e)}")
+
+    @property
+    def auth(self) -> str:
+        """Get the method"""
+        return self.message.get('authentication')
 
     @property
     def method(self) -> str:

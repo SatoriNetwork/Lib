@@ -9,6 +9,28 @@ async def serverStartUp():
     await dataServer.startServer()
     await asyncio.sleep(1)
 
+async def authenticate():
+    await serverStartUp()
+    
+    dataClient = DataClient('0.0.0.0')
+    auth = {
+          'client_pubkey': '123awd',
+          'client_challenge': '523adsd'
+    }
+    response: Message = await dataClient.authenticate(authDict=auth)
+    if response.status == DataServerApi.statusSuccess.value:
+          authDict = response.auth
+          print(authDict['server_challenge'])
+          print(authDict['server_pubkey'])
+          print(authDict['server_signature'])
+          # TODO : sign the server_challenge and return back to the server
+          replyFromClient = {
+                'client_server_signature': 'Lolol'
+          }
+          response: Message = await dataClient.authenticate(authDict=replyFromClient)
+          if response.status == DataServerApi.statusSuccess.value:
+                print(response.senderMsg)
+
 async def checkIfLocalNeuronAuthenticated():
     await serverStartUp()
     
@@ -165,5 +187,5 @@ async def checkToSubscribe():
         if response.status == DataServerApi.statusSuccess.value:
             print(response.senderMsg)
 
-asyncio.run(checkIfLocalNeuronAuthenticated())
+asyncio.run(authenticate())
 

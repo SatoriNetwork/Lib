@@ -113,6 +113,26 @@ class DataServer:
 
         request: Message = Message.fromBytes(message)
         
+        if request.method == DataServerApi.initAuthenticate.value:
+            ''' a client sends a request to start the authenticatication process'''
+            if request.auth is None:
+                return DataServerApi.statusFail.createResponse('Authentication info not present', request.id)
+            elif request.auth.get('client_server_signature', None) is not None:
+                debug('client-server challenge : ', request.auth.get('client_server_signature'), color='cyan')
+                # TODO : we now have the client_server_signature
+                return DataServerApi.statusSuccess.createResponse('Successfully authenticated with the server', request.id)
+            else:
+                debug('client pubkey : ', request.auth.get('client_pubkey', None), color='cyan')
+                debug('client challenge : ', request.auth.get('client_challenge', None), color='cyan')
+                # TODO: sign the challenge with the server prvt key
+                # TODO: fetch the needed details
+                authDict = {
+                    'server_pubkey': 123,
+                    'server_challenge': 123,
+                    'server_signature': 123,
+                }
+                return DataServerApi.statusSuccess.createResponse('Signed the challenge, return the signed server challenge', request.id, auth=authDict)
+        
         if request.method == DataServerApi.isLocalNeuronClient.value:
             ''' local neuron client sends this request to server so the server identifies the client as its local client after auth '''
             # local - TODO: add authentication

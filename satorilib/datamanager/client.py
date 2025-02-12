@@ -194,6 +194,15 @@ class DataClient:
         ''' sends the observation/prediction data to the server '''
         return await self.send((self.serverHostPort), Message(DataServerApi.insertStreamData.createRequest(uuid, data, replace, isSub=isSub)))
 
+    async def authenticate(self, authDict) -> Message:
+        ''' client initiates the auth process
+            auth = {
+            'client_pubkey': xxxx,
+            'client_challenge': x2x3,
+            }  
+        '''
+        return await self.send((self.serverHostPort), Message(DataServerApi.initAuthenticate.createRequest(auth=authDict)))
+
     async def isLocalNeuronClient(self) -> Message:
         ''' neuron client tells the server that it is its own neuron client ( authentication done on the client side ) '''
         return await self.send((self.serverHostPort), Message(DataServerApi.isLocalNeuronClient.createRequest()))

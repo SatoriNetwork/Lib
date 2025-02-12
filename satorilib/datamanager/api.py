@@ -11,6 +11,7 @@ class DataClientApi(Enum):
     
 class DataServerApi(Enum):
     '''the endpoint that data clients (local/remote) hit on the data server'''
+    initAuthenticate = 'client/initiate/auth'
     isLocalNeuronClient = 'client/neuron'
     isLocalEngineClient = 'client/engine'
     setPubsubMap = 'pubsub/set'
@@ -61,6 +62,7 @@ class DataServerApi(Enum):
         fromDate: Union[str, None] = None,
         toDate: Union[str, None] = None,
         isSub: bool = False,
+        auth: Union[dict, None] = None,
     ) -> dict:
         return {
                 'method': self.value,
@@ -73,6 +75,7 @@ class DataServerApi(Enum):
                     'to_ts': toDate,
                 },
                 'data': data,
+                'authentication': auth,
             }
 
     def createResponse(
@@ -81,7 +84,8 @@ class DataServerApi(Enum):
         id: int,
         # uuid: Union[str, dict, list, None] = None,
         data: Union[pd.DataFrame, None] = None,
-        streamInfo: Union[dict, list, None] = None
+        streamInfo: Union[dict, list, None] = None,
+        auth: Union[dict, None] = None,
         # isSub: bool = False,
     ) -> dict:
         return {
@@ -92,6 +96,7 @@ class DataServerApi(Enum):
                 #     'uuid': uuid,
                 # },
                 'data': data,
+                'authentication': auth,
                 'stream_info': streamInfo
             }
     

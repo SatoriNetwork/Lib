@@ -198,7 +198,7 @@ class DataClient:
         ''' sends the observation/prediction data to the server '''
         return await self.send((self.serverHostPort), Message(DataServerApi.insertStreamData.createRequest(uuid, data, replace, isSub=isSub)))
 
-    async def authenticate1(self, auth: dict[str, str]) -> Message:
+    async def authenticateStart(self, auth: dict[str, str]) -> Message:
         ''' client initiates the auth process
             auth = {
             'client_pubkey': xxxx,
@@ -207,7 +207,7 @@ class DataClient:
         '''
         return await self.send((self.serverHostPort), Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
 
-    async def authenticate2(self, response: dict[str, str]) -> Message:
+    async def authenticateEnd(self, response: dict[str, str]) -> Message:
         ''' client initiates the auth process
             auth = {
                 'client_pubkey': xxxx,
@@ -224,6 +224,8 @@ class DataClient:
                 'client_pubkey': self.identity.pubkey,
                 'client_address': self.identity.address,
                 'client_signature': self.identity.sign(response.get('server_challenge', ''))}
+            return await self.send((self.serverHostPort), Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
+        # if failed to prove it's identity just disconnect from server
         return await self.send((self.serverHostPort), Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
 
     async def isLocalNeuronClient(self) -> Message:

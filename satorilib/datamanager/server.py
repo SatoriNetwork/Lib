@@ -137,12 +137,11 @@ class DataServer:
                 debug('client challenge : ', request.auth.get('client_challenge', None), color='cyan')
                 # TODO: sign the challenge with the server prvt key
                 # TODO: fetch the needed details
-                authDict = {
+                auth = {
                     'server_pubkey': self.identity.pubkey,
                     'server_challenge': self.identity.challenge(),
-                    'server_signature': self.identity.sign(msg=request.auth.get('client_challenge', '')),
-                }
-                return DataServerApi.statusSuccess.createResponse('Signed the challenge, return the signed server challenge', request.id, auth=authDict)
+                    'server_signature': self.identity.sign(msg=request.auth.get('client_challenge', ''))}
+                return DataServerApi.statusSuccess.createResponse('Signed the challenge, return the signed server challenge', request.id, auth=auth)
 
         if request.method == DataServerApi.isLocalNeuronClient.value:
             ''' local neuron client sends this request to server so the server identifies the client as its local client after auth '''

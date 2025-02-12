@@ -3,9 +3,9 @@ import pandas as pd
 from typing import Any, Union
 from io import StringIO
 from satorilib.logging import INFO, setup, debug, info, warning, error
-from satorilib.datamanager.helper import Message, Peer, ConnectedPeer
-from satorilib.datamanager.manager import DataManager  
-from satorilib.datamanager.api import DataServerApi 
+from satorilib.datamanager.helper import Message, Peer, ConnectedPeer, Identity
+from satorilib.datamanager.manager import DataManager
+from satorilib.datamanager.api import DataServerApi
 
 
 
@@ -14,12 +14,14 @@ class DataServer:
         self,
         host: str,
         port: int = 24602,
+        identity: Identity = None,
     ):
         self.host = host
         self.port = port
-        self.server = None 
+        self.server = None
         self.connectedClients: dict[Peer, ConnectedPeer] = {}
-        self.dataManager: DataManager = DataManager() 
+        self.dataManager: DataManager = DataManager()
+        self.identity = identity
 
     @property
     def localClients(self) -> dict[Peer, ConnectedPeer]:
@@ -112,7 +114,7 @@ class DataServer:
             return convertedData
 
         request: Message = Message.fromBytes(message)
-        
+
         if request.method == DataServerApi.initAuthenticate.value:
             ''' a client sends a request to start the authenticatication process'''
             if request.auth is None:
@@ -120,19 +122,26 @@ class DataServer:
             elif request.auth.get('client_server_signature', None) is not None:
                 debug('client-server challenge : ', request.auth.get('client_server_signature'), color='cyan')
                 # TODO : we now have the client_server_signature
-                return DataServerApi.statusSuccess.createResponse('Successfully authenticated with the server', request.id)
+                verified = self.identity.verify(
+                    msg=self.identity.challenges.get(request.auth.get('client_pubkey', None)),
+                    sig=request.auth.get('client_server_signature'),
+                    pubkey=request.auth.get('client_pubkey', None),
+                    address=request.auth.get('client_address', None))
+                if verified:
+                    return DataServerApi.statusSuccess.createResponse('Successfully authenticated with the server', request.id)
+                return DataServerApi.statusSuccess.createResponse('Failed to authenticated with the server', request.id)
             else:
                 debug('client pubkey : ', request.auth.get('client_pubkey', None), color='cyan')
                 debug('client challenge : ', request.auth.get('client_challenge', None), color='cyan')
                 # TODO: sign the challenge with the server prvt key
                 # TODO: fetch the needed details
                 authDict = {
-                    'server_pubkey': 123,
-                    'server_challenge': 123,
-                    'server_signature': 123,
+                    'server_pubkey': self.identity.pubkey,
+                    'server_challenge': self.identity.challenge(),
+                    'server_signature': self.identity.sign(msg=request.auth.get('client_challenge', '')),
                 }
                 return DataServerApi.statusSuccess.createResponse('Signed the challenge, return the signed server challenge', request.id, auth=authDict)
-        
+
         if request.method == DataServerApi.isLocalNeuronClient.value:
             ''' local neuron client sends this request to server so the server identifies the client as its local client after auth '''
             # local - TODO: add authentication
@@ -162,7 +171,7 @@ class DataServer:
                 return DataServerApi.statusSuccess.createResponse('Subscription stream available to subscribe to', request.id)
             else:
                 return DataServerApi.statusFail.createResponse('Subscription not available', request.id)
-        
+
         elif request.method == DataServerApi.streamInactive.value:
             ''' local client tells the server is not active anymore '''
             publication_uuid = self.dataManager.pubSubMapping.get(request.uuid, {}).get('publicationUuid')
@@ -255,7 +264,7 @@ class DataServer:
             try:
                 if request.data is None:
                     return DataServerApi.statusFail.createResponse('No data provided', request.id)
-                if request.isSubscription: 
+                if request.isSubscription:
                     dataForSubscribers = self.dataManager.db._addSubDataToDatabase(request.uuid, request.data)
                     updatedMessage = Message({
                                         'sub': request.sub,
@@ -295,8 +304,3 @@ class DataServer:
                 return DataServerApi.statusFail.createResponse(f'Error deleting data: {str(e)}', request.id)
 
         return DataServerApi.unknown.createResponse("Unknown request", request.id)
-
-
-
-
-

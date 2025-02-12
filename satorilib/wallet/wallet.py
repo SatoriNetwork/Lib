@@ -120,9 +120,11 @@ class WalletBase():
 
     @staticmethod
     def generateEntropy() -> bytes:
+        import secrets
         # return m.to_entropy(m.generate())
         # return b64encode(x.to_seed(x.generate(strength=128))).decode('utf-8')
-        return os.urandom(32)
+        # return os.urandom(32)
+        return secrets.token_bytes(32)
 
     def _generateWords(self):
         return mnemonic.Mnemonic('english').to_mnemonic(self._entropy or b'')

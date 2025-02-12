@@ -61,6 +61,7 @@ class EvrmoreWallet(Wallet):
         watchAssets: list[str] = None,
         skipSave: bool = False,
         pullFullTransactions: bool = True,
+        noElectrumx: bool = False,
     ):
         super().__init__(
             walletPath,
@@ -70,7 +71,9 @@ class EvrmoreWallet(Wallet):
             watchAssets=watchAssets,
             skipSave=skipSave,
             pullFullTransactions=pullFullTransactions)
-        self.electrumx = electrumx or EvrmoreWallet.createElectrumxConnection()
+        self.electrumx = electrumx or (
+            None if noElectrumx else
+            EvrmoreWallet.createElectrumxConnection())
         self.type = type
 
     @property

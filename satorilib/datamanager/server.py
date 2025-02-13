@@ -130,6 +130,8 @@ class DataServer:
                     pubkey=request.auth.get('client_pubkey', None),
                     address=request.auth.get('client_address', None))
                 if verified:
+                    self.connectedClients[peerAddr].pubkey = request.auth.get('client_pubkey', None)
+                    self.connectedClients[peerAddr].address = request.auth.get('client_address', None)
                     return DataServerApi.statusSuccess.createResponse('Successfully authenticated with the server', request.id)
                 return DataServerApi.statusSuccess.createResponse('Failed to authenticated with the server', request.id)
             else:

@@ -51,22 +51,22 @@ class Peer:
     def __init__(self, ip: str, port: int) -> None:
         self.ip = ip
         self.port = port
-    
+
     def __eq__(self, value: 'Peer') -> bool:
         return self.ip == value.ip and self.port == value.port
 
     def __str__(self) -> str:
         return str(self.asTuple)
-    
+
     def __hash__(self) -> int:
         return hash((self.ip, self.port))
 
     def __repr__(self) -> str:
-        return self.ip, self.port
+        return str(self.asTuple)
 
     @property
     def asTuple(self) -> tuple[str, int]:
-        return self.__repr__()
+        return self.ip, self.port
 
 
 class ConnectedPeer:
@@ -79,6 +79,8 @@ class ConnectedPeer:
         publications: Union[set[str], None] = None, # the streams that this client publishes (to my server)
         isNeuron: bool = False,
         isEngine: bool = False,
+        address: bool = False,
+        pubkey: bool = False,
     ):
         self.hostPort = hostPort
         self.websocket = websocket
@@ -87,6 +89,8 @@ class ConnectedPeer:
         self.isNeuron = isNeuron
         self.isEngine = isEngine
         self.listener = None
+        self.address = None
+        self.pubkey = None
         self.stop = asyncio.Event()
 
     @property
@@ -100,15 +104,15 @@ class ConnectedPeer:
     @property
     def isClient(self):
         return self.hostPort[1] != 24602
-    
+
     @property
     def isServer(self):
         return not self.isClient
-    
+
     @property
     def isLocal(self) -> bool:
         return self.isEngine or self.isNeuron
-    
+
     def add_subscription(self, uuid: str):
         self.subscriptions.add(uuid)
 
@@ -132,7 +136,7 @@ class ConnectedPeer:
         existed = uuid in self.publications
         self.publications.discard(uuid)
         return existed
-        
+
 
 class Message:
 
@@ -148,17 +152,17 @@ class Message:
         """
         if isResponse:
             return {
-            'status': self.status,
-            'message': self.senderMsg,
-            'id': self.id,
-            # 'sub': self.sub,
-            'params': {
-                'uuid': self.uuid,
-            },
-            'data': self.data,
-            'authentication': self.auth,
-            'stream_info': self.streamInfo
-        }
+                'status': self.status,
+                'message': self.senderMsg,
+                'id': self.id,
+                # 'sub': self.sub,
+                'params': {
+                    'uuid': self.uuid,
+                },
+                'data': self.data,
+                'authentication': self.auth,
+                'stream_info': self.streamInfo
+            }
         return {
             'method': self.method,
             'id': self.id,
@@ -177,7 +181,7 @@ class Message:
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict())
-    
+
     def toBytes(self, response: bool = False) -> bytes:
         """Convert Message to PyArrow bytes for sending over websocket"""
         message_dict = self.to_dict(response)
@@ -190,7 +194,7 @@ class Message:
         with pa.ipc.new_stream(sink, table.schema) as writer:
             writer.write(table)
         return sink.getvalue().to_pybytes()
-    
+
     @classmethod
     def fromBytes(cls, byte_data: bytes) -> 'Message':
         """Create Message from PyArrow bytes received from websocket"""
@@ -198,7 +202,7 @@ class Message:
         table = reader.read_all()
         message_dict = {}
         for k, v in table.to_pydict().items():
-            value = v[0]  
+            value = v[0]
             if k == 'data' and isinstance(value, bytes):
                 try:
                     message_dict[k] = cls._deserializeDataframe(value)
@@ -209,7 +213,7 @@ class Message:
             else:
                 message_dict[k] = value
         return cls(message_dict)
-    
+
     @staticmethod
     def _serializeDataframe(df: pd.DataFrame) -> Union[bytes, None]:
         """Serialize DataFrame using PyArrow IPC with proper error handling"""
@@ -255,7 +259,7 @@ class Message:
     def senderMsg(self) -> str:
         """Get the method"""
         return self.message.get('message')
-    
+
     @property
     def id(self) -> str:
         """Get the id UUID"""
@@ -265,7 +269,7 @@ class Message:
     def status(self) -> str:
         """Get the status"""
         return self.message.get('status')
-    
+
     @property
     def statusMsg(self) -> str:
         """Get the status"""
@@ -315,14 +319,13 @@ class Message:
     def is_success(self) -> bool:
         """Get the status"""
         return self.status == 'success'
-    
+
     @property
     def isSubscription(self) -> bool:
         """ server will indicate with True or False """
         return self.sub
-        
+
     @property
     def isResponse(self) -> bool:
         """ server will indicate with True or False """
         return not self.isSubscription
-    

@@ -224,6 +224,8 @@ class DataClient:
                 'client_pubkey': self.identity.pubkey,
                 'client_address': self.identity.address,
                 'client_signature': self.identity.sign(response.get('server_challenge', ''))}
+            # peer = self.peers.get((host, port)).pubkey = response.get('client_pubkey', None)
+            # peer = self.peers.get((host, port)).address = response.get('client_address', None)
             return await self.send((self.serverHostPort), Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
         # if failed to prove it's identity just disconnect from server
         return await self.send((self.serverHostPort), Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))

@@ -25,7 +25,7 @@ class EvrmoreWallet(Wallet):
         'electrum1-mainnet.evrmorecoin.org:50002',
         'electrum2-mainnet.evrmorecoin.org:50002',
         '1-electrum.satorinet.ie:50002', #WilQSL
-        'evr-electrum.wutup.io:50002', #Kasvot Växt
+        #'evr-electrum.wutup.io:50002', #Kasvot Växt
     ]
 
     electrumxServersWithoutSSL: list[str] = [
@@ -42,14 +42,24 @@ class EvrmoreWallet(Wallet):
     def createElectrumxConnection(
         persistent: bool = False,
         hostPort: str = None,
-        hostPorts: list[str] = None
+        hostPorts: list[str] = None,
+        retry: int = 0,
     ) -> Electrumx:
-        hostPort = hostPort or random.choice(
-            hostPorts or EvrmoreWallet.electrumxServers)
-        return Electrumx(
-            persistent=persistent,
-            host=hostPort.split(':')[0],
-            port=int(hostPort.split(':')[1]))
+        hostports = hostPorts or EvrmoreWallet.electrumxServersWithoutSSL
+        hostPort = hostPort or random.choice(hostports)
+        try:
+            return Electrumx(
+                persistent=persistent,
+                host=hostPort.split(':')[0],
+                port=int(hostPort.split(':')[1]))
+        except Exception as e:
+            logging.error(e)
+            if retry < len(hostPorts):
+                return EvrmoreWallet.createElectrumxConnection(
+                    persistent=persistent,
+                    hostports=hostports,
+                    retry=retry+1)
+            raise e
 
     def __init__(
         self,
@@ -62,6 +72,7 @@ class EvrmoreWallet(Wallet):
         watchAssets: list[str] = None,
         skipSave: bool = False,
         pullFullTransactions: bool = True,
+        hostPort: str = None,
     ):
         super().__init__(
             walletPath,
@@ -71,7 +82,9 @@ class EvrmoreWallet(Wallet):
             watchAssets=watchAssets,
             skipSave=skipSave,
             pullFullTransactions=pullFullTransactions)
-        self.electrumx = electrumx or EvrmoreWallet.createElectrumxConnection()
+        self.electrumx = (
+            electrumx or
+            EvrmoreWallet.createElectrumxConnection(hostPort=hostPort))
         self.type = type
 
     @property

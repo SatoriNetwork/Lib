@@ -208,12 +208,7 @@ class DataClient:
         '''
         # todo: when we create a challenge for the server we index it by their pubkey.
         #       when we generate the challenge on clients end, index by hostport instead.
-        return await self.send((self.serverHostPort), Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
-
-    async def authenticateEnd(self, response: dict[str, str]) -> Message:
-        ''' client initiates the auth process
-
-        '''
+        response = await self.send((self.serverHostPort), Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
         verified = self.idenity.verify(
             msg=self.identity.challenges.get(<self.peers.hostport OR self.serverHostPort if local>, ''),
             sig=response.get('server_signature', b''),

@@ -201,22 +201,22 @@ class DataClient:
     async def authenticateStart(self, auth: dict[str, str]) -> Message:
         ''' client initiates the auth process
             auth = {
-            'client_pubkey': xxxx,
-            'client_challenge': x2x3,
+                'client_pubkey': xxxx,
+                'client_address': xxxx,
+                'client_challenge': x2x3,
             }
         '''
+        # todo: when we create a challenge for the server we index it by their pubkey.
+        #       when we generate the challenge on clients end, index by hostport instead.
         return await self.send((self.serverHostPort), Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
 
     async def authenticateEnd(self, response: dict[str, str]) -> Message:
         ''' client initiates the auth process
-            auth = {
-                'client_pubkey': xxxx,
-                'client_signature': x2x3,
-            }
+
         '''
         verified = self.idenity.verify(
-            msg=response.get('server_challange', ''),
-            sig=response.get('server_signature', ''),
+            msg=self.identity.challenges.get(<self.peers.hostport OR self.serverHostPort if local>, ''),
+            sig=response.get('server_signature', b''),
             pubkey=response.get('server_pubkey', None),
             address=response.get('server_address', None))
         if verified:
@@ -224,8 +224,8 @@ class DataClient:
                 'client_pubkey': self.identity.pubkey,
                 'client_address': self.identity.address,
                 'client_signature': self.identity.sign(response.get('server_challenge', ''))}
-            # peer = self.peers.get((host, port)).pubkey = response.get('client_pubkey', None)
-            # peer = self.peers.get((host, port)).address = response.get('client_address', None)
+            self.peers.get((<self.peers.hostport OR self.serverHostPort if local>)).pubkey = response.get('server_pubkey', None)
+            self.peers.get((<self.peers.hostport OR self.serverHostPort if local>)).address = response.get('server_address', None)
             return await self.send((self.serverHostPort), Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
         # if failed to prove it's identity just disconnect from server
         return await self.send((self.serverHostPort), Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))

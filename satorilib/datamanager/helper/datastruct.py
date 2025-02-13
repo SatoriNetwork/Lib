@@ -79,8 +79,8 @@ class ConnectedPeer:
         publications: Union[set[str], None] = None, # the streams that this client publishes (to my server)
         isNeuron: bool = False,
         isEngine: bool = False,
-        address: bool = False,
-        pubkey: bool = False,
+        pubkey: str = False,
+        address: str = False,
     ):
         self.hostPort = hostPort
         self.websocket = websocket
@@ -89,8 +89,8 @@ class ConnectedPeer:
         self.isNeuron = isNeuron
         self.isEngine = isEngine
         self.listener = None
-        self.address = None
         self.pubkey = None
+        self.address = None
         self.stop = asyncio.Event()
 
     @property

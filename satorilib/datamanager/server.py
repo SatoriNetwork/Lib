@@ -121,12 +121,12 @@ class DataServer:
             ''' a client sends a request to start the authenticatication process'''
             if request.auth is None:
                 return DataServerApi.statusFail.createResponse('Authentication info not present', request.id)
-            elif request.auth.get('client_server_signature', None) is not None:
-                debug('client-server challenge : ', request.auth.get('client_server_signature'), color='cyan')
-                # TODO : we now have the client_server_signature
+            elif request.auth.get('client_signature', None) is not None:
+                debug('client-server challenge : ', request.auth.get('client_signature'), color='cyan')
+                # TODO : we now have the client_signature
                 verified = self.identity.verify(
                     msg=self.identity.challenges.get(request.auth.get('client_pubkey', None)),
-                    sig=request.auth.get('client_server_signature'),
+                    sig=request.auth.get('client_signature', b''),
                     pubkey=request.auth.get('client_pubkey', None),
                     address=request.auth.get('client_address', None))
                 if verified:
@@ -141,7 +141,8 @@ class DataServer:
                 # TODO: fetch the needed details
                 auth = {
                     'server_pubkey': self.identity.pubkey,
-                    'server_challenge': self.identity.challenge(),
+                    'server_address': self.identity.address,
+                    'server_challenge': self.identity.challenge(request.auth.get('client_pubkey', None)),
                     'server_signature': self.identity.sign(msg=request.auth.get('client_challenge', ''))}
                 return DataServerApi.statusSuccess.createResponse('Signed the challenge, return the signed server challenge', request.id, auth=auth)
 

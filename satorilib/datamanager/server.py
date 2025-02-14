@@ -122,8 +122,8 @@ class DataServer:
             if request.auth is None:
                 return DataServerApi.statusFail.createResponse('Authentication info not present', request.id)
             elif request.auth.get('client_signature', None) is not None:
+                # 2nd part of Auth
                 debug('client-server challenge : ', request.auth.get('client_signature'), color='cyan')
-                # TODO : we now have the client_signature
                 verified = self.identity.verify(
                     msg=self.identity.challenges.get(request.auth.get('client_pubkey', None)),
                     sig=request.auth.get('client_signature', b''),
@@ -135,10 +135,10 @@ class DataServer:
                     return DataServerApi.statusSuccess.createResponse('Successfully authenticated with the server', request.id)
                 return DataServerApi.statusSuccess.createResponse('Failed to authenticated with the server', request.id)
             else:
+                # 1st part of Auth
                 debug('client pubkey : ', request.auth.get('client_pubkey', None), color='cyan')
+                debug('client address : ', request.auth.get('client_address', None), color='cyan')
                 debug('client challenge : ', request.auth.get('client_challenge', None), color='cyan')
-                # TODO: sign the challenge with the server prvt key
-                # TODO: fetch the needed details
                 auth = {
                     'server_pubkey': self.identity.pubkey,
                     'server_address': self.identity.address,

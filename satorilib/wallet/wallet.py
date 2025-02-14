@@ -261,12 +261,13 @@ class Wallet(WalletBase):
 
     @property
     def account(self) -> 'eth_account.Account':
-        try:
-            from satorilib.wallet.ethereum.wallet import EthereumWallet
-            return EthereumWallet.generateAccount(self._entropy)
-        except Exception as e:
-            logging.error(e)
-            return None
+        if self.isDecrypted:
+            try:
+                from satorilib.wallet.ethereum.wallet import EthereumWallet
+                return EthereumWallet.generateAccount(self._entropy)
+            except Exception as e:
+                logging.error('error with eth account:', e)
+        return None
 
     @property
     def ethAddress(self) -> str:

@@ -121,29 +121,27 @@ class DataServer:
             ''' a client sends a request to start the authenticatication process'''
             if request.auth is None:
                 return DataServerApi.statusFail.createResponse('Authentication info not present', request.id)
-            elif request.auth.get('client_signature', None) is not None:
+            elif request.auth.get('signature', None) is not None:
                 # 2nd part of Auth
-                debug('client-server challenge : ', request.auth.get('client_signature'), color='cyan')
+                debug('client-server challenge : ', request.auth.get('signature'), color='cyan')
                 verified = self.identity.verify(
-                    msg=self.identity.challenges.get(request.auth.get('client_pubkey', None)),
-                    sig=request.auth.get('client_signature', b''),
-                    pubkey=request.auth.get('client_pubkey', None),
-                    address=request.auth.get('client_address', None))
+                    msg=self.identity.challenges.get(request.auth.get('pubkey', None)),
+                    sig=request.auth.get('signature', b''),
+                    pubkey=request.auth.get('pubkey', None),
+                    address=request.auth.get('address', None))
                 if verified:
-                    self.connectedClients[peerAddr].pubkey = request.auth.get('client_pubkey', None)
-                    self.connectedClients[peerAddr].address = request.auth.get('client_address', None)
+                    self.connectedClients[peerAddr].pubkey = request.auth.get('pubkey', None)
+                    self.connectedClients[peerAddr].address = request.auth.get('address', None)
                     return DataServerApi.statusSuccess.createResponse('Successfully authenticated with the server', request.id)
                 return DataServerApi.statusSuccess.createResponse('Failed to authenticated with the server', request.id)
             else:
                 # 1st part of Auth
-                debug('client pubkey : ', request.auth.get('client_pubkey', None), color='cyan')
-                debug('client address : ', request.auth.get('client_address', None), color='cyan')
-                debug('client challenge : ', request.auth.get('client_challenge', None), color='cyan')
-                auth = {
-                    'server_pubkey': self.identity.pubkey,
-                    'server_address': self.identity.address,
-                    'server_challenge': self.identity.challenge(request.auth.get('client_pubkey', None)),
-                    'server_signature': self.identity.sign(msg=request.auth.get('client_challenge', ''))}
+                debug('client pubkey : ', request.auth.get('pubkey', None), color='cyan')
+                debug('client address : ', request.auth.get('address', None), color='cyan')
+                debug('client challenge : ', request.auth.get('challenge', None), color='cyan')
+                auth = self.identity.authenticationPayload(
+                    challengeId=request.auth.get('pubkey', None),
+                    challenged=request.auth.get('challenge', ''))
                 return DataServerApi.statusSuccess.createResponse('Signed the challenge, return the signed server challenge', request.id, auth=auth)
 
         if request.method == DataServerApi.isLocalNeuronClient.value:

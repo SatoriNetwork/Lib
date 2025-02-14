@@ -3,6 +3,18 @@ from abc import ABC, abstractmethod
 
 class Identity(ABC):
 
+    @property
+    @abstractmethod
+    def pubkey(self) -> str:
+        """Returns the public key."""
+        pass
+
+    @property
+    @abstractmethod
+    def address(self) -> str:
+        """Returns the address."""
+        pass
+
     @abstractmethod
     def challenge(self) -> str:
         """Genergates a challenge for challenge response."""
@@ -23,14 +35,18 @@ class Identity(ABC):
         """Verifies a message signature."""
         pass
 
-    @property
     @abstractmethod
-    def pubkey(self) -> str:
-        """Returns the public key."""
-        pass
-
-    @property
-    @abstractmethod
-    def address(self) -> str:
-        """Returns the address."""
+    def authenticationPayload(
+        self,
+        challengeId: Union[str, None] = None,
+        challenged:Union[str, None] = None,
+        signature:Union[bytes, None] = None,
+    ) -> dict[str, str]:
+        """
+        {
+            'pubkey': self.pubkey,
+            'address': self.address,
+            'challenge': self.challenge(),
+        }
+        """
         pass

@@ -198,31 +198,27 @@ class DataClient:
         ''' sends the observation/prediction data to the server '''
         return await self.send((self.serverHostPort), Message(DataServerApi.insertStreamData.createRequest(uuid, data, replace, isSub=isSub)))
 
-    async def authenticate(self, auth: dict[str, str], peerHost: Union[str, None] = None) -> Message:
-        ''' client initiates the auth process
-            auth = {
-                'client_pubkey': xxxx,
-                'client_address': xxxx,
-                'client_challenge': x2x3,
-            }
-        '''
-        # todo: when we create a challenge for the server we index it by their pubkey.
-        #       when we generate the challenge on clients end, index by hostport instead.
-        response = await self.send((peerHost, self.serverPort) if peerHost else None, Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
+    async def authenticate(self, peerHost: Union[str, None] = None) -> Message:
+        ''' client initiates the auth process '''
+        auth = self.identity.authenticationPayload(challengeId=peerHost)
+        response = await self.send(
+            peerAddr=(peerHost, self.serverPort) if peerHost else None,
+            request=Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
         verified = self.idenity.verify(
             msg=self.identity.challenges.get((peerHost, self.serverPort) if peerHost else self.serverHostPort, ''),
-            sig=response.auth.get('server_signature', b''),
-            pubkey=response.auth.get('server_pubkey', None),
-            address=response.auth.get('server_address', None))
+            sig=response.auth.get('signature', b''),
+            pubkey=response.auth.get('pubkey', None),
+            address=response.auth.get('address', None))
         if verified:
-            auth = {
-                'client_pubkey': self.identity.pubkey,
-                'client_address': self.identity.address,
-                'client_signature': self.identity.sign(response.auth.get('server_challenge', ''))}
-            self.peers.get((peerHost, self.serverPort) if peerHost else self.serverHostPort).pubkey = response.auth.get('server_pubkey', None)
-            self.peers.get((peerHost, self.serverPort) if peerHost else self.serverHostPort).address = response.auth.get('server_address', None)
-            return await self.send((peerHost, self.serverPort) if peerHost else None, Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
-        await self.disconnect(self.peers[(peerHost, self.serverPort) if peerHost else self.serverHostPort])
+            auth = self.identity.authenticationPayload(challenged=response.auth.get('challenge', ''))
+            peer = self.peers.get((peerHost, self.serverPort) if peerHost else self.serverHostPort)
+            peer.pubkey = response.auth.get('pubkey', None)
+            peer.address = response.auth.get('address', None)
+            return await self.send(
+                peerAddr=(peerHost, self.serverPort) if peerHost else None,
+                request=Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
+        await self.disconnect(
+            peer=self.peers.get((peerHost, self.serverPort) if peerHost else self.serverHostPort))
         return Message(DataServerApi.statusFail.createResponse("Failed to authenticate"))
 
     async def isLocalNeuronClient(self) -> Message:

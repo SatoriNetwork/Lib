@@ -261,3 +261,18 @@ class Idenity(IdentityBase):
         pubkey: Union[str, bytes, None] = None,
     ) -> bool:
         ''' verifies a message with the public key '''
+
+
+    def authenticationPayload(
+        self,
+        challengeId: Union[str, None] = None,
+        challenged:Union[str, None] = None,
+        signature:Union[bytes, None] = None,
+    ) -> dict[str, str]:
+
+        return {
+            'pubkey': self.publicKey,
+            'address': self.address,
+            **({'challenge': self.challenge(challengeId) if challengeId else {}}),
+            **({'signature': self.sign(challenged)} if challenged else {}),
+            **({'signature': signature} if signature else {})}

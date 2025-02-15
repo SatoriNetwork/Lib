@@ -701,6 +701,19 @@ class SatoriServerClient(object):
                 'unable to stakeProxyRemove due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
 
+    def invitedBy(self, address: str) -> tuple[bool, dict]:
+        ''' removes a stream from the server '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/invited/by',
+                payload=json.dumps({'referrer': address}))
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to report referrer due to connection timeout; try again Later.', e, color='yellow')
+            return False, {}
+
     def publish(
         self,
         topic: str,

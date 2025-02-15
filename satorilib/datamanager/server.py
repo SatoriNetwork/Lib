@@ -50,6 +50,7 @@ class DataServer:
         debug("Connected peer:", peerAddr, print=True)
         try:
             async for message in websocket:
+                peer = self.connectedClients[peerAddr]
                 if peer.isSecure:
                     message = self.identity.decrypt(
                         shared=peer.sharedSecret,

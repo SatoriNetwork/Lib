@@ -1054,6 +1054,24 @@ class SatoriServerClient(object):
 
     ## untested ##
 
+    def setPoolSize(self, poolStakeLimit: float) -> tuple[bool, dict]:
+        """
+        Function to set the pool size
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/pool/size/set',
+                payload=json.dumps({"poolStakeLimit": float(poolStakeLimit)}))
+            if response.status_code == 200:
+                return True, response.text
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in poolAcceptingWorkers: {str(e)}"
+            return False, {"error": error_message}
+
     def setPoolWorkerReward(self, rewardPercentage: float) -> tuple[bool, dict]:
         """
         Function to set the pool status to accepting or not accepting
@@ -1063,6 +1081,23 @@ class SatoriServerClient(object):
                 function=requests.post,
                 endpoint='/pool/worker/reward/set',
                 payload=json.dumps({"rewardPercentage": float(rewardPercentage)}))
+            if response.status_code == 200:
+                return True, response.text
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in poolAcceptingWorkers: {str(e)}"
+            return False, {"error": error_message}
+
+    def getPoolSize(self, address: str) -> tuple[bool, dict]:
+        """
+        Function to set the pool status to accepting or not accepting
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint=f'/pool/size/get/{address}')
             if response.status_code == 200:
                 return True, response.text
             else:

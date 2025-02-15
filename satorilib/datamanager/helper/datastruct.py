@@ -79,8 +79,10 @@ class ConnectedPeer:
         publications: Union[set[str], None] = None, # the streams that this client publishes (to my server)
         isNeuron: bool = False,
         isEngine: bool = False,
-        pubkey: str = False,
-        address: str = False,
+        pubkey: str = None,
+        address: str = None,
+        sharedSecret: str = None,
+        aesKey: str = None,
     ):
         self.hostPort = hostPort
         self.websocket = websocket
@@ -89,9 +91,12 @@ class ConnectedPeer:
         self.isNeuron = isNeuron
         self.isEngine = isEngine
         self.listener = None
-        self.pubkey = None
-        self.address = None
         self.stop = asyncio.Event()
+        # for authentication and encryption:
+        self.pubkey = pubkey
+        self.address = address
+        self.sharedSecret = sharedSecret
+        self.aesKey = aesKey
 
     @property
     def host(self):
@@ -113,13 +118,17 @@ class ConnectedPeer:
     def isLocal(self) -> bool:
         return self.isEngine or self.isNeuron
 
-    def add_subscription(self, uuid: str):
+    @property
+    def isSecure(self) -> bool:
+        return self.sharedSecret is not None
+
+    def addSubscription(self, uuid: str):
         self.subscriptions.add(uuid)
 
-    def add_publication(self, uuid: str):
+    def addPublication(self, uuid: str):
         self.publications.add(uuid)
 
-    def remove_subscription(self, uuid: str) -> bool:
+    def removeSubscription(self, uuid: str) -> bool:
         """
         Remove a subscription if it exists.
         Returns True if the subscription was removed, False if it wasn't found.
@@ -128,7 +137,7 @@ class ConnectedPeer:
         self.subscriptions.discard(uuid)
         return existed
 
-    def remove_publication(self, uuid: str) -> bool:
+    def removePublication(self, uuid: str) -> bool:
         """
         Remove a publication if it exists.
         Returns True if the publication was removed, False if it wasn't found.
@@ -137,6 +146,17 @@ class ConnectedPeer:
         self.publications.discard(uuid)
         return existed
 
+    def setPubkey(self, pubkey):
+        self.pubkey = pubkey
+
+    def setAddress(self, address):
+        self.address = address
+
+    def setSharedSecret(self, sharedSecret):
+        self.sharedSecret = sharedSecret
+
+    def setAesKey(self, aesKey):
+        self.aesKey = aesKey
 
 class Message:
 
@@ -239,6 +259,20 @@ class Message:
             return table.to_pandas()
         except Exception as e:
             raise ValueError(f"Failed to deserialize DataFrame: {str(e)}")
+
+    @staticmethod
+    def _serializeDataFrameWithPyarrow(df: pd.DataFrame) -> bytes:
+        """
+        Serialize the DataFrame to Arrow and return
+        """
+        return pa.serialize(df).to_buffer().to_pybytes()
+
+    @staticmethod
+    def _deserializeDataFrameWithPyarrow(data: bytes) -> pd.DataFrame:
+        """
+        deserialize back into a DataFrame.
+        """
+        return pa.deserialize(data)
 
     @property
     def auth(self) -> str:

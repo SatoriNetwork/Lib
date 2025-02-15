@@ -50,3 +50,18 @@ class Identity(ABC):
         }
         """
         pass
+
+    @abstractmethod
+    def secret(self, pubkey: str) -> None:
+        """Generates a shared secret with another public key."""
+        pass
+
+    @abstractmethod
+    def encrypt(self, shared: bytes,  msg: Union[bytes, str], aesKey: Union[bytes, None] = None) -> None:
+        """Encrypts a message with the shared secret."""
+        pass
+
+    @abstractmethod
+    def decrypt(self, shared: bytes, blob: Union[bytes, str], aesKey: Union[bytes, None] = None) -> None:
+        """Encrypts a message with the shared secret."""
+        pass

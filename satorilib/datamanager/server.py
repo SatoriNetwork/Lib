@@ -51,7 +51,20 @@ class DataServer:
         try:
             async for message in websocket:
                 debug(f"Received request: {Message.fromBytes(message).to_dict()}", print=True)
-                response = Message(await self.handleRequest(peerAddr, message)).toBytes(True)
+                response = Message(await self.handleRequest(peerAddr, message))
+                peer = self.connectedClients[peerAddr]
+                if (
+                    peer.isSecure and
+                    # don't encrypt the notification message after successful auth:
+                    response.message != 'Successfully authenticated with the server'
+                ):
+                    response = response.toBytes(True)
+                    response = self.identity.encrypt(
+                        shared=peer.sharedSecret,
+                        aesKey=peer.aesKey,
+                        msg=response)
+                else:
+                    response = response.toBytes(True)
                 await self.connectedClients[peerAddr].websocket.send(response)
         except websockets.exceptions.ConnectionClosed:
             error(f"Connection closed with {peerAddr}")
@@ -130,8 +143,11 @@ class DataServer:
                     pubkey=request.auth.get('pubkey', None),
                     address=request.auth.get('address', None))
                 if verified:
-                    self.connectedClients[peerAddr].pubkey = request.auth.get('pubkey', None)
-                    self.connectedClients[peerAddr].address = request.auth.get('address', None)
+                    peer = self.connectedClients[peerAddr]
+                    peer.setPubkey(request.auth.get('pubkey', None))
+                    peer.setAddress(request.auth.get('address', None))
+                    peer.setSharedSecret(self.identity.secret(peer.pubkey))
+                    peer.setAesKey(self.identity.derivedKey(peer.sharedSecret))
                     return DataServerApi.statusSuccess.createResponse('Successfully authenticated with the server', request.id)
                 return DataServerApi.statusSuccess.createResponse('Failed to authenticated with the server', request.id)
             else:
@@ -180,18 +196,18 @@ class DataServer:
             if publication_uuid is not None:
                 connectedClientsProvidingThisStream = len([request.uuid in localClient.publications for localClient in self.localClients.values()])
                 if connectedClientsProvidingThisStream > 1:
-                    self.connectedClients[peerAddr].remove_subscription(request.uuid)
-                    self.connectedClients[peerAddr].remove_publication(request.uuid)
-                    self.connectedClients[peerAddr].remove_subscription(publication_uuid)
-                    self.connectedClients[peerAddr].remove_publication(publication_uuid)
+                    self.connectedClients[peerAddr].removeSubscription(request.uuid)
+                    self.connectedClients[peerAddr].removePublication(request.uuid)
+                    self.connectedClients[peerAddr].removeSubscription(publication_uuid)
+                    self.connectedClients[peerAddr].removePublication(publication_uuid)
                     await self.updateSubscribers(Message(_createResponse("inactive", "Stream inactive")))
                     await self.updateSubscribers(Message(_createResponse("inactive", "Stream inactive", uuid_override=publication_uuid)))
                 else:
                     for connectedClient in self.connectedClients.values():
-                        connectedClient.remove_subscription(request.uuid)
-                        connectedClient.remove_publication(request.uuid)
-                        connectedClient.remove_subscription(publication_uuid)
-                        connectedClient.remove_publication(publication_uuid)
+                        connectedClient.removeSubscription(request.uuid)
+                        connectedClient.removePublication(request.uuid)
+                        connectedClient.removeSubscription(publication_uuid)
+                        connectedClient.removePublication(publication_uuid)
                     await self.updateSubscribers(Message(_createResponse("inactive", "Stream inactive")))
                     await self.updateSubscribers(Message(_createResponse("inactive", "Stream inactive", uuid_override=publication_uuid)))
                 return DataServerApi.statusSuccess.createResponse('inactive stream removed from server', request.id)
@@ -205,14 +221,14 @@ class DataServer:
         elif request.method == DataServerApi.subscribe.value:
             ''' client tells the server it wants to subscribe so the server can add to its subscribers '''
             if request.uuid is not None:
-                self.connectedClients[peerAddr].add_subscription(request.uuid)
+                self.connectedClients[peerAddr].addSubscription(request.uuid)
                 return DataServerApi.statusSuccess.createResponse('Subscriber info set', request.id)
             return DataServerApi.statusFail.createResponse('UUID must be provided', request.id)
 
         elif request.method == DataServerApi.addActiveStream.value:
             ''' local client tells the server to add a stream to its publication list since the local client is subscribed to that stream '''
             if request.uuid is not None:
-                self.connectedClients[peerAddr].add_publication(request.uuid)
+                self.connectedClients[peerAddr].addPublication(request.uuid)
                 return DataServerApi.statusSuccess.createResponse('Publication Stream added', request.id)
             return DataServerApi.statusFail.createResponse('UUID must be provided', request.id)
 

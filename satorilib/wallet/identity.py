@@ -1,8 +1,13 @@
 from typing import Union
 import os
 import secrets
-from base64 import b64encode, b64decode
 import mnemonic
+import base64
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.fernet import Fernet
 from satorilib import logging
 from satorilib import config
 
@@ -23,6 +28,14 @@ class IdentityBase():
     def symbol(self) -> str:
         return 'wallet'
 
+    @property
+    def pubkey(self) -> str:
+        return self.publicKey
+
+    @property
+    def privkey(self) -> str:
+        return self.privateKey
+
     def close(self) -> None:
         self._entropy = None
         self._entropyStr = ''
@@ -34,10 +47,10 @@ class IdentityBase():
         yaml = yaml or {}
         self._entropy = yaml.get('entropy')
         if isinstance(self._entropy, bytes):
-            self._entropyStr = b64encode(self._entropy).decode('utf-8')
+            self._entropyStr = base64.b64encode(self._entropy).decode('utf-8')
         if isinstance(self._entropy, str):
             self._entropyStr = self._entropy
-            self._entropy = b64decode(self._entropy)
+            self._entropy = base64.b64decode(self._entropy)
         self.words = yaml.get('words', '')
         self.privateKey = yaml.get('privateKey', '')
         self.publicKey = yaml.get('publicKey', '')
@@ -49,7 +62,7 @@ class IdentityBase():
         if self._entropy is None:
             return False
         _entropy = self._entropy
-        _entropyStr = b64encode(_entropy).decode('utf-8')
+        _entropyStr = base64.b64encode(_entropy).decode('utf-8')
         _privateKeyObj = self._generatePrivateKey()
         if _privateKeyObj is None:
             return False
@@ -73,7 +86,7 @@ class IdentityBase():
 
     def generateObjects(self):
         self._entropy = self._entropy or IdentityBase.generateEntropy()
-        self._entropyStr = b64encode(self._entropy).decode('utf-8')
+        self._entropyStr = base64.b64encode(self._entropy).decode('utf-8')
         self._privateKeyObj = self._generatePrivateKey()
         self._addressObj = self._generateAddress()
 
@@ -125,6 +138,127 @@ class IdentityBase():
     def _generateUncompressedPubkey(self):
         ''' returns a private key object '''
         return self._generatePrivateKey(compressed=False).pub.hex()
+
+    ## encryption ##############################################################
+
+    def secret(self, pubkey: str) -> None:
+        """
+        Derive a shared secret with another public key (hex).
+        """
+        # 1. Get our private key bytes from CEvrmoreSecret
+        # returns 32 raw bytes
+        my_priv_bytes = self._privateKeyObj._cec_key.get_secret()
+        my_ec_private_key = ec.derive_private_key(
+            private_value=int.from_bytes(my_priv_bytes, 'big'),
+            curve=ec.SECP256K1())
+
+        # 2. Parse the peer’s public key
+        peer_pubkey_bytes = bytes.fromhex(pubkey)
+        peer_ec_public_key = ec.EllipticCurvePublicKey.from_encoded_point(
+            curve=ec.SECP256K1(),
+            data=peer_pubkey_bytes)
+
+        # 3. Perform ECDH
+        shared_secret = my_ec_private_key.exchange(
+            algorithm=ec.ECDH(),
+            peer_public_key=peer_ec_public_key)
+
+        return shared_secret
+
+    @staticmethod
+    def derivedKey(shared: bytes, info: bytes = b'evrmore-ecdh') -> bytes:
+        """
+        Use HKDF to turn the ECDH shared secret into a 32-byte AES key.
+        """
+        aesKey = HKDF(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=None,
+            info=info).derive(shared)  # 32 bytes
+        return aesKey
+
+    @staticmethod
+    def aesGcmEncrypt(aesKey: bytes, plaintext: bytes, aad: bytes = None) -> tuple[bytes, bytes]:
+        """
+        Encrypt plaintext using AES-GCM. Returns (nonce, ciphertext).
+        - `aad` is "additional authenticated data" which GCM will authenticate
+        but not encrypt (commonly used for e.g. message headers).
+        """
+        # 12-byte random nonce is typical
+        nonce = os.urandom(12)
+        aesgcm = AESGCM(aesKey)
+        ciphertext = aesgcm.encrypt(nonce, plaintext, aad)
+        return nonce, ciphertext
+
+    @staticmethod
+    def aesGcmDecrypt(aesKey: bytes, nonce: bytes, ciphertext: bytes, aad: bytes = None) -> bytes:
+        """
+        Decrypt ciphertext using AES-GCM. Returns plaintext bytes.
+        """
+        aesgcm = AESGCM(aesKey)
+        plaintext = aesgcm.decrypt(nonce, ciphertext, aad)
+        return plaintext
+
+    @staticmethod
+    def fernetEncrypt(aesKey: bytes, ciphertext: bytes) -> bytes:
+        """ Encrypts a message using the ECDH-derived shared secret. """
+        # Encrypt with Fernet (just an example symmetric scheme)
+        fernetKey = base64.urlsafe_b64encode(aesKey)
+        f = Fernet(fernetKey)
+        ciphertext = f.encrypt(ciphertext)
+        return ciphertext
+
+    @staticmethod
+    def fernetDecrypt(aesKey: bytes, ciphertext: bytes) -> bytes:
+        """
+        Decrypts a message using the ECDH-derived shared secret.
+        """
+        fernetKey = base64.urlsafe_b64encode(aesKey)
+        f = Fernet(fernetKey)
+        plaintext = f.decrypt(ciphertext)
+        return plaintext
+
+
+    @staticmethod
+    def encrypt(
+        shared: bytes,
+        msg: Union[bytes, str],
+        aesKey: Union[bytes, None] = None,
+    ) -> bytes:
+        """
+        Encrypt a message using the ECDH-derived shared secret, returning a single blob:
+        [12-byte nonce] + [ciphertext with GCM tag appended].
+        """
+        if isinstance(msg, str):
+            msg = msg.encode('utf-8')
+        # aesGcmEncrypt -> (nonce, ciphertext)
+        nonce, ciphertext = IdentityBase.aesGcmEncrypt(
+            aesKey=aesKey or IdentityBase.derivedKey(shared),
+            plaintext=msg)
+        # Return nonce and ciphertext together
+        return nonce + ciphertext
+
+    @staticmethod
+    def decrypt(
+        shared: bytes,
+        blob: Union[bytes, str],
+        aesKey: Union[bytes, None] = None,
+    ) -> bytes:
+        """
+        Decrypt an AES-GCM message that was packaged as [nonce + ciphertext].
+        We parse out the first 12 bytes as the nonce, and everything else is ciphertext.
+        """
+        if isinstance(blob, str):
+            blob = blob.encode('utf-8')
+        # The nonce is always 12 bytes in this pattern
+        nonce = blob[:12]
+        ciphertext = blob[12:]
+        plaintext = IdentityBase.aesGcmDecrypt(
+            aesKey=aesKey or IdentityBase.derivedKey(shared),
+            nonce=nonce,
+            ciphertext=ciphertext)
+        return plaintext
+
 
 
 class Idenity(IdentityBase):
@@ -195,7 +329,6 @@ class Idenity(IdentityBase):
     def networkByte(self) -> bytes:
         return (33).to_bytes(1, 'big') # evrmore by default
 
-
     ### Loading ################################################################
 
     def walletFileExists(self, path: Union[str, None] = None):
@@ -262,7 +395,6 @@ class Idenity(IdentityBase):
     ) -> bool:
         ''' verifies a message with the public key '''
 
-
     def authenticationPayload(
         self,
         challengeId: Union[str, None] = None,
@@ -271,7 +403,7 @@ class Idenity(IdentityBase):
     ) -> dict[str, str]:
 
         return {
-            'pubkey': self.publicKey,
+            'pubkey': self.pubkey,
             'address': self.address,
             **({'challenge': self.challenge(challengeId) if challengeId else {}}),
             **({'signature': self.sign(challenged)} if challenged else {}),

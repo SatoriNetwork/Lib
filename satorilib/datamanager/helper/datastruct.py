@@ -4,9 +4,8 @@ import asyncio
 import json
 import pandas as pd
 import pyarrow as pa
-from dataclasses import dataclass, replace
-from satorilib.datamanager.api import DataServerApi
-
+from dataclasses import dataclass
+from satorilib.utils.dataclass import CopiableDataclass
 
 class Subscription:
     def __init__(
@@ -70,47 +69,23 @@ class Peer:
         return self.ip, self.port
 
 @dataclass(frozen=True)
-class SecurityPolicy:
+class SecurityPolicy(CopiableDataclass):
     localAuthentication: bool = True
     remoteAuthentication: bool = True
     localEncryption: bool = True
     remoteEncryption: bool = True
 
-    @classmethod
-    def fromInstance(
-        cls,
-        existing:  "SecurityPolicy",
-        **overrides
-    ) ->  "SecurityPolicy":
-        """
-        Create a new instance from an existing instance, optionally
-        overriding any fields via keyword arguments.
-
-        Usage:
-            new_policy = SecurityPolicy.fromInstance(
-                old_policy,
-                localAuthentication=True
-            )
-        """
-        return replace(existing, **overrides)
-
-    def copy(self, **overrides) -> "SecurityPolicy":
-        """
-        Create a new instance from the current instance, optionally
-        overriding any fields via keyword arguments.
-
-        Usage:
-            new_policy = old_policy.modify(
-                localAuthentication=True
-            )
-        """
-        return self.fromInstance(self, **overrides)
-
-SECURITY_POLICY = SecurityPolicy(
+PEER_SECURITY_POLICY = SecurityPolicy(
     localAuthentication=True,
     remoteAuthentication=True,
     localEncryption=True,
     remoteEncryption=True)
+
+LOCAL_SECURITY_POLICY = SecurityPolicy(
+    localAuthentication=True,
+    remoteAuthentication=True,
+    localEncryption=False,
+    remoteEncryption=False)
 
 class ConnectedPeer:
 
@@ -122,11 +97,12 @@ class ConnectedPeer:
         publications: Union[set[str], None] = None, # the streams that this client publishes (to my server)
         isNeuron: bool = False,
         isEngine: bool = False,
+        isLocalServer: bool = False,
         pubkey: str = None,
         address: str = None,
         sharedSecret: str = None,
         aesKey: str = None,
-        security: SecurityPolicy = SECURITY_POLICY,
+        securityPolicy: SecurityPolicy = None,
     ):
         self.hostPort = hostPort
         self.websocket = websocket
@@ -134,6 +110,7 @@ class ConnectedPeer:
         self.publications: set[str] = publications or set()
         self.isNeuron = isNeuron
         self.isEngine = isEngine
+        self.isLocalServer = isLocalServer
         self.listener = None
         self.stop = asyncio.Event()
         # for authentication and encryption:
@@ -141,7 +118,7 @@ class ConnectedPeer:
         self.address = address
         self.sharedSecret = sharedSecret
         self.aesKey = aesKey
-        self.security = security # this could be modified by partner
+        self.securityPolicy = self.setSecurityPolicy(securityPolicy)
 
     @property
     def host(self):
@@ -161,19 +138,19 @@ class ConnectedPeer:
 
     @property
     def isLocal(self) -> bool:
-        return self.isEngine or self.isNeuron
+        return self.isEngine or self.isNeuron or self.isLocalServer
 
     @property
     def isIncomingEncrypted(self) -> bool:
         return (
             self.sharedSecret is not None and
-            self.security.remoteEncryption)
+            self.securityPolicy.remoteEncryption)
 
     @property
     def isOutgoingEncrypted(self) -> bool:
         return (
             self.sharedSecret is not None and
-            self.security.localEncryption)
+            self.securityPolicy.localEncryption)
 
     def addSubscription(self, uuid: str):
         self.subscriptions.add(uuid)
@@ -211,13 +188,27 @@ class ConnectedPeer:
     def setAesKey(self, aesKey):
         self.aesKey = aesKey
 
-    def setSecurityPolicy(self, securityPolicy: SecurityPolicy):
+    def setIsNeuron(self, value: bool):
+        self.isNeuron = value
+        self.setSecurityPolicy()
+
+    def setIsEngine(self, value: bool):
+        self.isEngine = value
+        self.setSecurityPolicy()
+
+    def setIsLocalServer(self, value: bool):
+        self.isLocalServer = value
+        self.setSecurityPolicy()
+
+    def setSecurityPolicy(self, securityPolicy: Union[SecurityPolicy, None] = None):
         '''
         client could require/requiest a certain security policy, for example
         it may want to turn off encryption since everything is public data,
-        and it can save time by no longer needing to encrypt/decrypt.
+        and it can save time by no longer needing to encrypt/decrypt, or if the
+        client and server are both on prem.
         '''
-        self.security = securityPolicy
+        self.securityPolicy = securityPolicy or (
+            PEER_SECURITY_POLICY if self.isLocal else LOCAL_SECURITY_POLICY)
 
 class Message:
 

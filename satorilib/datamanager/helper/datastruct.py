@@ -211,6 +211,14 @@ class ConnectedPeer:
     def setAesKey(self, aesKey):
         self.aesKey = aesKey
 
+    def setSecurityPolicy(self, securityPolicy: SecurityPolicy):
+        '''
+        client could require/requiest a certain security policy, for example
+        it may want to turn off encryption since everything is public data,
+        and it can save time by no longer needing to encrypt/decrypt.
+        '''
+        self.security = securityPolicy
+
 class Message:
 
     def __init__(self, message: dict):

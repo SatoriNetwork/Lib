@@ -121,19 +121,19 @@ class ConnectedPeer:
         self.securityPolicy = self.setSecurityPolicy(securityPolicy)
 
     @property
-    def host(self):
+    def host(self) -> str:
         return self.hostPort[0]
 
     @property
-    def port(self):
+    def port(self) -> int:
         return self.hostPort[1]
 
     @property
-    def isAClient(self):
+    def isAClient(self) -> bool:
         return self.hostPort[1] != 24602
 
     @property
-    def isAServer(self):
+    def isAServer(self) -> bool:
         return not self.isAClient
 
     @property
@@ -202,10 +202,11 @@ class ConnectedPeer:
 
     def setSecurityPolicy(self, securityPolicy: Union[SecurityPolicy, None] = None):
         '''
-        client could require/requiest a certain security policy, for example
-        it may want to turn off encryption since everything is public data,
-        and it can save time by no longer needing to encrypt/decrypt, or if the
-        client and server are both on prem.
+        client could require/requiest a certain security policy, for example it
+        may want to turn off encryption since everything is public data, and it
+        can save time by no longer needing to encrypt/decrypt, or if the client
+        and server are both on prem. Or maybe even we switch to always using
+        wss and we don't need to encrypt at this level for most situtations.
         '''
         self.securityPolicy = securityPolicy or (
             PEER_SECURITY_POLICY if self.isLocal else LOCAL_SECURITY_POLICY)

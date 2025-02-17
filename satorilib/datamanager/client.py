@@ -24,6 +24,9 @@ class DataClient:
         self.responses: dict[str, Message] = {}
         self.running = False
 
+    def server(self)-> ConnectedPeer:
+        return self.peers.get(self.serverHostPort)
+
     def isConnected(
         self,
         host: Union[str, None] = None,
@@ -49,8 +52,9 @@ class DataClient:
         try:
             websocket = await websockets.connect(uri)
             self.peers[(peerHost, peerPort)] = ConnectedPeer(
-                (peerHost, peerPort), websocket
-            )
+                hostPort=(peerHost, peerPort),
+                websocket=websocket,
+                isServer=(peerHost, peerPort) == self.serverHostPort)
             self.peers[(peerHost, peerPort)].listener = asyncio.create_task(
                 self.listenToPeer(self.peers[(peerHost, peerPort)])
             )
@@ -64,7 +68,7 @@ class DataClient:
         try:
             while True:
                 msg = await peer.websocket.recv()
-                if peer.isSecure:
+                if peer.isIncomingEncrypted:
                     msg = self.identity.decrypt(
                         shared=peer.sharedSecret,
                         aesKey=peer.aesKey,
@@ -179,7 +183,7 @@ class DataClient:
         try:
             msg = request.toBytes()
             peer = self.peers[peerAddr]
-            if peer.isSecure:
+            if peer.isOutgoingEncrypted:
                 msg = self.identity.encrypt(
                     shared=peer.sharedSecret,
                     aesKey=peer.aesKey,

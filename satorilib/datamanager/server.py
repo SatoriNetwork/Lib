@@ -51,7 +51,7 @@ class DataServer:
         try:
             async for message in websocket:
                 peer = self.connectedClients[peerAddr]
-                if peer.isSecure:
+                if peer.isIncomingEncrypted:
                     message = self.identity.decrypt(
                         shared=peer.sharedSecret,
                         aesKey=peer.aesKey,
@@ -60,7 +60,7 @@ class DataServer:
                 response = Message(await self.handleRequest(peerAddr, message))
                 peer = self.connectedClients[peerAddr]
                 if (
-                    peer.isSecure and
+                    peer.isOutgoingEncrypted and
                     # don't encrypt the notification message after successful auth:
                     response.message != 'Successfully authenticated with the server'
                 ):
@@ -169,13 +169,13 @@ class DataServer:
         if request.method == DataServerApi.isLocalNeuronClient.value:
             ''' local neuron client sends this request to server so the server identifies the client as its local client after auth '''
             # local - TODO: add authentication
-            self.connectedClients[peerAddr].isNeuron = True
+            self.connectedClients[peerAddr].setIsNeuron(True)
             return DataServerApi.statusSuccess.createResponse('Authenticated as Neuron client', request.id)
 
         elif request.method == DataServerApi.isLocalEngineClient.value:
             ''' engine client sends this request to server so the server identifies the client as its local client after auth '''
             # local - TODO: add authentication
-            self.connectedClients[peerAddr].isEngine = True
+            self.connectedClients[peerAddr].setIsEngine(True)
             return DataServerApi.statusSuccess.createResponse('Authenticated as Engine client', request.id)
 
         elif request.method == DataServerApi.setPubsubMap.value:

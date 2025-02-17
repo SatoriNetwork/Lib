@@ -4,6 +4,7 @@ import asyncio
 import json
 import pandas as pd
 import pyarrow as pa
+from dataclasses import dataclass, replace
 from satorilib.datamanager.api import DataServerApi
 
 
@@ -68,61 +69,6 @@ class Peer:
     def asTuple(self) -> tuple[str, int]:
         return self.ip, self.port
 
-
-# from enum import Enum
-
-
-# class SecurityLevel(Enum):
-#     none = 0
-#     mutualAuthentication = 1
-#     mutualEncryption = 2
-#     # localAuthentication = 3 # we require them to authenticate with us
-#     # remoteAuthentication = 4 # peer requires us to authenticate with them
-#     # localEncryption = 5 # encrypt our messages to them
-#     # remoteEncryption = 6 # peer encrypts their messages to us
-#     # ... # other possible security levels
-
-#     def __str__(self) -> str:
-#         return self.name
-
-#     @property
-#     def peerAuthenticationRequired(self) -> bool:
-#         return self.value in (
-#             SecurityLevel.mutualAuthentication,
-#             SecurityLevel.mutualEncryption)
-
-#     @property
-#     def authenticationRequired(self) -> bool:
-#         return self.value in (
-#             SecurityLevel.mutualAuthentication,
-#             SecurityLevel.mutualEncryption)
-
-#     @property
-#     def peerEncryptionRequired(self) -> bool:
-#         return self.value in (SecurityLevel.mutualEncryption)
-
-#     @property
-#     def encryptionRequired(self) -> bool:
-#         return self.value in (SecurityLevel.mutualEncryption)
-
-from dataclasses import dataclass, replace
-#
-#@dataclass
-#class SecurityPolicy:
-#    localAuthentication: bool = True
-#    remoteAuthentication: bool = True
-#    localEncryption: bool = True
-#    remoteEncryption: bool = True
-#
-## Example usage
-#SECURITY_POLICY = SecurityPolicy(
-#    localAuthentication=True,
-#    remoteAuthentication=True,
-#    localEncryption=True,
-#    remoteEncryption=True)
-
-# For an immutable versionfrom dataclasses import dataclass, replace
-
 @dataclass(frozen=True)
 class SecurityPolicy:
     localAuthentication: bool = True
@@ -165,11 +111,6 @@ SECURITY_POLICY = SecurityPolicy(
     remoteAuthentication=True,
     localEncryption=True,
     remoteEncryption=True)
-
-#immutable_policy = SecurityPolicy(localAuthentication=True)
-# The next line would raise a FrozenInstanceError:
-# immutable_policy.localAuthentication = False
-
 
 class ConnectedPeer:
 

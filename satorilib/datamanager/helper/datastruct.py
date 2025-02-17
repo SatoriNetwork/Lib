@@ -69,6 +69,108 @@ class Peer:
         return self.ip, self.port
 
 
+# from enum import Enum
+
+
+# class SecurityLevel(Enum):
+#     none = 0
+#     mutualAuthentication = 1
+#     mutualEncryption = 2
+#     # localAuthentication = 3 # we require them to authenticate with us
+#     # remoteAuthentication = 4 # peer requires us to authenticate with them
+#     # localEncryption = 5 # encrypt our messages to them
+#     # remoteEncryption = 6 # peer encrypts their messages to us
+#     # ... # other possible security levels
+
+#     def __str__(self) -> str:
+#         return self.name
+
+#     @property
+#     def peerAuthenticationRequired(self) -> bool:
+#         return self.value in (
+#             SecurityLevel.mutualAuthentication,
+#             SecurityLevel.mutualEncryption)
+
+#     @property
+#     def authenticationRequired(self) -> bool:
+#         return self.value in (
+#             SecurityLevel.mutualAuthentication,
+#             SecurityLevel.mutualEncryption)
+
+#     @property
+#     def peerEncryptionRequired(self) -> bool:
+#         return self.value in (SecurityLevel.mutualEncryption)
+
+#     @property
+#     def encryptionRequired(self) -> bool:
+#         return self.value in (SecurityLevel.mutualEncryption)
+
+from dataclasses import dataclass, replace
+#
+#@dataclass
+#class SecurityPolicy:
+#    localAuthentication: bool = True
+#    remoteAuthentication: bool = True
+#    localEncryption: bool = True
+#    remoteEncryption: bool = True
+#
+## Example usage
+#SECURITY_POLICY = SecurityPolicy(
+#    localAuthentication=True,
+#    remoteAuthentication=True,
+#    localEncryption=True,
+#    remoteEncryption=True)
+
+# For an immutable versionfrom dataclasses import dataclass, replace
+
+@dataclass(frozen=True)
+class SecurityPolicy:
+    localAuthentication: bool = True
+    remoteAuthentication: bool = True
+    localEncryption: bool = True
+    remoteEncryption: bool = True
+
+    @classmethod
+    def fromInstance(
+        cls,
+        existing:  "SecurityPolicy",
+        **overrides
+    ) ->  "SecurityPolicy":
+        """
+        Create a new instance from an existing instance, optionally
+        overriding any fields via keyword arguments.
+
+        Usage:
+            new_policy = SecurityPolicy.fromInstance(
+                old_policy,
+                localAuthentication=True
+            )
+        """
+        return replace(existing, **overrides)
+
+    def copy(self, **overrides) -> "SecurityPolicy":
+        """
+        Create a new instance from the current instance, optionally
+        overriding any fields via keyword arguments.
+
+        Usage:
+            new_policy = old_policy.modify(
+                localAuthentication=True
+            )
+        """
+        return self.fromInstance(self, **overrides)
+
+SECURITY_POLICY = SecurityPolicy(
+    localAuthentication=True,
+    remoteAuthentication=True,
+    localEncryption=True,
+    remoteEncryption=True)
+
+#immutable_policy = SecurityPolicy(localAuthentication=True)
+# The next line would raise a FrozenInstanceError:
+# immutable_policy.localAuthentication = False
+
+
 class ConnectedPeer:
 
     def __init__(
@@ -83,6 +185,7 @@ class ConnectedPeer:
         address: str = None,
         sharedSecret: str = None,
         aesKey: str = None,
+        security: SecurityPolicy = SECURITY_POLICY,
     ):
         self.hostPort = hostPort
         self.websocket = websocket
@@ -97,6 +200,7 @@ class ConnectedPeer:
         self.address = address
         self.sharedSecret = sharedSecret
         self.aesKey = aesKey
+        self.security = security # this could be modified by partner
 
     @property
     def host(self):
@@ -119,8 +223,16 @@ class ConnectedPeer:
         return self.isEngine or self.isNeuron
 
     @property
-    def isSecure(self) -> bool:
-        return self.sharedSecret is not None
+    def isIncomingEncrypted(self) -> bool:
+        return (
+            self.sharedSecret is not None and
+            self.security.remoteEncryption)
+
+    @property
+    def isOutgoingEncrypted(self) -> bool:
+        return (
+            self.sharedSecret is not None and
+            self.security.localEncryption)
 
     def addSubscription(self, uuid: str):
         self.subscriptions.add(uuid)

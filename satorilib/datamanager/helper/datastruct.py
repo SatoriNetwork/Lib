@@ -95,9 +95,9 @@ class ConnectedPeer:
         websocket: websockets.WebSocketServerProtocol,
         subscriptions: Union[set[str], None] = None, # the streams that this client subscribes to (from my server)
         publications: Union[set[str], None] = None, # the streams that this client publishes (to my server)
-        isNeuron: bool = False,
-        isEngine: bool = False,
-        isLocalServer: bool = False,
+        isNeuron: bool = False, # local
+        isEngine: bool = False, # local
+        isServer: bool = False, # local
         pubkey: str = None,
         address: str = None,
         sharedSecret: str = None,
@@ -110,7 +110,7 @@ class ConnectedPeer:
         self.publications: set[str] = publications or set()
         self.isNeuron = isNeuron
         self.isEngine = isEngine
-        self.isLocalServer = isLocalServer
+        self.isServer = isServer
         self.listener = None
         self.stop = asyncio.Event()
         # for authentication and encryption:
@@ -129,16 +129,16 @@ class ConnectedPeer:
         return self.hostPort[1]
 
     @property
-    def isClient(self):
+    def isAClient(self):
         return self.hostPort[1] != 24602
 
     @property
-    def isServer(self):
-        return not self.isClient
+    def isAServer(self):
+        return not self.isAClient
 
     @property
     def isLocal(self) -> bool:
-        return self.isEngine or self.isNeuron or self.isLocalServer
+        return self.isEngine or self.isNeuron or self.isServer
 
     @property
     def isIncomingEncrypted(self) -> bool:
@@ -197,7 +197,7 @@ class ConnectedPeer:
         self.setSecurityPolicy()
 
     def setIsLocalServer(self, value: bool):
-        self.isLocalServer = value
+        self.isServer = value
         self.setSecurityPolicy()
 
     def setSecurityPolicy(self, securityPolicy: Union[SecurityPolicy, None] = None):

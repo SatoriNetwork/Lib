@@ -209,7 +209,7 @@ class ConnectedPeer:
         wss and we don't need to encrypt at this level for most situtations.
         '''
         self.securityPolicy = securityPolicy or (
-            PEER_SECURITY_POLICY if self.isLocal else LOCAL_SECURITY_POLICY)
+            LOCAL_SECURITY_POLICY if self.isLocal else PEER_SECURITY_POLICY)
 
 class Message:
 

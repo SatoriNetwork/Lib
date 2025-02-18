@@ -62,7 +62,7 @@ class DataServer:
                 if (
                     peer.isOutgoingEncrypted and
                     # don't encrypt the notification message after successful auth:
-                    response.message != 'Successfully authenticated with the server'
+                    response.senderMsg != 'Successfully authenticated with the server'
                 ):
                     response = response.toBytes(True)
                     response = self.identity.encrypt(
@@ -228,6 +228,7 @@ class DataServer:
             ''' client tells the server it wants to subscribe so the server can add to its subscribers '''
             if request.uuid is not None:
                 self.connectedClients[peerAddr].addSubscription(request.uuid)
+                # TODO: broadcast that we have subscribed
                 return DataServerApi.statusSuccess.createResponse('Subscriber info set', request.id)
             return DataServerApi.statusFail.createResponse('UUID must be provided', request.id)
 

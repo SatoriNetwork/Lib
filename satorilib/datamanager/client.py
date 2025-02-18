@@ -221,23 +221,24 @@ class DataClient:
         response = await self.send(
             peerAddr=(peerHost, self.serverPort) if peerHost else None,
             request=Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
-        verified = self.idenity.verify(
-            msg=self.identity.challenges.get((peerHost, self.serverPort) if peerHost else self.serverHostPort, ''),
-            sig=response.auth.get('signature', b''),
-            pubkey=response.auth.get('pubkey', None),
-            address=response.auth.get('address', None))
-        if verified:
-            auth = self.identity.authenticationPayload(challenged=response.auth.get('challenge', ''))
-            peer = self.peers.get((peerHost, self.serverPort) if peerHost else self.serverHostPort)
-            answer = await self.send(
-                peerAddr=(peerHost, self.serverPort) if peerHost else None,
-                request=Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
-            if answer == 'Successfully authenticated with the server':
-                peer.setPubkey(response.auth.get('pubkey', None))
-                peer.setAddress(response.auth.get('address', None))
-                peer.setSharedSecret(self.identity.secret(peer.pubkey))
-                peer.setAesKey(self.identity.derivedKey(peer.sharedSecret))
-            return answer
+        if response.status == DataServerApi.statusSuccess.value:
+            verified = self.identity.verify(
+                msg=self.identity.challenges.get((peerHost, self.serverPort) if peerHost else self.serverHostPort, ''),
+                sig=response.auth.get('signature', b''),
+                pubkey=response.auth.get('pubkey', None),
+                address=response.auth.get('address', None))
+            if verified:
+                auth = self.identity.authenticationPayload(challenged=response.auth.get('challenge', ''))
+                peer = self.peers.get((peerHost, self.serverPort) if peerHost else self.serverHostPort)
+                answer = await self.send(
+                    peerAddr=(peerHost, self.serverPort) if peerHost else None,
+                    request=Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
+                if answer.status == DataServerApi.statusSuccess.value:
+                    peer.setPubkey(response.auth.get('pubkey', None))
+                    peer.setAddress(response.auth.get('address', None))
+                    peer.setSharedSecret(self.identity.secret(peer.pubkey))
+                    peer.setAesKey(self.identity.derivedKey(peer.sharedSecret))
+                    return answer
         await self.disconnect(
             peer=self.peers.get((peerHost, self.serverPort) if peerHost else self.serverHostPort))
         return Message(DataServerApi.statusFail.createResponse("Failed to authenticate"))

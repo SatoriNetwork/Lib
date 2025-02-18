@@ -261,7 +261,7 @@ class IdentityBase():
 
 
 
-class Idenity(IdentityBase):
+class Identity(IdentityBase):
 
     @staticmethod
     def openSafely(

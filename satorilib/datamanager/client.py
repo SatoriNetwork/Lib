@@ -14,16 +14,17 @@ from satorilib.datamanager.api import DataServerApi
 
 class DataClient:
 
-    def __init__(self, serverHost: str, identity: Identity = None):
+    def __init__(self, serverHost: str, identity: Union[Identity, None] = None):
         self.serverPort = 24602
         self.identity = identity
         self.serverHostPort: Tuple[str, int] = serverHost, self.serverPort
         self.peers: Dict[Tuple[str, int], ConnectedPeer] = {}
         self.subscriptions: dict[Subscription, queue.Queue] = {}
-        self.publications: dict[str, str] = {} # {subUuid, publicationUuid}
+        self.publications: dict[str, str] = {}
         self.responses: dict[str, Message] = {}
         self.running = False
 
+    @property
     def server(self)-> ConnectedPeer:
         return self.peers.get(self.serverHostPort)
 
@@ -217,21 +218,22 @@ class DataClient:
 
     async def authenticate(self, peerHost: Union[str, None] = None) -> Message:
         ''' client initiates the auth process '''
+        peerHost = peerHost if peerHost is not None else self.serverHostPort[0]
         auth = self.identity.authenticationPayload(challengeId=peerHost)
         response = await self.send(
-            peerAddr=(peerHost, self.serverPort) if peerHost else None,
+            peerAddr=(peerHost, self.serverPort),
             request=Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
         if response.status == DataServerApi.statusSuccess.value:
             verified = self.identity.verify(
-                msg=self.identity.challenges.get((peerHost, self.serverPort) if peerHost else self.serverHostPort, ''),
+                msg=self.identity.challenges.get(peerHost, ''),
                 sig=response.auth.get('signature', b''),
                 pubkey=response.auth.get('pubkey', None),
                 address=response.auth.get('address', None))
             if verified:
                 auth = self.identity.authenticationPayload(challenged=response.auth.get('challenge', ''))
-                peer = self.peers.get((peerHost, self.serverPort) if peerHost else self.serverHostPort)
+                peer = self.peers.get((peerHost, self.serverPort), '')
                 answer = await self.send(
-                    peerAddr=(peerHost, self.serverPort) if peerHost else None,
+                    peerAddr=(peerHost, self.serverPort),
                     request=Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
                 if answer.status == DataServerApi.statusSuccess.value:
                     peer.setPubkey(response.auth.get('pubkey', None))
@@ -240,7 +242,7 @@ class DataClient:
                     peer.setAesKey(self.identity.derivedKey(peer.sharedSecret))
                     return answer
         await self.disconnect(
-            peer=self.peers.get((peerHost, self.serverPort) if peerHost else self.serverHostPort))
+            peer=self.peers.get((peerHost, self.serverPort), ''))
         return Message(DataServerApi.statusFail.createResponse("Failed to authenticate"))
 
     async def isLocalNeuronClient(self) -> Message:

@@ -147,7 +147,7 @@ class IdentityBase():
         """
         # 1. Get our private key bytes from CEvrmoreSecret
         # returns 32 raw bytes
-        my_priv_bytes = self._privateKeyObj._cec_key.get_secret()
+        my_priv_bytes = self._privateKeyObj._cec_key.get_raw_privkey()
         my_ec_private_key = ec.derive_private_key(
             private_value=int.from_bytes(my_priv_bytes, 'big'),
             curve=ec.SECP256K1())

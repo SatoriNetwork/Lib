@@ -118,7 +118,7 @@ class ConnectedPeer:
         self.address = address
         self.sharedSecret = sharedSecret
         self.aesKey = aesKey
-        self.securityPolicy = self.setSecurityPolicy(securityPolicy)
+        self.setSecurityPolicy(securityPolicy)
 
     @property
     def host(self) -> str:
@@ -210,6 +210,7 @@ class ConnectedPeer:
         '''
         self.securityPolicy = securityPolicy or (
             LOCAL_SECURITY_POLICY if self.isLocal else PEER_SECURITY_POLICY)
+
 
 class Message:
 

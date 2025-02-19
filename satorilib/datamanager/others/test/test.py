@@ -1,35 +1,25 @@
 import asyncio
 from satorilib.datamanager import DataServer, DataClient, Message, DataServerApi
+from satorilib.wallet.evrmore.identity import EvrmoreIdentity 
 from satoriengine.veda.engine import Engine
+from satorineuron import config
 import pandas as pd
 
+walletPath = config.walletPath('wallet.yaml')
 uuid = "23dc3133-5b3a-5b27-803e-70a07cf3c4f7"
+
 async def serverStartUp():
-    dataServer = DataServer('0.0.0.0')
+    dataServer = DataServer(host='0.0.0.0', identity=EvrmoreIdentity(walletPath))
     await dataServer.startServer()
     await asyncio.sleep(1)
 
 async def authenticate():
     await serverStartUp()
-    
-    dataClient = DataClient('0.0.0.0')
-    auth = {
-          'client_pubkey': '123awd',
-          'client_challenge': '523adsd'
-    }
-    response: Message = await dataClient.authenticate(authDict=auth)
-    if response.status == DataServerApi.statusSuccess.value:
-          authDict = response.auth
-          print(authDict['server_challenge'])
-          print(authDict['server_pubkey'])
-          print(authDict['server_signature'])
-          # TODO : sign the server_challenge and return back to the server
-          replyFromClient = {
-                'client_server_signature': 'Lolol'
-          }
-          response: Message = await dataClient.authenticate(authDict=replyFromClient)
-          if response.status == DataServerApi.statusSuccess.value:
-                print(response.senderMsg)
+    dataClient = DataClient('0.0.0.0', EvrmoreIdentity(walletPath))
+    response: Message = await dataClient.authenticate()
+    print(response.to_dict())
+    # if response.status == DataServerApi.statusSuccess.value:
+    #       print(response.auth)
 
 async def checkIfLocalNeuronAuthenticated():
     await serverStartUp()

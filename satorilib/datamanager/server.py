@@ -15,7 +15,7 @@ class DataServer:
         self,
         host: str,
         port: int = 24602,
-        identity: Identity = None,
+        identity: Union[Identity, None] = None,
     ):
         self.host = host
         self.port = port
@@ -155,7 +155,6 @@ class DataServer:
                     peer.setSharedSecret(self.identity.secret(peer.pubkey))
                     peer.setAesKey(self.identity.derivedKey(peer.sharedSecret))
                     return DataServerApi.statusSuccess.createResponse('Successfully authenticated with the server', request.id)
-                return DataServerApi.statusSuccess.createResponse('Failed to authenticated with the server', request.id)
             else:
                 # 1st part of Auth
                 debug('client pubkey : ', request.auth.get('pubkey', None), color='cyan')
@@ -165,16 +164,15 @@ class DataServer:
                     challengeId=request.auth.get('pubkey', None),
                     challenged=request.auth.get('challenge', ''))
                 return DataServerApi.statusSuccess.createResponse('Signed the challenge, return the signed server challenge', request.id, auth=auth)
+            return DataServerApi.statusFail.createResponse('Failed to authenticated with the server', request.id)
 
         if request.method == DataServerApi.isLocalNeuronClient.value:
             ''' local neuron client sends this request to server so the server identifies the client as its local client after auth '''
-            # local - TODO: add authentication
             self.connectedClients[peerAddr].setIsNeuron(True)
             return DataServerApi.statusSuccess.createResponse('Authenticated as Neuron client', request.id)
 
         elif request.method == DataServerApi.isLocalEngineClient.value:
             ''' engine client sends this request to server so the server identifies the client as its local client after auth '''
-            # local - TODO: add authentication
             self.connectedClients[peerAddr].setIsEngine(True)
             return DataServerApi.statusSuccess.createResponse('Authenticated as Engine client', request.id)
 

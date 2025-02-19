@@ -142,7 +142,6 @@ class DataServer:
                 return DataServerApi.statusFail.createResponse('Authentication info not present', request.id)
             elif request.auth.get('signature', None) is not None:
                 # 2nd part of Auth
-                debug('client-server challenge : ', request.auth.get('signature'), color='cyan')
                 verified = self.identity.verify(
                     msg=self.identity.challenges.get(request.auth.get('pubkey', None)),
                     sig=request.auth.get('signature', b''),
@@ -157,9 +156,13 @@ class DataServer:
                     return DataServerApi.statusSuccess.createResponse('Successfully authenticated with the server', request.id)
             else:
                 # 1st part of Auth
-                debug('client pubkey : ', request.auth.get('pubkey', None), color='cyan')
-                debug('client address : ', request.auth.get('address', None), color='cyan')
-                debug('client challenge : ', request.auth.get('challenge', None), color='cyan')
+                if request.auth.get('islocal', None) is not None:
+                    if request.auth.get('islocal') == 'engine':
+                        self.connectedClients[peerAddr].setIsEngine(True)
+                    elif request.auth.get('islocal') == 'neuron':
+                        self.connectedClients[peerAddr].setIsNeuron(True)
+                    else:
+                        return DataServerApi.statusFail.createResponse('Invalid client type', request.id)
                 auth = self.identity.authenticationPayload(
                     challengeId=request.auth.get('pubkey', None),
                     challenged=request.auth.get('challenge', ''))

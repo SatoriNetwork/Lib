@@ -216,10 +216,12 @@ class DataClient:
         ''' sends the observation/prediction data to the server '''
         return await self.send((self.serverHostPort), Message(DataServerApi.insertStreamData.createRequest(uuid, data, replace, isSub=isSub)))
 
-    async def authenticate(self, peerHost: Union[str, None] = None) -> Message:
+    async def authenticate(self, peerHost: Union[str, None] = None, islocal: str = None) -> Message:
         ''' client initiates the auth process '''
         peerHost = peerHost if peerHost is not None else self.serverHostPort[0]
         auth = self.identity.authenticationPayload(challengeId=peerHost)
+        if islocal is not None:
+            auth['islocal'] = islocal
         response = await self.send(
             peerAddr=(peerHost, self.serverPort),
             request=Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))

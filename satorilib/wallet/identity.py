@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.fernet import Fernet
 from satorilib import logging
 from satorilib import config
+from satorilib.disk.utils import safetify
 
 
 class IdentityBase():
@@ -348,6 +349,34 @@ class Identity(IdentityBase):
             raise Exception('wallet or vault file corrupt')
         return True
 
+    def save(self, path: Union[str, None] = None) -> bool:
+        path = path or self.walletPath
+        safetify(path)
+        if self.walletFileExists(path):
+            return False
+        config.put(
+            data={
+                **(
+                    self.encryptWallet(content=self.yaml)
+                    if hasattr(self, 'yaml') and isinstance(self.yaml, dict)
+                    else {}),
+                **self.encryptWallet(
+                    content={
+                        'entropy': self._entropyStr,
+                        'words': self.words,
+                        'privateKey': self.privateKey,
+                    }),
+                **{
+                    'publicKey': self.publicKey,
+                    'scripthash': self.scripthash,
+                    self.symbol: {
+                        'address': self.address,
+                    }
+                }
+            },
+            path=path)
+        return True
+
     def close(self) -> None:
         self.password = None
         self.yaml = None
@@ -376,6 +405,18 @@ class Identity(IdentityBase):
             except Exception as _:
                 return encrypted
         return encrypted
+
+    def encryptWallet(self, content: dict) -> dict:
+        if isinstance(self.password, str):
+            from satorilib import secret
+            try:
+                return secret.encryptMapValues(
+                    content=content,
+                    password=self.password,
+                    keys=['entropy', 'privateKey', 'words'])
+            except Exception as _:
+                return content
+        return content
 
     def setAlias(self, alias: Union[str, None] = None) -> None:
         self.alias = alias

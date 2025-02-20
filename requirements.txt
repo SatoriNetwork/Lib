@@ -1,6 +1,10 @@
 ### non python requirements
 ## ipfs version 0.14.0 - 0.17.0
 
+# datamanager
+# cryptography==44.0.1 
+# python-evrmorelib -U
+
 setuptools==65.6.3 # 56.0.0
 
 ## needed for engine

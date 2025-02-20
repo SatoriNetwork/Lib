@@ -16,7 +16,7 @@ async def serverStartUp():
 async def authenticate():
     await serverStartUp()
     dataClient = DataClient('0.0.0.0', EvrmoreIdentity(walletPath))
-    response: Message = await dataClient.authenticate()
+    response: Message = await dataClient.authenticate(isClient='neuron')
     print(response.to_dict())
     # if response.status == DataServerApi.statusSuccess.value:
     #       print(response.auth)
@@ -84,13 +84,13 @@ async def toCheckIfDataIsInsertedIntoClient():
     await serverStartUp()
     
     df = pd.DataFrame({
-        'value': [969.717144],
-        'hash':['bsjnlcs']
-    }, index=['2024-10-02 04:30:06.341021'])
+        'value': [968.717144],
+        'hash':['bsjnlct']
+    }, index=['2024-10-03 04:30:06.341021'])
 
 
     dataClient = DataClient('0.0.0.0')
-    response: Message = await dataClient.insertStreamData(uuid,df)
+    response: Message = await dataClient.insertStreamData(uuid, df, isSub=True)
     if response.status == DataServerApi.statusSuccess.value:
           print(response.senderMsg)
 
@@ -177,5 +177,5 @@ async def checkToSubscribe():
         if response.status == DataServerApi.statusSuccess.value:
             print(response.senderMsg)
 
-asyncio.run(authenticate())
+asyncio.run(toCheckIfDataIsInsertedIntoClient())
 

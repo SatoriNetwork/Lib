@@ -7,9 +7,6 @@ from satorilib.datamanager.helper import Message, Peer, ConnectedPeer, Identity
 from satorilib.datamanager.manager import DataManager
 from satorilib.datamanager.api import DataServerApi
 
-# from satorilib.wallet.evrmore.identity import EvrmoreIdentity
-# identity = EvrmoreIdentity(walletPath='/Satori/Neuron/wallet/wallet.yaml')
-
 class DataServer:
     def __init__(
         self,
@@ -75,9 +72,27 @@ class DataServer:
         except websockets.exceptions.ConnectionClosed:
             error(f"Connection closed with {peerAddr}")
         finally:
-            for key, peer in list(self.connectedClients.items()):
-                if peer.websocket == websocket:
-                    del self.connectedClients[key]
+            await self._cleanupConnection(peerAddr)
+            # for key, peer in list(self.connectedClients.items()):
+            #     if peer.websocket == websocket:
+            #         # notify all subscribers of this client on its inactivation
+            #         del self.connectedClients[key]
+
+    async def _cleanupConnection(self, peerAddr: Peer):
+        '''clean up resources when a connection is closed'''
+        if peerAddr in self.connectedClients:
+            peer = self.connectedClients[peerAddr]
+            for uuid in peer.publications:
+                disconnectMsg = Message({
+                    "status": "inactive",
+                    "message": f"Publisher {peerAddr} disconnected",
+                    "params": {"uuid": uuid}
+                })
+                await self.updateSubscribers(disconnectMsg)
+            if not peer.websocket.closed:
+                await peer.websocket.close()
+            del self.connectedClients[peerAddr]
+            debug(f"Cleaned up connection for peer: {peerAddr}", print=True)
 
     async def updateSubscribers(self, msg: Message):
         '''

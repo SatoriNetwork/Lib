@@ -7,6 +7,10 @@ from satorilib.datamanager.helper import Message, Peer, ConnectedPeer, Identity
 from satorilib.datamanager.manager import DataManager
 from satorilib.datamanager.api import DataServerApi, DataClientApi
 
+# neuron blindly subscribes ( no need of self.availableStreams check for the neuron to subscribe to engineUpdates )
+# for all clients if self.availableStreams if failed sent the subscription not available yet 
+# engine only adds to its publication stream once the stream is active ( tell the server )
+
 class DataServer:
     def __init__(
         self,
@@ -52,7 +56,7 @@ class DataServer:
                     message = self.identity.decrypt(
                         shared=peer.sharedSecret,
                         aesKey=peer.aesKey,
-                        msg=message)
+                        blob=message)
                 debug(f"Received request: {Message.fromBytes(message).to_dict()}", print=True)
                 response = Message(await self.handleRequest(peerAddr, message))
                 peer = self.connectedClients[peerAddr]

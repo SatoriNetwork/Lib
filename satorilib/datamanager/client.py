@@ -73,7 +73,7 @@ class DataClient:
                     msg = self.identity.decrypt(
                         shared=peer.sharedSecret,
                         aesKey=peer.aesKey,
-                        msg=msg)
+                        blob=msg)
                 message = Message.fromBytes(msg)
                 asyncio.create_task(self.handlePeerMessage(message, peer))  # Process async
         # except websockets.exceptions.ConnectionClosed:

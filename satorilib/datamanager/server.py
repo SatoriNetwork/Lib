@@ -5,7 +5,7 @@ from io import StringIO
 from satorilib.logging import INFO, setup, debug, info, warning, error
 from satorilib.datamanager.helper import Message, Peer, ConnectedPeer, Identity
 from satorilib.datamanager.manager import DataManager
-from satorilib.datamanager.api import DataServerApi
+from satorilib.datamanager.api import DataServerApi, DataClientApi
 
 class DataServer:
     def __init__(
@@ -72,22 +72,14 @@ class DataServer:
         except websockets.exceptions.ConnectionClosed:
             error(f"Connection closed with {peerAddr}")
         finally:
-            await self._cleanupConnection(peerAddr)
-            # for key, peer in list(self.connectedClients.items()):
-            #     if peer.websocket == websocket:
-            #         # notify all subscribers of this client on its inactivation
-            #         del self.connectedClients[key]
+            await self.cleanupConnection(peerAddr)
 
-    async def _cleanupConnection(self, peerAddr: Peer):
+    async def cleanupConnection(self, peerAddr: Peer):
         '''clean up resources when a connection is closed'''
         if peerAddr in self.connectedClients:
             peer = self.connectedClients[peerAddr]
             for uuid in peer.publications:
-                disconnectMsg = Message({
-                    "status": "inactive",
-                    "message": f"Publisher {peerAddr} disconnected",
-                    "params": {"uuid": uuid}
-                })
+                disconnectMsg = Message(DataClientApi.streamInactive.createResponse(uuid))
                 await self.updateSubscribers(disconnectMsg)
             if not peer.websocket.closed:
                 await peer.websocket.close()
@@ -174,6 +166,8 @@ class DataServer:
                 if request.auth.get('islocal', None) is not None:
                     if request.auth.get('islocal') == 'engine':
                         self.connectedClients[peerAddr].setIsEngine(True)
+                        for k, v in self.dataManager.pubSubMapping.items():
+                            self.connectedClients[peerAddr].addPublication(v['publicationUuid'])
                     elif request.auth.get('islocal') == 'neuron':
                         self.connectedClients[peerAddr].setIsNeuron(True)
                     else:
@@ -192,12 +186,18 @@ class DataServer:
         elif request.method == DataServerApi.isLocalEngineClient.value:
             ''' engine client sends this request to server so the server identifies the client as its local client after auth '''
             self.connectedClients[peerAddr].setIsEngine(True)
+            for k, v in self.dataManager.pubSubMapping:
+                self.connectedClients[peerAddr].addPublication(v['publicationUuid'])
             return DataServerApi.statusSuccess.createResponse('Authenticated as Engine client', request.id)
 
         elif request.method == DataServerApi.setPubsubMap.value:
             ''' local neuron client sends the related pub-sub streams it recieved from the rendevous server '''
             for sub_uuid, data in request.uuid.items():
                 self.dataManager.pubSubMapping[sub_uuid] = data
+            for client in self.connectedClients.values():
+                if client.isEngine:
+                    for k, v in self.dataManager.pubSubMapping.items():
+                        client.addPublication(v['publicationUuid'])
             return DataServerApi.statusSuccess.createResponse('Pub-Sub map set in Server', request.id)
 
         elif request.method == DataServerApi.getPubsubMap.value:
@@ -242,11 +242,11 @@ class DataServer:
 
         elif request.method == DataServerApi.subscribe.value:
             ''' client tells the server it wants to subscribe so the server can add to its subscribers '''
-            if request.uuid is not None:
+            if request.uuid is not None and request.uuid in self.availableStreams:
                 self.connectedClients[peerAddr].addSubscription(request.uuid)
                 # TODO: broadcast that we have subscribed
                 return DataServerApi.statusSuccess.createResponse('Subscriber info set', request.id)
-            return DataServerApi.statusFail.createResponse('UUID must be provided', request.id)
+            return DataServerApi.statusFail.createResponse('Subcsription not available yet', request.id)
 
         elif request.method == DataServerApi.addActiveStream.value:
             ''' local client tells the server to add a stream to its publication list since the local client is subscribed to that stream '''

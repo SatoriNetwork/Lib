@@ -3,11 +3,26 @@ from enum import Enum
 import pandas as pd
 import time
 
+def _generateCallId() -> str:
+        return str(time.time())
 
 class DataClientApi(Enum):
     '''the endpoint that data servers hit on the data client'''
     streamInactive = 'stream/inactive'
     streamObservation = 'stream/observation'
+
+    def createResponse(
+        self,
+        uuid: str,
+    ) -> dict:
+        return {
+                'status': self.value,
+                'id': _generateCallId(),
+                'params': {
+                    'uuid': uuid,
+                },
+                'sub': True
+            }
     
 class DataServerApi(Enum):
     '''the endpoint that data clients (local/remote) hit on the data server'''
@@ -31,10 +46,6 @@ class DataServerApi(Enum):
     statusFail = 'failed'
     statusInactiveStream = 'inactive'
     
-    @staticmethod
-    def _generateCallId() -> str:
-        return str(time.time())
-        
     def fromString(self, method: str) -> 'DataServerApi':
         ''' convert a string to a DataServerApi '''
         for api in DataServerApi:
@@ -66,7 +77,7 @@ class DataServerApi(Enum):
     ) -> dict:
         return {
                 'method': self.value,
-                'id': self._generateCallId(),
+                'id': _generateCallId(),
                 'sub': isSub,
                 'params': {
                     'uuid': uuid,

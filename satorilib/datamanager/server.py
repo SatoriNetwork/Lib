@@ -190,18 +190,12 @@ class DataServer:
         elif request.method == DataServerApi.isLocalEngineClient.value:
             ''' engine client sends this request to server so the server identifies the client as its local client after auth '''
             self.connectedClients[peerAddr].setIsEngine(True)
-            for k, v in self.dataManager.pubSubMapping:
-                self.connectedClients[peerAddr].addPublication(v['publicationUuid'])
             return DataServerApi.statusSuccess.createResponse('Authenticated as Engine client', request.id)
 
         elif request.method == DataServerApi.setPubsubMap.value:
             ''' local neuron client sends the related pub-sub streams it recieved from the rendevous server '''
             for sub_uuid, data in request.uuid.items():
                 self.dataManager.pubSubMapping[sub_uuid] = data
-            for client in self.connectedClients.values():
-                if client.isEngine:
-                    for k, v in self.dataManager.pubSubMapping.items():
-                        client.addPublication(v['publicationUuid'])
             return DataServerApi.statusSuccess.createResponse('Pub-Sub map set in Server', request.id)
 
         elif request.method == DataServerApi.getPubsubMap.value:
@@ -246,9 +240,11 @@ class DataServer:
 
         elif request.method == DataServerApi.subscribe.value:
             ''' client tells the server it wants to subscribe so the server can add to its subscribers '''
-            if request.uuid is not None and request.uuid in self.availableStreams:
+            if request.uuid is not None:
                 self.connectedClients[peerAddr].addSubscription(request.uuid)
                 # TODO: broadcast that we have subscribed
+                if request.uuid not in self.availableStreams:
+                    return DataServerApi.statusSuccess.createResponse('Subscriber info set but publisher not active yet', request.id)
                 return DataServerApi.statusSuccess.createResponse('Subscriber info set', request.id)
             return DataServerApi.statusFail.createResponse('Subcsription not available yet', request.id)
 
@@ -257,6 +253,8 @@ class DataServer:
             if request.uuid is not None:
                 self.connectedClients[peerAddr].addPublication(request.uuid)
                 return DataServerApi.statusSuccess.createResponse('Publication Stream added', request.id)
+            print('self.availableStreams')
+            print(self.availableStreams)
             return DataServerApi.statusFail.createResponse('UUID must be provided', request.id)
 
         if request.uuid is None:

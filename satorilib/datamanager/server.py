@@ -253,8 +253,6 @@ class DataServer:
             if request.uuid is not None:
                 self.connectedClients[peerAddr].addPublication(request.uuid)
                 return DataServerApi.statusSuccess.createResponse('Publication Stream added', request.id)
-            print('self.availableStreams')
-            print(self.availableStreams)
             return DataServerApi.statusFail.createResponse('UUID must be provided', request.id)
 
         if request.uuid is None:
@@ -315,7 +313,7 @@ class DataServer:
                                         'data': dataForSubscribers
                                     })
                     await self.updateSubscribers(updatedMessage)
-                    return DataServerApi.statusSuccess.createResponse('Data added to server database', request.id)
+                    return DataServerApi.statusSuccess.createResponse('Subscription data added to server database', request.id)
                 if request.replace:
                     self.dataManager.db.deleteTable(request.uuid)
                     self.dataManager.db.createTable(request.uuid)

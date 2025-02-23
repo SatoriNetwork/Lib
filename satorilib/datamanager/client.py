@@ -104,7 +104,7 @@ class DataClient:
         ''' update state for the calling client '''
         if message.isSubscription:
             if peer.hostPort != self.serverHostPort:
-                await self.handleMessageForServer(message) # TODO : for remote subscriptions enable otherwise we skip this
+                await self.handleMessageForServer(message)
             subscription = self._findSubscription(
                 subscription=Subscription(message.uuid)
             )

@@ -7,10 +7,6 @@ from satorilib.datamanager.helper import Message, Peer, ConnectedPeer, Identity
 from satorilib.datamanager.manager import DataManager
 from satorilib.datamanager.api import DataServerApi, DataClientApi
 
-# neuron blindly subscribes ( no need of self.availableStreams check for the neuron to subscribe to engineUpdates )
-# for all clients if self.availableStreams if failed sent the subscription not available yet 
-# engine only adds to its publication stream once the stream is active ( tell the server )
-
 class DataServer:
     def __init__(
         self,
@@ -253,7 +249,7 @@ class DataServer:
             if request.uuid is not None:
                 self.connectedClients[peerAddr].addPublication(request.uuid)
                 return DataServerApi.statusSuccess.createResponse('Publication Stream added', request.id)
-            return DataServerApi.statusFail.createResponse('UUID must be provided', request.id)
+            return DataServerApi.statusFail.createResponse('UUID must be provided', request.id) 
 
         if request.uuid is None:
             return DataServerApi.statusFail.createResponse('Missing uuid parameter', request.id)
@@ -306,7 +302,12 @@ class DataServer:
                 if request.data is None:
                     return DataServerApi.statusFail.createResponse('No data provided', request.id)
                 if request.isSubscription:
+                    # TODO: if this message is from someone who is not set as a publisher, set it as a publisher
+
+                    # TODO:  if the provider is provided by the local engine in the message use that 
+                    # else use the address as the provider 
                     dataForSubscribers = self.dataManager.db._addSubDataToDatabase(request.uuid, request.data)
+                    # TODO: dataForSubscriber should include the provider
                     updatedMessage = Message({
                                         'sub': request.sub,
                                         'params': {'uuid': request.uuid},

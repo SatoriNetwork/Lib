@@ -291,7 +291,7 @@ class SqliteDatabase:
                 raise ValueError(f"Table {table_uuid} does not exist")
             df = pd.read_sql_query(
                 f"""
-                SELECT ts, value, hash 
+                SELECT ts, value, hash, provider 
                 FROM "{table_uuid}"
                 ORDER BY ts
                 """, 

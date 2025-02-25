@@ -301,16 +301,18 @@ class DataServer:
                     return DataServerApi.statusFail.createResponse('No data provided', request.id)
                 if request.isSubscription:
                     self.connectedClients[peerAddr].addPublication(request.uuid)
-                    if 'provider' in request.data.columns:
-                        provider = request.data['provider'].values[0]
-                    else:
-                        provider = self.connectedClients[peerAddr].address
+                    # if provider is the local engine use that else let the server decide
+                    provider = self.connectedClients[peerAddr].address
+                    if self.connectedClients[peerAddr].isEngine:
+                        if 'provider' in request.data.columns:
+                            provider = request.data['provider'].values[0]
                     dataForSubscribers = self.dataManager.db._addSubDataToDatabase(request.uuid, request.data, provider)
                     updatedMessage = Message({
                                         'sub': request.sub,
                                         'params': {'uuid': request.uuid},
                                         'data': dataForSubscribers
                                     })
+                    print(dataForSubscribers)
                     await self.updateSubscribers(updatedMessage)
                     return DataServerApi.statusSuccess.createResponse('Subscription data added to server database', request.id)
                 if request.replace:

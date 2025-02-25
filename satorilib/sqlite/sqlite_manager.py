@@ -314,8 +314,8 @@ class SqliteDatabase:
                 debug(f"Table {table_uuid} does not exist", print=True)
                 self.createTable(table_uuid)
 
-            if 'provider' not in newDf.columns:
-                newDf['provider'] = str(provider)
+            # if 'provider' not in newDf.columns:
+            #     newDf['provider'] = str(provider)
 
             if not all(col in newDf.columns for col in ["hash", "value"]):
                 if 'value' not in newDf.columns:
@@ -345,12 +345,13 @@ class SqliteDatabase:
                     newDf.index[0],             
                     newDf['value'].iloc[0], 
                     newDf['hash'].iloc[0],
-                    newDf['provider'].iloc[0]
+                    provider
                 )
             )
             self.conn.commit()
             info(f"Added new records to database {table_uuid}")
             self._sortTableByTimestamp(table_uuid) # TODO : do we need to sort the table
+            newDf['provider'] = provider
             return newDf 
 
         except Exception as e:

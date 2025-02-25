@@ -91,9 +91,18 @@ class DataServer:
         is this message something anyone has subscribed to?
         if yes, await self.connected_peers[subscribig_peer].websocket.send(message)
         '''
+        msgBytes = msg.toBytes()
         for connectedClient in self.connectedClients.values():
             if msg.uuid in connectedClient.subscriptions:
-                await connectedClient.websocket.send(msg.toBytes())
+                if connectedClient.isLocal:
+                    await connectedClient.websocket.send(msgBytes)
+                else:
+                    response = self.identity.encrypt(
+                        shared=connectedClient.sharedSecret,
+                        aesKey=connectedClient.aesKey,
+                        msg=response)
+                    await connectedClient.websocket.send(response)
+
 
     async def disconnectAllPeers(self):
         """ disconnect from all peers and stop the server """
@@ -312,7 +321,6 @@ class DataServer:
                                         'params': {'uuid': request.uuid},
                                         'data': dataForSubscribers
                                     })
-                    print(dataForSubscribers)
                     await self.updateSubscribers(updatedMessage)
                     return DataServerApi.statusSuccess.createResponse('Subscription data added to server database', request.id)
                 if request.replace:

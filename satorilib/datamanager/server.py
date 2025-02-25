@@ -100,7 +100,7 @@ class DataServer:
                     response = self.identity.encrypt(
                         shared=connectedClient.sharedSecret,
                         aesKey=connectedClient.aesKey,
-                        msg=response)
+                        msg=msgBytes)
                     await connectedClient.websocket.send(response)
 
 

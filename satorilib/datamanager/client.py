@@ -8,7 +8,7 @@ from typing import Dict, Any, Union, Tuple, Set
 from satorilib.logging import INFO, setup, debug, info, warning, error
 from satorilib.datamanager.helper import Identity
 from satorilib.datamanager.helper import Message, ConnectedPeer, Subscription
-from satorilib.datamanager.api import DataServerApi
+from satorilib.datamanager.api import DataServerApi, DataClientApi
 
 
 
@@ -90,13 +90,11 @@ class DataClient:
     async def handleMessageForServer(self, message: Message) -> None:
         ''' update server about subscription or if the stream is inactive, so it can notify other subscribers '''
         try:
-            response = await self.insertStreamData(
+            await self.insertStreamData(
                 uuid=message.uuid,
                 data=message.data,
                 isSub=True
             )
-            if response.status != DataServerApi.statusSuccess:
-                raise Exception(response.senderMsg)
         except Exception as e:
             error('Unable to set data in server: ', e)
 
@@ -117,7 +115,7 @@ class DataClient:
 
     async def handleMessageForSelf(self, message: Message) -> None:
         ''' modify self state '''
-        if message.status == 'inactive':
+        if message.status == DataClientApi.streamInactive.value:
             subscription = self._findSubscription(
                 subscription=Subscription(message.uuid))
             if self.subscriptions.get(subscription) is not None:

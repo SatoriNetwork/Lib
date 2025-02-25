@@ -10,10 +10,10 @@ async def main():
     client = DataClient("0.0.0.0", identity=EvrmoreIdentity(walletPath))
     df = pd.DataFrame({
         'value': [969.717144],
-        'provider': 'krishna'
-        }, index=['2025-11-06 04:30:06.341021'])
+        # 'provider': 'krishna'
+        }, index=['2025-13-06 04:30:06.341021'])
     
-    await client.authenticate(islocal='engine')
+    await client.authenticate(islocal='neuron')
     await client.insertStreamData('009bb819-b737-55f5-b4d7-d851316eceae', 
                                                           df, 
                                                           isSub=True)

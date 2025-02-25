@@ -1,6 +1,6 @@
 import sqlite3
 import os
-from typing import Dict, Any, List
+from typing import Dict, Any, Union
 from satorilib.utils import generateUUID
 import pandas as pd
 from pathlib import Path
@@ -80,7 +80,8 @@ class SqliteDatabase:
                 CREATE TABLE IF NOT EXISTS "{table_uuid}" (
                     ts TIMESTAMP PRIMARY KEY NOT NULL,
                     value NUMERIC(20, 10) NOT NULL,
-                    hash TEXT NOT NULL
+                    hash TEXT NOT NULL,
+                    provider TEXT NOT NULL
                 )
             ''')
             self.conn.commit()
@@ -143,13 +144,14 @@ class SqliteDatabase:
                 CREATE TABLE "{temp_table}" (
                     ts TIMESTAMP PRIMARY KEY NOT NULL,
                     value NUMERIC(20, 10) NOT NULL,
-                    hash TEXT NOT NULL
+                    hash TEXT NOT NULL,
+                    provider TEXT NOT NULL
                 )
             ''')
             self.cursor.execute(
                 f'''
-                INSERT INTO "{temp_table}" (ts, value, hash)
-                SELECT ts, value, hash FROM "{table_uuid}"
+                INSERT INTO "{temp_table}" (ts, value, hash, provider)
+                SELECT ts, value, hash, provider FROM "{table_uuid}"
                 ORDER BY ts ASC
             ''')
             self.cursor.execute(f'DROP TABLE IF EXISTS "{table_uuid}"')
@@ -186,10 +188,10 @@ class SqliteDatabase:
                     for idx, row in df.iterrows():
                         self.cursor.execute(
                             f'''
-                            SELECT 1 FROM "{table_name}" WHERE ts = ? AND value = ? AND hash = ?
-                            ''', (idx, float(row['value']), str(row['hash'])))
+                            SELECT 1 FROM "{table_name}" WHERE ts = ? AND value = ? AND hash = ? AND provider = ?
+                            ''', (idx, float(row['value']), str(row['hash']), folder_metadata[folder_name].get('author')))
                         if not self.cursor.fetchone():
-                            self.cursor.execute(f'INSERT INTO "{table_name}" (ts, value, hash) VALUES (?, ?, ?)', (idx, float(row['value']), str(row['hash'])))
+                            self.cursor.execute(f'INSERT INTO "{table_name}" (ts, value, hash, provider) VALUES (?, ?, ?, ?)', (idx, float(row['value']), str(row['hash']), folder_metadata[folder_name].get('author')))
                     self.conn.commit()
                     imported_count += 1
                 except Exception as e:
@@ -210,11 +212,12 @@ class SqliteDatabase:
                 self.cursor.execute(
                     f'''
                     SELECT 1 FROM "{table_uuid}" 
-                    WHERE ts = ? AND value = ? AND hash = ?
+                    WHERE ts = ? AND value = ? AND hash = ? AND provider = ?
                     ''', (
                         idx, 
                         float(row['value']), 
-                        str(row['hash'])
+                        str(row['hash']),
+                        stream_dict.get('author')
                     ))
                 if not self.cursor.fetchone():
                     self.cursor.execute(
@@ -224,7 +227,8 @@ class SqliteDatabase:
                         ''', (
                             idx,
                             float(row['value']),
-                            str(row['hash'])
+                            str(row['hash']),
+                            stream_dict.get('author')
                         ))
                     imported_rows += 1
             self.conn.commit()
@@ -299,7 +303,7 @@ class SqliteDatabase:
         except Exception as e:
             error(f"Database error converting table {table_uuid} to DataFrame: {e}")
 
-    def _addSubDataToDatabase(self, table_uuid: str, newDf: pd.DataFrame):
+    def _addSubDataToDatabase(self, table_uuid: str, newDf: pd.DataFrame, provider: str):
         try:
             self.cursor.execute(
                 """
@@ -314,7 +318,7 @@ class SqliteDatabase:
                 if 'value' not in newDf.columns:
                     return pd.DataFrame()
                     # raise ValueError("DataFrame must contain 'value' column")
-                    
+
                 result = pd.read_sql_query(
                     f"""
                     SELECT hash 
@@ -328,16 +332,18 @@ class SqliteDatabase:
                 newDf.index = newDf.index.astype(str)
                 newDf['value'] = newDf['value'].astype(float)
                 newDf['hash'] = self.hashIt(prior_hash + str(newDf.index[0]) + str(newDf['value'].iloc[0]))
+                newDf['provider'] = str(provider)
 
             self.cursor.execute(
                 f"""
-                INSERT INTO "{table_uuid}" (ts, value, hash)
-                VALUES (?, ?, ?)
+                INSERT INTO "{table_uuid}" (ts, value, hash, provider)
+                VALUES (?, ?, ?, ?)
                 """,
                 (
                     newDf.index[0],             
                     newDf['value'].iloc[0], 
-                    newDf['hash'].iloc[0]
+                    newDf['hash'].iloc[0],
+                    newDf['provider'].iloc[0]
                 )
             )
             self.conn.commit()
@@ -367,27 +373,30 @@ class SqliteDatabase:
             df.index = df.index.astype(str)
             df['value'] = df['value'].astype(float)
             df['hash'] = df['hash'].astype(str)
+            df['provider'] = df['provider'].astype(str)
 
             imported_rows = 0
             for idx, row in df.iterrows():
                 self.cursor.execute(
                     f'''
                     SELECT 1 FROM "{table_uuid}" 
-                    WHERE ts = ? AND value = ? AND hash = ?
+                    WHERE ts = ? AND value = ? AND hash = ? AND provider = ?
                     ''', (
                         idx,
                         float(row['value']),
-                        str(row['hash'])
+                        str(row['hash']),
+                        str(row['provider'])
                     ))
                 if not self.cursor.fetchone():
                     self.cursor.execute(
                         f'''
-                        INSERT INTO "{table_uuid}" (ts, value, hash) 
-                        VALUES (?, ?, ?)
+                        INSERT INTO "{table_uuid}" (ts, value, hash, provider) 
+                        VALUES (?, ?, ?, ?)
                         ''', (
                             idx,
                             float(row['value']),
-                            str(row['hash'])
+                            str(row['hash']),
+                            str(row['provider'])
                         ))
                     imported_rows += 1
             self.conn.commit()

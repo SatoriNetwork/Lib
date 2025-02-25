@@ -166,8 +166,6 @@ class DataServer:
                 if request.auth.get('islocal', None) is not None:
                     if request.auth.get('islocal') == 'engine':
                         self.connectedClients[peerAddr].setIsEngine(True)
-                        for k, v in self.dataManager.pubSubMapping.items():
-                            self.connectedClients[peerAddr].addPublication(v['publicationUuid'])
                     elif request.auth.get('islocal') == 'neuron':
                         self.connectedClients[peerAddr].setIsNeuron(True)
                     else:
@@ -302,12 +300,12 @@ class DataServer:
                 if request.data is None:
                     return DataServerApi.statusFail.createResponse('No data provided', request.id)
                 if request.isSubscription:
-                    # TODO: if this message is from someone who is not set as a publisher, set it as a publisher
-
-                    # TODO:  if the provider is provided by the local engine in the message use that 
-                    # else use the address as the provider 
-                    dataForSubscribers = self.dataManager.db._addSubDataToDatabase(request.uuid, request.data)
-                    # TODO: dataForSubscriber should include the provider
+                    self.connectedClients[peerAddr].addPublication(request.uuid)
+                    if 'provider' in request.data.columns:
+                        provider = request.data['provider'].values[0]
+                    else:
+                        provider = self.connectedClients[peerAddr].address
+                    dataForSubscribers = self.dataManager.db._addSubDataToDatabase(request.uuid, request.data, provider)
                     updatedMessage = Message({
                                         'sub': request.sub,
                                         'params': {'uuid': request.uuid},

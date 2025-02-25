@@ -223,16 +223,14 @@ class DataServer:
                     self.connectedClients[peerAddr].removePublication(request.uuid)
                     self.connectedClients[peerAddr].removeSubscription(publication_uuid)
                     self.connectedClients[peerAddr].removePublication(publication_uuid)
-                    await self.updateSubscribers(Message(_createResponse("inactive", "Stream inactive")))
-                    await self.updateSubscribers(Message(_createResponse("inactive", "Stream inactive", uuid_override=publication_uuid)))
                 else:
                     for connectedClient in self.connectedClients.values():
                         connectedClient.removeSubscription(request.uuid)
                         connectedClient.removePublication(request.uuid)
                         connectedClient.removeSubscription(publication_uuid)
                         connectedClient.removePublication(publication_uuid)
-                    await self.updateSubscribers(Message(_createResponse("inactive", "Stream inactive")))
-                    await self.updateSubscribers(Message(_createResponse("inactive", "Stream inactive", uuid_override=publication_uuid)))
+                await self.updateSubscribers(Message(DataClientApi.streamInactive.createResponse(request.uuid)))
+                await self.updateSubscribers(Message(DataClientApi.streamInactive.createResponse(publication_uuid)))
                 return DataServerApi.statusSuccess.createResponse('inactive stream removed from server', request.id)
             else:
                 return DataServerApi.statusFail.createResponse('Requested uuid is not present in the server', request.id)

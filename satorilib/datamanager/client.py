@@ -85,7 +85,7 @@ class DataClient:
     async def handlePeerMessage(self, message: Message, peer: ConnectedPeer) -> None:
         ''' pass to server, modify owner's state, modify self state '''
         await self.handleMessageForOwner(message, peer)
-        await self.handleMessageForSelf(message)
+        # await self.handleMessageForSelf(message) # lets say neuron is subscribed to engine, this will make it unsubscribe
 
     async def handleMessageForServer(self, message: Message) -> None:
         ''' update server about subscription or if the stream is inactive, so it can notify other subscribers '''

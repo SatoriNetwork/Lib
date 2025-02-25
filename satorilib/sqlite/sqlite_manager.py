@@ -314,6 +314,9 @@ class SqliteDatabase:
                 debug(f"Table {table_uuid} does not exist", print=True)
                 self.createTable(table_uuid)
 
+            if 'provider' not in newDf.columns:
+                newDf['provider'] = str(provider)
+
             if not all(col in newDf.columns for col in ["hash", "value"]):
                 if 'value' not in newDf.columns:
                     return pd.DataFrame()
@@ -332,7 +335,6 @@ class SqliteDatabase:
                 newDf.index = newDf.index.astype(str)
                 newDf['value'] = newDf['value'].astype(float)
                 newDf['hash'] = self.hashIt(prior_hash + str(newDf.index[0]) + str(newDf['value'].iloc[0]))
-                newDf['provider'] = str(provider)
 
             self.cursor.execute(
                 f"""

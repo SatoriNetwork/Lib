@@ -487,7 +487,8 @@ class SatoriServerClient(object):
         self,
         vaultSignature: Union[str, bytes],
         vaultPubkey: str,
-        address: str
+        address: str,
+        vaultAddress: str = '',
     ) -> tuple[bool, str]:
         ''' add lend address '''
         try:
@@ -499,6 +500,7 @@ class SatoriServerClient(object):
                 raiseForStatus=False,
                 payload=json.dumps({
                     'vaultSignature': vaultSignature,
+                    'vaultAddress': vaultAddress,
                     'vaultPubkey': vaultPubkey,
                     'address': address}))
             return response.status_code < 400, response.text

@@ -197,14 +197,18 @@ class DataServer:
 
         elif request.method == DataServerApi.setPubsubMap.value:
             ''' local neuron client sends the related pub-sub streams it recieved from the rendevous server '''
-            for sub_uuid, data in request.uuid.items():
-                self.dataManager.pubSubMapping[sub_uuid] = data
+            for k, v in request.uuid.items():
+                if k == 'transferProtocol':
+                    self.dataManager.transferProtocol = request.uuid['transferProtocol']
+                else:
+                    self.dataManager.pubSubMapping[k] = v
             return DataServerApi.statusSuccess.createResponse('Pub-Sub map set in Server', request.id)
 
         elif request.method == DataServerApi.getPubsubMap.value:
             ''' this request fetches related pub-sub streams '''
-            streamDict = _convertPeerInfoDict(self.dataManager.pubSubMapping)
-            return DataServerApi.statusSuccess.createResponse('Pub-Sub map fetched from server', request.id, streamInfo=streamDict)
+            pubSubInfo = {'pubSubMapping': _convertPeerInfoDict(self.dataManager.pubSubMapping), 
+                          'transferProtocol': self.dataManager.transferProtocol}
+            return DataServerApi.statusSuccess.createResponse('Pub-Sub map fetched from server', request.id, streamInfo=pubSubInfo)
 
         elif request.method == DataServerApi.isStreamActive.value:
             ''' client asks the server whether it has the stream its trying to subscribe to in its publication list  '''

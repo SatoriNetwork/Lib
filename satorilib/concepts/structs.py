@@ -15,9 +15,9 @@ class StreamId:
     def generateUUID(data: dict) -> uuid:
         namespace = uuid.NAMESPACE_DNS
         values = [
-            data.get('source'), 
-            data.get('author'), 
-            data.get('stream'), 
+            data.get('source'),
+            data.get('author'),
+            data.get('stream'),
             data.get('target')]
         combined = ':'.join(str(v) for v in values)
         return uuid.uuid5(namespace, combined)
@@ -62,8 +62,8 @@ class StreamId:
         return ["source", "author", "stream", "target"]
 
     def topic(
-        self, 
-        asJson: bool = True, 
+        self,
+        asJson: bool = True,
         authorAsPubkey=False
     ) -> Union[str, dict[str, str]]:
         """
@@ -89,7 +89,7 @@ class StreamId:
     @property
     def id(self):
         return (self.__source, self.__author, self.__stream, self.__target)
-    
+
     @property
     def uuid(self) -> str:
         return str(StreamId.generateUUID(self.topic(asJson=False)))
@@ -212,7 +212,7 @@ class StreamId:
 
 class StreamUuid(StreamId):
     """unique identifier for a stream"""
-    
+
     def __init__(self, uuid: str, source: str='', author: str='', stream: str='', target: str=''):
         super().__init__(source=source, author=author, stream=stream, target=target)
         self.uuid = uuid
@@ -566,13 +566,14 @@ class Observation:
         return str(vars(self))
 
     def __repr__(self):
-        return f"Observation of {self.streamId}: " + str(
-            {
-                "time": self.time,
-                "data": self.value,
-                "hash": self.observationHash,
-            }
-        )
+        return f"Observation of {self.streamId}: " + str(self.dictionary)
+
+    @property
+    def dictionary(self):
+        return {
+            "time": self.time,
+            "data": self.value,
+            "hash": self.observationHash}
 
     @staticmethod
     def parse(raw):

@@ -319,6 +319,7 @@ class DataServer:
                             provider = request.data['provider'].values[0]
                     dataForSubscribers = self.dataManager.db._addSubDataToDatabase(request.uuid, request.data, provider)
                     updatedMessage = Message({
+                                        'status': 'success',
                                         'sub': request.sub,
                                         'params': {'uuid': request.uuid},
                                         'data': dataForSubscribers

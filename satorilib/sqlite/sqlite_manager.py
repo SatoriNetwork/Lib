@@ -357,7 +357,7 @@ class SqliteDatabase:
         except Exception as e:
                 self.conn.rollback()
                 error(f"Error adding data to database: ",e)
-                return newDf
+                return pd.DataFrame()
         
     def _addDataframeToDatabase(self, table_uuid: str, df: pd.DataFrame):
         """ Writes a pandas DataFrame to a specified database table """

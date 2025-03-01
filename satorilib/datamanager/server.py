@@ -318,13 +318,14 @@ class DataServer:
                         if 'provider' in request.data.columns:
                             provider = request.data['provider'].values[0]
                     dataForSubscribers = self.dataManager.db._addSubDataToDatabase(request.uuid, request.data, provider)
-                    updatedMessage = Message({
-                                        'status': 'success',
-                                        'sub': request.sub,
-                                        'params': {'uuid': request.uuid},
-                                        'data': dataForSubscribers
-                                    })
-                    await self.updateSubscribers(updatedMessage)
+                    if not dataForSubscribers.empty:
+                        updatedMessage = Message({
+                                            'status': 'success',
+                                            'sub': request.sub,
+                                            'params': {'uuid': request.uuid},
+                                            'data': dataForSubscribers
+                                        })
+                        await self.updateSubscribers(updatedMessage)
                     return DataServerApi.statusSuccess.createResponse('Subscription data added to server database', request.id)
                 if request.replace:
                     self.dataManager.db.deleteTable(request.uuid)

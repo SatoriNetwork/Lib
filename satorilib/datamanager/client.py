@@ -79,7 +79,7 @@ class DataClient:
         # except websockets.exceptions.ConnectionClosed:
         #     self.disconnect(peer)
         except Exception as e:
-            error(f"Unexpected error in listenToPeer: {e}")
+            # error(f"Unexpected error in listenToPeer: {e}")
             await self.disconnect(peer)
 
     async def handlePeerMessage(self, message: Message, peer: ConnectedPeer) -> None:

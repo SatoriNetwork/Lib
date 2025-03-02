@@ -1191,3 +1191,27 @@ class SatoriServerClient(object):
         except Exception as e:
             error_message = f"Error in setMiningMode: {str(e)}"
             return False, {"error": error_message}
+
+    def loopbackCheck(self, ipAddress:Union[str, None], port: Union[int, None]) -> tuple[bool, dict]:
+        """
+        asks the central server (could ask fellow Neurons) if our own dataserver
+        is publically reachable.
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.post,
+                endpoint='/api/v0/loopback/check',
+                payload=json.dumps({
+                    **({'ip': str(ipAddress)} if ipAddress is not None else {}),
+                    **({'port': port} if port is not None else {})}))
+            if response.status_code == 200:
+                try:
+                    return True, response.json().get('port_open', False)
+                except Exception as e:
+                    return False, {"unexpected error": e, "response.text": response.text}
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in setMiningMode: {str(e)}"
+            return False, {"error": error_message}

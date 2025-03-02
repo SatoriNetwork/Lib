@@ -33,14 +33,19 @@ class DataServer:
 
     async def startServer(self):
         """ Start the WebSocket server """
+        import socket
+        ipv6_mode = ':' in self.host
         self.server = await websockets.serve(
             self.handleConnection,
-            self.host,
-            self.port)
+            host=self.host,
+            port=self.port,
+            family=socket.AF_INET6 if ipv6_mode else socket.AF_INET
+        )
 
     async def handleConnection(self, websocket: websockets.WebSocketServerProtocol):
         """ handle incoming connections and messages """
-        peerAddr: Peer = Peer(*websocket.remote_address)
+        remoteAddr = websocket.remote_address
+        peerAddr: Peer = Peer(remoteAddr[0], remoteAddr[1])
         self.connectedClients[peerAddr] = self.connectedClients.get(
             peerAddr, ConnectedPeer(peerAddr, websocket)
         )
@@ -318,12 +323,14 @@ class DataServer:
                         if 'provider' in request.data.columns:
                             provider = request.data['provider'].values[0]
                     dataForSubscribers = self.dataManager.db._addSubDataToDatabase(request.uuid, request.data, provider)
-                    updatedMessage = Message({
-                                        'sub': request.sub,
-                                        'params': {'uuid': request.uuid},
-                                        'data': dataForSubscribers
-                                    })
-                    await self.updateSubscribers(updatedMessage)
+                    if not dataForSubscribers.empty:
+                        updatedMessage = Message({
+                                            'status': 'success',
+                                            'sub': request.sub,
+                                            'params': {'uuid': request.uuid},
+                                            'data': dataForSubscribers
+                                        })
+                        await self.updateSubscribers(updatedMessage)
                     return DataServerApi.statusSuccess.createResponse('Subscription data added to server database', request.id)
                 if request.replace:
                     self.dataManager.db.deleteTable(request.uuid)

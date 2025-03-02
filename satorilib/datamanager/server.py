@@ -203,16 +203,19 @@ class DataServer:
         elif request.method == DataServerApi.setPubsubMap.value:
             ''' local neuron client sends the related pub-sub streams it recieved from the rendevous server '''
             for k, v in request.uuid.items():
-                if k == 'transferProtocolFlag':
-                    self.dataManager.transferProtocolFlag = request.uuid.get(k, {})
+                if k == 'transferProtocol':
+                    self.dataManager.transferProtocol = request.uuid.get(k, {})
+                elif k == 'transferProtocolPayload':
+                    self.dataManager.transferProtocolPayload = request.uuid.get(k, {})
                 else:
                     self.dataManager.pubSubMapping[k] = v
             return DataServerApi.statusSuccess.createResponse('Pub-Sub map set in Server', request.id)
 
         elif request.method == DataServerApi.getPubsubMap.value:
             ''' this request fetches related pub-sub streams '''
-            pubSubInfo = {'pubSubMapping': _convertPeerInfoDict(self.dataManager.pubSubMapping), 
-                          'transferProtocolFlag': self.dataManager.transferProtocolFlag}
+            pubSubInfo = {'pubSubMapping': _convertPeerInfoDict(self.dataManager.pubSubMapping),
+                          'transferProtocol': self.dataManager.transferProtocol,
+                          'transferProtocolPayload': self.dataManager.transferProtocolPayload}
             return DataServerApi.statusSuccess.createResponse('Pub-Sub map fetched from server', request.id, streamInfo=pubSubInfo)
 
         elif request.method == DataServerApi.isStreamActive.value:
@@ -263,7 +266,7 @@ class DataServer:
             if request.uuid is not None:
                 self.connectedClients[peerAddr].addPublication(request.uuid)
                 return DataServerApi.statusSuccess.createResponse('Publication Stream added', request.id)
-            return DataServerApi.statusFail.createResponse('UUID must be provided', request.id) 
+            return DataServerApi.statusFail.createResponse('UUID must be provided', request.id)
 
         if request.uuid is None:
             return DataServerApi.statusFail.createResponse('Missing uuid parameter', request.id)

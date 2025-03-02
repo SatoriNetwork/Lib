@@ -49,7 +49,10 @@ class DataClient:
 
     async def connectToPeer(self, peerHost: str, peerPort: int = 24602):
         '''Connect to other Peers'''
-        uri = f'ws://{peerHost}:{peerPort}'
+        if ':' in peerHost and not peerHost.startswith('['):
+            uri = f'ws://[{peerHost}]:{peerPort}'
+        else:
+            uri = f'ws://{peerHost}:{peerPort}'
         try:
             websocket = await websockets.connect(uri)
             self.peers[(peerHost, peerPort)] = ConnectedPeer(

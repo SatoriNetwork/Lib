@@ -339,7 +339,7 @@ class Message:
         return self.message.get('method')
 
     @property
-    def streamInfo(self) -> str:
+    def streamInfo(self) -> Union[dict, list]:
         """Get the method"""
         return self.message.get('stream_info')
 

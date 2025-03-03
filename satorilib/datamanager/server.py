@@ -331,9 +331,13 @@ class DataServer:
                                             'status': 'success',
                                             'sub': request.sub,
                                             'params': {'uuid': request.uuid},
-                                            'data': dataForSubscribers
+                                            'data': dataForSubscribers,
+                                            'stream_info': self.dataManager.transferProtocolPayload if self.dataManager.transferProtocol == 'p2p-proactive' else None
                                         })
-                        await self.updateSubscribers(updatedMessage)
+                        if self.dataManager.transferProtocol == 'p2p-proactive':
+                            await self.connectedClients[peerAddr].websocket.send(updatedMessage.toBytes())
+                        else:
+                            await self.updateSubscribers(updatedMessage)
                     return DataServerApi.statusSuccess.createResponse('Subscription data added to server database', request.id)
                 if request.replace:
                     self.dataManager.db.deleteTable(request.uuid)

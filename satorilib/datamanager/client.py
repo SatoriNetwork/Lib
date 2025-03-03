@@ -101,11 +101,26 @@ class DataClient:
         except Exception as e:
             error('Unable to set data in server: ', e)
 
+    async def handleMessageForSubscriberClients(self, message: Message):
+        for ip in message.streamInfo:
+            try:
+                # TODO: how does one client authenticate with another client?
+                response = await self.send(
+                    peerAddr=(ip, self.serverPort),
+                    request=message
+                )
+                info(response.senderMsg)
+            except Exception as e:
+                # error('Unable to sent data to external client: ', e)
+                pass
+
     async def handleMessageForOwner(self, message: Message, peer: ConnectedPeer) -> None:
         ''' update state for the calling client '''
         if message.isSubscription:
             if peer.hostPort != self.serverHostPort:
                 await self.handleMessageForServer(message)
+            elif message.streamInfo is not None:
+                await self.handleMessageForSubscriberClients(message)
             subscription = self._findSubscription(
                 subscription=Subscription(message.uuid)
             )

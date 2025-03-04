@@ -332,9 +332,10 @@ class DataServer:
                                             'sub': request.sub,
                                             'params': {'uuid': request.uuid},
                                             'data': dataForSubscribers,
-                                            'stream_info': self.dataManager.transferProtocolPayload if self.dataManager.transferProtocol == 'p2p-proactive' else None
+                                            **({'stream_info': self.dataManager.transferProtocolPayload if self.dataManager.transferProtocol == 'p2p-proactive' else None } 
+                                                if self.dataManager.transferProtocol == 'p2p-proactive' and self.connectedClients[peerAddr].isLocal else {})
                                         })
-                        if self.dataManager.transferProtocol == 'p2p-proactive':
+                        if self.dataManager.transferProtocol == 'p2p-proactive' and self.connectedClients[peerAddr].isLocal:
                             await self.connectedClients[peerAddr].websocket.send(updatedMessage.toBytes())
                         else:
                             await self.updateSubscribers(updatedMessage)

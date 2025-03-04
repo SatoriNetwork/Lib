@@ -47,7 +47,7 @@ class DataClient:
         return True
         # return self.peers.get((host, port)) is not None
 
-    async def connectToPeer(self, peerHost: str, peerPort: int = 24602):
+    async def connectToPeer(self, peerHost: str, peerPort: int = 24602) -> bool:
         '''Connect to other Peers'''
         if ':' in peerHost and not peerHost.startswith('['):
             uri = f'ws://[{peerHost}]:{peerPort}'
@@ -63,9 +63,10 @@ class DataClient:
                 self.listenToPeer(self.peers[(peerHost, peerPort)])
             )
             debug(f'Connected to peer at {uri}', print=True)
+            return True
         except Exception as e:
             # error(f'Failed to connect to peer at {uri}: {e}')
-            pass
+            return False
 
     async def listenToPeer(self, peer: ConnectedPeer):
         ''' Handles receiving messages from an individual peer '''
@@ -183,20 +184,22 @@ class DataClient:
             await self.disconnect(connectedPeer)
         info('Disconnected from all peers and stopped server')
 
-    async def connect(self, peerAddr: Tuple[str, int]) -> Dict:
+    async def connect(self, peerAddr: Tuple[str, int], auth: bool = True) -> Dict:
         if peerAddr not in self.peers:
             peerHost, peerPort = peerAddr
-            await self.connectToPeer(peerHost, peerPort)
+            if await self.connectToPeer(peerHost, peerPort) and auth:
+                await self.authenticate(peerHost)
 
     async def send(
         self,
         peerAddr: Tuple[str, int],
         request: Message,
         sendOnly: bool = False,
+        auth: bool = True,
     ) -> Message:
         '''Send a request to a specific peer'''
         peerAddr = peerAddr or self.serverHostPort
-        await self.connect(peerAddr)
+        await self.connect(peerAddr, auth=auth)
         try:
             msg = request.toBytes()
             peer = self.peers[peerAddr]
@@ -240,7 +243,8 @@ class DataClient:
             auth['islocal'] = islocal
         response = await self.send(
             peerAddr=(peerHost, self.serverPort),
-            request=Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
+            request=Message(DataServerApi.initAuthenticate.createRequest(auth=auth)),
+            auth=False)
         if response.status == DataServerApi.statusSuccess.value:
             verified = self.identity.verify(
                 msg=self.identity.challenges.get(peerHost, ''),
@@ -252,7 +256,8 @@ class DataClient:
                 peer = self.peers.get((peerHost, self.serverPort), '')
                 answer = await self.send(
                     peerAddr=(peerHost, self.serverPort),
-                    request=Message(DataServerApi.initAuthenticate.createRequest(auth=auth)))
+                    request=Message(DataServerApi.initAuthenticate.createRequest(auth=auth)),
+                    auth=False)
                 if answer.status == DataServerApi.statusSuccess.value:
                     peer.setPubkey(response.auth.get('pubkey', None))
                     peer.setAddress(response.auth.get('address', None))

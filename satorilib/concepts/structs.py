@@ -13,24 +13,20 @@ class StreamId:
     """unique identifier for a stream"""
 
     @staticmethod
-    def generateUUID(data: dict) -> uuid:
+    def generateUUID(data: Union['StreamId', str, dict] = None) -> uuid:
         namespace = uuid.NAMESPACE_DNS
-        values = [
-            data.get('source'),
-            data.get('author'),
-            data.get('stream'),
-            data.get('target')]
-        combined = ':'.join(str(v) for v in values)
-        return uuid.uuid5(namespace, combined)
-
-    #@staticmethod
-    #def generateUUID(data: Union['StreamId', str, dict] = None) -> uuid:
-    #    namespace = uuid.NAMESPACE_DNS
-    #    if isinstance(data, StreamId):
-    #        data = data.jsonId
-    #    elif isinstance(data, dict):
-    #        data = StreamId.fromMap(data).jsonId
-    #    return uuid.uuid5(namespace, data)
+        if isinstance(data, StreamId):
+            #data = data.jsonId
+            data = data.topic(asJson=False)
+        if isinstance(data, dict):
+            #data = StreamId.fromMap(data).jsonId
+            values = [
+                data.get('source'),
+                data.get('author'),
+                data.get('stream'),
+                data.get('target')]
+            data = ':'.join(str(v) for v in values)
+        return uuid.uuid5(namespace, data)
 
     @staticmethod
     def keys():

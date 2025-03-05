@@ -105,9 +105,8 @@ class DataClient:
     async def handleMessageForSubscriberClients(self, message: Message):
         for ip in message.streamInfo:
             try:
-                # TODO: how does one client authenticate with another client?
                 response = await self.send(
-                    peerAddr=(ip, self.serverPort),
+                    peerAddr=(ip, self.serverPort), # TODO: fix the port stuff
                     request=message
                 )
                 info(response.senderMsg)

@@ -1244,7 +1244,7 @@ class SatoriServerClient(object):
                 function=requests.post,
                 endpoint='/api/v0/get/stream/subscribers',
                 payload=json.dumps({'streams': streams}))
-            if response.status_code == 200:
+            if 200 <= response.status_code < 400:
                 return True, response.json()
             else:
                 error_message = f"Server returned status code {response.status_code}: {response.text}"
@@ -1263,7 +1263,7 @@ class SatoriServerClient(object):
                 function=requests.post,
                 endpoint='/api/v0/get/stream/publisher',
                 payload=json.dumps({'streams': streams}))
-            if response.status_code == 200:
+            if 200 <= response.status_code < 400:
                 return True, response.json()
             else:
                 error_message = f"Server returned status code {response.status_code}: {response.text}"

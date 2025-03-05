@@ -320,7 +320,6 @@ class DataServer:
                     return DataServerApi.statusFail.createResponse('No data provided', request.id)
                 if request.isSubscription:
                     self.connectedClients[peerAddr].addPublication(request.uuid)
-                    # if provider is the local engine use that else let the server decide
                     provider = self.connectedClients[peerAddr].address
                     if self.connectedClients[peerAddr].isEngine:
                         if 'provider' in request.data.columns:
@@ -332,7 +331,7 @@ class DataServer:
                                             'sub': request.sub,
                                             'params': {'uuid': request.uuid},
                                             'data': dataForSubscribers,
-                                            **({'stream_info': self.dataManager.transferProtocolPayload if self.dataManager.transferProtocol == 'p2p-proactive' else None } 
+                                            **({'stream_info': self.dataManager.transferProtocolPayload[request.uuid] if request.uuid in self.dataManager.transferProtocolPayload else []} 
                                                 if self.dataManager.transferProtocol == 'p2p-proactive' and self.connectedClients[peerAddr].isLocal else {})
                                         })
                         if self.dataManager.transferProtocol == 'p2p-proactive' and self.connectedClients[peerAddr].isLocal:

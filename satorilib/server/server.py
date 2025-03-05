@@ -1233,3 +1233,41 @@ class SatoriServerClient(object):
         except Exception as e:
             error_message = f"Error in setMiningMode: {str(e)}"
             return False, {"error": error_message}
+
+    def getStreamsSubscribers(self, streams:list[str]) -> tuple[bool, list]:
+        """
+        asks the central server (could ask fellow Neurons) if our own dataserver
+        is publically reachable.
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.post,
+                endpoint='/api/v0/get/stream/subscribers',
+                payload=json.dumps({'streams': streams}))
+            if response.status_code == 200:
+                return True, response.json()
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in setMiningMode: {str(e)}"
+            return False, {"error": error_message}
+
+    def getStreamsPublishers(self, streams:list[str]) -> tuple[bool, list]:
+        """
+        asks the central server (could ask fellow Neurons) if our own dataserver
+        is publically reachable.
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.post,
+                endpoint='/api/v0/get/stream/publisher',
+                payload=json.dumps({'streams': streams}))
+            if response.status_code == 200:
+                return True, response.json()
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in setMiningMode: {str(e)}"
+            return False, {"error": error_message}

@@ -11,7 +11,7 @@ class DataServer:
     def __init__(
         self,
         host: str,
-        port: int = 24602,
+        port: int = 24600,
         identity: Union[Identity, None] = None,
     ):
         self.host = host
@@ -336,8 +336,7 @@ class DataServer:
                                         })
                         if self.dataManager.transferProtocol == 'p2p-proactive' and self.connectedClients[peerAddr].isLocal:
                             await self.connectedClients[peerAddr].websocket.send(updatedMessage.toBytes())
-                        else:
-                            await self.updateSubscribers(updatedMessage)
+                        await self.updateSubscribers(updatedMessage)
                     return DataServerApi.statusSuccess.createResponse('Subscription data added to server database', request.id)
                 if request.replace:
                     self.dataManager.db.deleteTable(request.uuid)

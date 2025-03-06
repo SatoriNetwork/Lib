@@ -68,6 +68,7 @@ class EvrmoreWallet(Wallet):
         isTestnet: bool = False,
         password: Union[str, None] = None,
         electrumx: Electrumx = None,
+        useElectrumx: bool = False,
         type: str = 'wallet',
         watchAssets: list[str] = None,
         skipSave: bool = False,
@@ -81,10 +82,13 @@ class EvrmoreWallet(Wallet):
             password=password,
             watchAssets=watchAssets,
             skipSave=skipSave,
-            pullFullTransactions=pullFullTransactions)
-        self.electrumx = (
-            electrumx or
-            EvrmoreWallet.createElectrumxConnection(hostPort=hostPort))
+            pullFullTransactions=pullFullTransactions,
+            useElectrumx=useElectrumx)
+
+        if self.useElectrumx:
+            self.electrumx = (
+                electrumx or
+                EvrmoreWallet.createElectrumxConnection(hostPort=hostPort))
         self.type = type
 
     @property

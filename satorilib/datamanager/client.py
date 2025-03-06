@@ -103,15 +103,16 @@ class DataClient:
             error('Unable to set data in server: ', e)
 
     async def handleMessageForSubscriberClients(self, message: Message):
-        for ip in message.streamInfo:
+        for hostPort in message.streamInfo:
+            host, port = hostPort.split(':')
             try:
                 response = await self.send(
-                    peerAddr=(ip, self.serverPort), # TODO: fix the port stuff
+                    peerAddr=(str(host), int(port)), 
                     request=message
                 )
                 info(response.senderMsg)
             except Exception as e:
-                # error('Unable to sent data to external client: ', e)
+                error('Unable to sent data to external client: ', e)
                 pass
 
     async def handleMessageForOwner(self, message: Message, peer: ConnectedPeer) -> None:

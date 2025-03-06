@@ -14,8 +14,8 @@ from satorilib.datamanager.api import DataServerApi, DataClientApi
 
 class DataClient:
 
-    def __init__(self, serverHost: str, identity: Union[Identity, None] = None):
-        self.serverPort = 24602
+    def __init__(self, serverHost: str, serverPort: int = 24602, identity: Union[Identity, None] = None):
+        self.serverPort = serverPort
         self.identity = identity
         self.serverHostPort: Tuple[str, int] = serverHost, self.serverPort
         self.peers: Dict[Tuple[str, int], ConnectedPeer] = {}

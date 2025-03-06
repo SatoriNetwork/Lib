@@ -187,7 +187,7 @@ class DataClient:
         if peerAddr not in self.peers:
             peerHost, peerPort = peerAddr
             if await self.connectToPeer(peerHost, peerPort) and auth:
-                await self.authenticate(peerHost)
+                await self.authenticate(peerHost=peerHost, peerPort=peerPort)
 
     async def send(
         self,
@@ -233,15 +233,16 @@ class DataClient:
     async def insertStreamData(self, uuid: str, data: pd.DataFrame, replace: bool = False, isSub: bool = False) -> Message:
         ''' sends the observation/prediction data to the server '''
         return await self.send((self.serverHostPort), Message(DataServerApi.insertStreamData.createRequest(uuid, data, replace, isSub=isSub)))
-
-    async def authenticate(self, peerHost: Union[str, None] = None, islocal: str = None) -> Message:
+    
+    async def authenticate(self, peerHost: Union[str, None] = None, peerPort: Union[int, None] = None, islocal: str = None) -> Message:
         ''' client initiates the auth process '''
         peerHost = peerHost if peerHost is not None else self.serverHostPort[0]
+        peerPort = peerPort if peerPort is not None else self.serverPort
         auth = self.identity.authenticationPayload(challengeId=peerHost)
         if islocal is not None:
             auth['islocal'] = islocal
         response = await self.send(
-            peerAddr=(peerHost, self.serverPort),
+            peerAddr=(peerHost, peerPort),
             request=Message(DataServerApi.initAuthenticate.createRequest(auth=auth)),
             auth=False)
         if response.status == DataServerApi.statusSuccess.value:
@@ -252,9 +253,9 @@ class DataClient:
                 address=response.auth.get('address', None))
             if verified:
                 auth = self.identity.authenticationPayload(challenged=response.auth.get('challenge', ''))
-                peer = self.peers.get((peerHost, self.serverPort), '')
+                peer = self.peers.get((peerHost, peerPort), '')
                 answer = await self.send(
-                    peerAddr=(peerHost, self.serverPort),
+                    peerAddr=(peerHost, peerPort),
                     request=Message(DataServerApi.initAuthenticate.createRequest(auth=auth)),
                     auth=False)
                 if answer.status == DataServerApi.statusSuccess.value:
@@ -264,7 +265,7 @@ class DataClient:
                     peer.setAesKey(self.identity.derivedKey(peer.sharedSecret))
                     return answer
         await self.disconnect(
-            peer=self.peers.get((peerHost, self.serverPort), ''))
+            peer=self.peers.get((peerHost, peerPort), ''))
         return Message(DataServerApi.statusFail.createResponse("Failed to authenticate"))
 
     async def isLocalNeuronClient(self) -> Message:

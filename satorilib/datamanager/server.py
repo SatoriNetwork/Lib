@@ -313,7 +313,7 @@ class DataServer:
             except Exception as e:
                 return DataServerApi.statusFail.createResponse('Failed to fetch data', request.id)
 
-        elif request.method == DataServerApi.insertStreamData.value:
+        elif request.method == DataServerApi.insertStreamData.value :
             ''' inserts the dataframe send in request into the database '''
             try:
                 if request.data is None:

@@ -92,7 +92,7 @@ class Electrumx(ElectrumxConnection):
         buffer = ''
         while not self.listenerStop.is_set():
             if not self.isConnected:
-                time.sleep(1)
+                time.sleep(10)
                 continue
             try:
                 raw = self.connection.recv(1024 * 16).decode('utf-8')
@@ -135,10 +135,15 @@ class Electrumx(ElectrumxConnection):
             except socket.timeout:
                 logging.warning('no activity for 10 minutes, wallet going to sleep.')
                 self.quiet.put(time.time())
-            # except Exception as e:
-            #    logging.error(f"Socket error during receive: {str(e)}")
-            #    self.quiet.put(time.time())
-            #    self.isConnected = False
+            except OSError as e:
+                # Typically errno = 9 here means 'Bad file descriptor'
+                logging.error("Socket closed. Marking self.isConnected = False.")
+                self.quiet.put(time.time())
+                self.isConnected = False
+            except Exception as e:
+                logging.error(f"Socket error during receive: {str(e)}")
+                self.quiet.put(time.time())
+                self.isConnected = False
 
     def listenForSubscriptions(self, method: str, params: list) -> dict:
         return self.subscriptions[Subscription(method, params)].get()

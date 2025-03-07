@@ -1271,3 +1271,56 @@ class SatoriServerClient(object):
         except Exception as e:
             error_message = f"Error in setMiningMode: {str(e)}"
             return False, {"error": error_message}
+
+
+    def getDataManagerPort(self) -> tuple[bool, list]:
+        """
+        gets the datamanager port for a wallet
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.t,
+                endpoint='/api/v0/datamanager/port/get')
+            if 200 <= response.status_code < 400:
+                return True, response.json()
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in setMiningMode: {str(e)}"
+            return False, {"error": error_message}
+
+    def getDataManagerPortByAddress(self, address:str) -> tuple[bool, list]:
+        """
+        gets the datamanager port for a wallet
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/api/v0/datamanager/port/get/{address}')
+            if 200 <= response.status_code < 400:
+                return True, response.json()
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in setMiningMode: {str(e)}"
+            return False, {"error": error_message}
+
+    def setDataManagerPort(self, port: int) -> tuple[bool, list]:
+        """
+        asks the central server (could ask fellow Neurons) if our own dataserver
+        is publically reachable.
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint=f'/api/v0/datamanager/port/set/{port}')
+            if 200 <= response.status_code < 400:
+                return True, response.json()
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in setMiningMode: {str(e)}"
+            return False, {"error": error_message}

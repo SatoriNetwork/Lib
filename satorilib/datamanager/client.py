@@ -14,7 +14,7 @@ from satorilib.datamanager.api import DataServerApi, DataClientApi
 
 class DataClient:
 
-    def __init__(self, serverHost: str, serverPort: int = 24600, identity: Union[Identity, None] = None):
+    def __init__(self, serverHost: str, serverPort: int = 24601, identity: Union[Identity, None] = None):
         self.serverPort = serverPort
         self.identity = identity
         self.serverHostPort: Tuple[str, int] = serverHost, self.serverPort
@@ -47,7 +47,7 @@ class DataClient:
         return True
         # return self.peers.get((host, port)) is not None
 
-    async def connectToPeer(self, peerHost: str, peerPort: int = 24600) -> bool:
+    async def connectToPeer(self, peerHost: str, peerPort: int = 24601) -> bool:
         '''Connect to other Peers'''
         if ':' in peerHost and not peerHost.startswith('['):
             uri = f'ws://[{peerHost}]:{peerPort}'
@@ -220,6 +220,7 @@ class DataClient:
         self,
         peerHost: str,
         uuid: str,
+        peerPort: Union[int, None] = None,
         publicationUuid: Union[str, None] = None,
         callback: Union[callable, None] = None) -> Message:
         ''' sends a subscription request to external source to recieve subscription updates '''
@@ -228,7 +229,7 @@ class DataClient:
         self._addStreamToServer(uuid, publicationUuid)
         subscription = Subscription(uuid, callback)
         self.subscriptions[subscription] = queue.Queue()
-        return await self.send((peerHost, self.serverPort), Message(DataServerApi.subscribe.createRequest(uuid))) # should we set isSub as True?
+        return await self.send((peerHost, peerPort if peerPort is not None else self.serverPort), Message(DataServerApi.subscribe.createRequest(uuid)))
 
     async def insertStreamData(self, uuid: str, data: pd.DataFrame, replace: bool = False, isSub: bool = False) -> Message:
         ''' sends the observation/prediction data to the server '''
@@ -280,41 +281,41 @@ class DataClient:
         ''' neuron local client gives the server pub/sub mapping info '''
         return await self.send((self.serverHostPort), Message(DataServerApi.setPubsubMap.createRequest(uuid)))
 
-    async def getPubsubMap(self, peerHost: str = None) -> Message:
+    async def getPubsubMap(self, peerHost: Union[str, None] = None, peerPort: Union[int, None] = None) -> Message:
         ''' engine local client gets pub/sub mapping info from the server '''
-        return await self.send((peerHost, self.serverPort) if peerHost else None, Message(DataServerApi.getPubsubMap.createRequest()))
+        return await self.send((peerHost, peerPort) if peerHost and peerPort else None, Message(DataServerApi.getPubsubMap.createRequest()))
 
-    async def isStreamActive(self, peerHost: str, uuid: str) -> Message:
+    async def isStreamActive(self, peerHost: str, uuid: str, peerPort: Union[int, None] = None) -> Message:
         ''' checks if the source server has an active stream the client is trying to subscribe to '''
-        return await self.send((peerHost, self.serverPort), Message(DataServerApi.isStreamActive.createRequest(uuid)))
+        return await self.send((peerHost, peerPort if peerPort is not None else self.serverPort), Message(DataServerApi.isStreamActive.createRequest(uuid)))
 
     async def streamInactive(self, uuid: str) -> Message:
         ''' tells the server that a particular stream is not active anymore '''
         return await self.send((self.serverHostPort), Message(DataServerApi.streamInactive.createRequest(uuid)))
 
-    async def getRemoteStreamData(self, peerHost: str, uuid: str)  -> Message:
+    async def getRemoteStreamData(self, peerHost: str, uuid: str, peerPort: Union[int, None] = None)  -> Message:
         ''' request for data from external server '''
-        return await self.send((peerHost, self.serverPort), Message(DataServerApi.getStreamData.createRequest(uuid)))
+        return await self.send((peerHost, peerPort if peerPort is not None else self.serverPort), Message(DataServerApi.getStreamData.createRequest(uuid)))
 
     async def getLocalStreamData(self, uuid: str)  -> Message:
         ''' request for data from local server '''
         return await self.send((self.serverHostPort), Message(DataServerApi.getStreamData.createRequest(uuid)))
 
-    async def getAvailableSubscriptions(self, peerHost: str)  -> Message:
+    async def getAvailableSubscriptions(self, peerHost: str, peerPort: Union[int, None] = None)  -> Message:
         ''' get from external server its list of available subscriptions '''
-        return await self.send((peerHost, self.serverPort), Message(DataServerApi.getAvailableSubscriptions.createRequest()))
+        return await self.send((peerHost, peerPort if peerPort is not None else self.serverPort), Message(DataServerApi.getAvailableSubscriptions.createRequest()))
 
     async def addActiveStream(self, uuid: str)  -> Message:
         ''' After confirming a stream is active, its send to its own server for adding it to its available streams '''
         return await self.send((self.serverHostPort), Message(DataServerApi.addActiveStream.createRequest(uuid)))
 
-    async def getStreamDataByRange(self, peerHost: str, uuid: str, fromDate: str, toDate: str)  -> Message:
+    async def getStreamDataByRange(self, peerHost: str, uuid: str, fromDate: str, toDate: str, peerPort: Union[int, None] = None)  -> Message:
         ''' request for data thats in a specific timestamp range  '''
-        return await self.send((peerHost, self.serverPort), Message(DataServerApi.getStreamDataByRange.createRequest(uuid, fromDate=fromDate, toDate=toDate)))
+        return await self.send((peerHost, peerPort if peerPort is not None else self.serverPort), Message(DataServerApi.getStreamDataByRange.createRequest(uuid, fromDate=fromDate, toDate=toDate)))
 
-    async def getStreamObservationByTime(self, peerHost: str, uuid: str, toDate: str)  -> Message:
+    async def getStreamObservationByTime(self, peerHost: str, uuid: str, toDate: str, peerPort: Union[int, None] = None)  -> Message:
         ''' request for row equal to or before a timestamp  '''
-        return await self.send((peerHost, self.serverPort), Message(DataServerApi.getStreamObservationByTime.createRequest(uuid, toDate=toDate)))
+        return await self.send((peerHost, peerPort if peerPort is not None else self.serverPort), Message(DataServerApi.getStreamObservationByTime.createRequest(uuid, toDate=toDate)))
 
     async def deleteStreamData(self, uuid: str, data: pd.DataFrame)  -> Message:
         ''' request to delete data from its own server '''

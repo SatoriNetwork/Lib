@@ -11,7 +11,7 @@ class DataServer:
     def __init__(
         self,
         host: str,
-        port: int = 24600,
+        port: int = 24601,
         identity: Union[Identity, None] = None,
     ):
         self.host = host

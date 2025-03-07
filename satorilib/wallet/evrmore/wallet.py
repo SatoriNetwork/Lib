@@ -68,7 +68,7 @@ class EvrmoreWallet(Wallet):
         isTestnet: bool = False,
         password: Union[str, None] = None,
         electrumx: Electrumx = None,
-        useElectrumx: bool = False,
+        useElectrumx: bool = True,
         type: str = 'wallet',
         watchAssets: list[str] = None,
         skipSave: bool = False,

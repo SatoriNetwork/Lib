@@ -112,7 +112,7 @@ class DataClient:
                 )
                 info(response.senderMsg)
             except Exception as e:
-                error('Unable to sent data to external client: ', e)
+                debug('Unable to sent data to external client: ', e, color='cyan')
                 pass
 
     async def handleMessageForOwner(self, message: Message, peer: ConnectedPeer) -> None:

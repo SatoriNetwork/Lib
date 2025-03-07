@@ -326,17 +326,23 @@ class DataServer:
                             provider = request.data['provider'].values[0]
                     dataForSubscribers = self.dataManager.db._addSubDataToDatabase(request.uuid, request.data, provider)
                     if not dataForSubscribers.empty:
-                        updatedMessage = Message({
-                                            'status': 'success',
-                                            'sub': request.sub,
-                                            'params': {'uuid': request.uuid},
-                                            'data': dataForSubscribers,
-                                            **({'stream_info': self.dataManager.transferProtocolPayload[request.uuid] if request.uuid in self.dataManager.transferProtocolPayload else []} 
-                                                if self.dataManager.transferProtocol == 'p2p-proactive' and self.connectedClients[peerAddr].isLocal else {})
-                                        })
+                        broadcastDict = {
+                            'status': 'success',
+                            'sub': request.sub,
+                            'params': {'uuid': request.uuid},
+                            'data': dataForSubscribers
+                        }
                         if self.dataManager.transferProtocol == 'p2p-proactive' and self.connectedClients[peerAddr].isLocal:
-                            await self.connectedClients[peerAddr].websocket.send(updatedMessage.toBytes())
-                        await self.updateSubscribers(updatedMessage)
+                            proactiveDict = broadcastDict.copy()
+                            proactiveDict['method'] = DataServerApi.insertStreamData.value
+                            if request.uuid in self.dataManager.transferProtocolPayload:
+                                proactiveDict['stream_info'] = self.dataManager.transferProtocolPayload[request.uuid]
+                            else:
+                                proactiveDict['stream_info'] = []
+                        proactiveMessage = Message(proactiveDict)
+                        if self.dataManager.transferProtocol == 'p2p-proactive' and self.connectedClients[peerAddr].isLocal:
+                            await self.connectedClients[peerAddr].websocket.send(proactiveMessage.toBytes())
+                        await self.updateSubscribers(Message(broadcastDict))
                     return DataServerApi.statusSuccess.createResponse('Subscription data added to server database', request.id)
                 if request.replace:
                     self.dataManager.db.deleteTable(request.uuid)

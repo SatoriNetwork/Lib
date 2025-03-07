@@ -106,11 +106,10 @@ class DataClient:
         for hostPort in message.streamInfo:
             host, port = hostPort.split(':')
             try:
-                response = await self.send(
+                await self.send(
                     peerAddr=(str(host), int(port)), 
                     request=message
                 )
-                info(response.senderMsg)
             except Exception as e:
                 debug('Unable to sent data to external client: ', e, color='cyan')
                 pass

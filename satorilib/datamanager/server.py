@@ -339,9 +339,7 @@ class DataServer:
                                 proactiveDict['stream_info'] = self.dataManager.transferProtocolPayload[request.uuid]
                             else:
                                 proactiveDict['stream_info'] = []
-                        proactiveMessage = Message(proactiveDict)
-                        if self.dataManager.transferProtocol == 'p2p-proactive' and self.connectedClients[peerAddr].isLocal:
-                            await self.connectedClients[peerAddr].websocket.send(proactiveMessage.toBytes())
+                            await self.connectedClients[peerAddr].websocket.send(Message(proactiveDict).toBytes())
                         await self.updateSubscribers(Message(broadcastDict))
                     return DataServerApi.statusSuccess.createResponse('Subscription data added to server database', request.id)
                 if request.replace:

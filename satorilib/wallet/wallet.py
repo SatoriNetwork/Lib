@@ -660,10 +660,11 @@ class Wallet(WalletBase):
         def invertDivisibility(divisibility: int):
             return (16 + 1) % (divisibility + 8 + 1)
 
-        divisions = self.stats.get('divisions', 8)
-        circulatingCoins = TxUtils.asAmount(int(self.stats.get(
+        stats = (self.stats or {})
+        divisions = stats.get('divisions', 8)
+        circulatingCoins = TxUtils.asAmount(int(stats.get(
             'sats_in_circulation', 100000000000000)))
-        # circulatingSats = self.stats.get(
+        # circulatingSats = stats.get(
         #    'sats_in_circulation', 100000000000000) / int('1' + ('0'*invertDivisibility(int(divisions))))
         # headTail = str(circulatingSats).split('.')
         # if headTail[1] == '0' or headTail[1] == '00000000':
@@ -674,8 +675,8 @@ class Wallet(WalletBase):
         return f'''
     Circulating Supply: {circulatingCoins}
     Decimal Points: {divisions}
-    Reissuable: {self.stats.get('reissuable', False)}
-    Issuing Transactions: {self.stats.get('source', {}).get('tx_hash', self.satoriOriginalTxHash)}
+    Reissuable: {stats.get('reissuable', False)}
+    Issuing Transactions: {stats.get('source', {}).get('tx_hash', self.satoriOriginalTxHash)}
     '''
 
     def authPayload(self, asDict: bool = False, challenge: str = None) -> Union[str, dict]:

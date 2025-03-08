@@ -14,7 +14,7 @@ from satorilib.datamanager.api import DataServerApi, DataClientApi
 
 class DataClient:
 
-    def __init__(self, serverHost: str, serverPort: int = 24601, identity: Union[Identity, None] = None):
+    def __init__(self, serverHost: str, serverPort: int = 24600, identity: Union[Identity, None] = None):
         self.serverPort = serverPort
         self.identity = identity
         self.serverHostPort: Tuple[str, int] = serverHost, self.serverPort
@@ -47,7 +47,7 @@ class DataClient:
         return True
         # return self.peers.get((host, port)) is not None
 
-    async def connectToPeer(self, peerHost: str, peerPort: int = 24601) -> bool:
+    async def connectToPeer(self, peerHost: str, peerPort: int = 24600) -> bool:
         '''Connect to other Peers'''
         if ':' in peerHost and not peerHost.startswith('['):
             uri = f'ws://[{peerHost}]:{peerPort}'

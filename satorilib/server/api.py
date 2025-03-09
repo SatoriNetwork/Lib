@@ -158,3 +158,6 @@ class CheckinDetails:
             f'\n\tsubscriptions: {self.subscriptions},'
             f'\n\tpublications: {self.publications},'
             f'\n\tpins: {self.pins})')
+
+    def get(self, key: str):
+        return self.raw.get(key, self.wallet.get(key))

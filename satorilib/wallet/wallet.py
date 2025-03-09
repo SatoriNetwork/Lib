@@ -217,6 +217,8 @@ class Wallet(WalletBase):
         self.unspentAssets = None
         self.status = None
         self.pullFullTransactions = pullFullTransactions
+        self.lastBalanceAmount = 0
+        self.lastCurrencyAmount = 0
         self.load()
         self.loadCache()
 
@@ -274,6 +276,15 @@ class Wallet(WalletBase):
     @property
     def ethAddress(self) -> str:
         return self.account.address
+
+    def shouldPullUnspents(self) -> bool:
+        return not (
+            self.lastBalanceAmount == self.balance.amount or 0 and
+            self.lastCurrencyAmount == self.currency.amount or 0)
+
+    def updateBalances(self):
+        self.lastBalanceAmount = self.balance.amount
+        self.lastCurrencyAmount = self.currency.amount
 
     ### Loading ################################################################
 
@@ -516,7 +527,10 @@ class Wallet(WalletBase):
     def getUnspents(self):
         if not self.useElectrumx:
             return
-        self.unspentCurrency = self.electrumx.api.getUnspentCurrency(scripthash=self.scripthash)
+        #import traceback
+        #traceback.print_stack()
+        self.electrumx.ensureConnected()
+        self.unspentCurrency = self.electrumx.api.getUnspentCurrency(scripthash=self.scripthash) or []
         self.unspentCurrency = [
             x for x in self.unspentCurrency
             if x.get('asset') == None]
@@ -526,7 +540,7 @@ class Wallet(WalletBase):
             #self.balanceOnChain = self.electrumx.api.getBalance(scripthash=self.scripthash)
             #logging.debug('self.balanceOnChain', self.balanceOnChain)
             # mempool sends all unspent transactions in currency and assets so we have to filter them here:
-            self.unspentAssets = self.electrumx.api.getUnspentAssets(scripthash=self.scripthash)
+            self.unspentAssets = self.electrumx.api.getUnspentAssets(scripthash=self.scripthash) or []
             self.unspentAssets = [
                 x for x in self.unspentAssets
                 if x.get('asset') != None]

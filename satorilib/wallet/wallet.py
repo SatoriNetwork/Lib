@@ -1795,7 +1795,7 @@ class Wallet(WalletBase):
                 txid = self.sendAllTransaction(address)
             else:
                 txid = self.satoriTransaction(amount=amount, address=address)
-            if len(txid) == 64:
+            if isinstance(txid, str) and len(txid) == 64:
                 return TransactionResult(
                     result=None,
                     success=True,

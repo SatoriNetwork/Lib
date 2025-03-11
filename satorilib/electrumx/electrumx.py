@@ -56,7 +56,6 @@ class Electrumx(ElectrumxConnection):
         self.lock = threading.Lock()
         self.subscriptions: dict[Subscription, queue.Queue] = {}
         self.responses: dict[str, dict] = {}
-        self.quiet = queue.Queue()
         self.listenerStop = threading.Event()
         self.pingerStop = threading.Event()
         self.startListener()
@@ -98,7 +97,6 @@ class Electrumx(ElectrumxConnection):
                 raw = self.connection.recv(1024 * 16).decode('utf-8')
                 buffer += raw
                 if raw == '':
-                    self.quiet.put(time.time())
                     self.isConnected = False
                     continue
                 if '\n' in raw:
@@ -128,21 +126,18 @@ class Electrumx(ElectrumxConnection):
                             self.responses[
                                 r.get('id', self._generateCallId())] = r
                     except json.decoder.JSONDecodeError as e:
-                        logging.error((
+                        logging.warning((
                             f"JSONDecodeError: {e} in message: {message} "
                             "error in _receive"))
-                        self.quiet.put(time.time())
             except socket.timeout:
-                logging.warning('no activity for 10 minutes, wallet going to sleep.')
-                self.quiet.put(time.time())
+                #logging.warning('no activity for 10 minutes, wallet going to sleep.')
+                pass
             except OSError as e:
                 # Typically errno = 9 here means 'Bad file descriptor'
-                logging.error("Socket closed. Marking self.isConnected = False.")
-                self.quiet.put(time.time())
+                logging.warning("Socket closed. Marking self.isConnected = False.")
                 self.isConnected = False
             except Exception as e:
-                logging.error(f"Socket error during receive: {str(e)}")
-                self.quiet.put(time.time())
+                logging.warning(f"Socket error during receive: {str(e)}")
                 self.isConnected = False
 
     def listenForSubscriptions(self, method: str, params: list) -> dict:
@@ -200,7 +195,9 @@ class Electrumx(ElectrumxConnection):
             self.isConnected = False
             return False
         try:
+            self.connection.settimeout(2)
             response = self.api.ping()
+            self.connection.settimeout(self.timeout)
             if response is None:
                 self.isConnected = False
                 return False
@@ -252,8 +249,7 @@ class Electrumx(ElectrumxConnection):
         self.connection.send(payload)
         if sendOnly:
             return None
-        x = self.listenForResponse(callId)
-        return x
+        return self.listenForResponse(callId)
 
     def subscribe(
         self,

@@ -58,6 +58,7 @@ class Electrumx(ElectrumxConnection):
         self.responses: dict[str, dict] = {}
         self.listenerStop = threading.Event()
         self.pingerStop = threading.Event()
+        self.ensureConnectedLock = threading.Lock()
         self.startListener()
         self.lastHandshake = 0
         self.handshaked = None
@@ -126,18 +127,17 @@ class Electrumx(ElectrumxConnection):
                             self.responses[
                                 r.get('id', self._generateCallId())] = r
                     except json.decoder.JSONDecodeError as e:
-                        logging.warning((
+                        logging.debug((
                             f"JSONDecodeError: {e} in message: {message} "
                             "error in _receive"))
             except socket.timeout:
-                #logging.warning('no activity for 10 minutes, wallet going to sleep.')
-                pass
+                logging.debug('no activity for 10 minutes, wallet going to sleep.')
             except OSError as e:
                 # Typically errno = 9 here means 'Bad file descriptor'
-                logging.warning("Socket closed. Marking self.isConnected = False.")
+                logging.debug("Socket closed. Marking self.isConnected = False.")
                 self.isConnected = False
             except Exception as e:
-                logging.warning(f"Socket error during receive: {str(e)}")
+                logging.debug(f"Socket error during receive: {str(e)}")
                 self.isConnected = False
 
     def listenForSubscriptions(self, method: str, params: list) -> dict:
@@ -210,10 +210,11 @@ class Electrumx(ElectrumxConnection):
             return False
 
     def ensureConnected(self) -> bool:
-        if not self.connected():
-            self.reconnect()
-            return self.connected()
-        return True
+        with self.ensureConnectedLock:
+            if not self.connected():
+                self.reconnect()
+                return self.connected()
+            return True
 
     def handshake(self):
         try:

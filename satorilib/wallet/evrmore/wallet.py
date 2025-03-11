@@ -45,8 +45,8 @@ class EvrmoreWallet(Wallet):
         hostPorts: list[str] = None,
         retry: int = 0,
     ) -> Electrumx:
-        hostports = hostPorts or EvrmoreWallet.electrumxServersWithoutSSL
-        hostPort = hostPort or random.choice(hostports)
+        hostPorts = hostPorts or EvrmoreWallet.electrumxServersWithoutSSL
+        hostPort = hostPort or random.choice(hostPorts)
         try:
             return Electrumx(
                 persistent=persistent,
@@ -57,7 +57,7 @@ class EvrmoreWallet(Wallet):
             if retry < len(hostPorts):
                 return EvrmoreWallet.createElectrumxConnection(
                     persistent=persistent,
-                    hostports=hostports,
+                    hostPorts=hostPorts,
                     retry=retry+1)
             raise e
 

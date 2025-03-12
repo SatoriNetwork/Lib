@@ -212,6 +212,7 @@ class Electrumx(ElectrumxConnection):
     def ensureConnected(self) -> bool:
         with self.ensureConnectedLock:
             if not self.connected():
+                logging.debug('ensureConnected() revealed wallet is not connected')
                 self.reconnect()
                 return self.connected()
             return True

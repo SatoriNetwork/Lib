@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Callable
 import os
 import json
 import joblib
@@ -172,12 +172,14 @@ class Wallet(WalletBase):
         walletPath: str,
         cachePath: Union[str, None] = None,
         reserve: float = .25,
+        kind: str = 'wallet',
         isTestnet: bool = False,
         password: Union[str, None] = None,
         watchAssets: Union[list[str], None] = None,
         skipSave: bool = False,
         pullFullTransactions: bool = True,
         useElectrumx: bool = True,
+        balanceUpdatedCallback: Union[Callable, None] = None,
     ):
         if walletPath == cachePath:
             raise Exception('wallet and cache paths cannot be the same')
@@ -202,6 +204,7 @@ class Wallet(WalletBase):
         self.reserve = TxUtils.asSats(reserve)
         self.stats = {}
         self.alias = None
+        self.kind = kind
         self.banner = None
         self.currency: Balance = Balance.empty('EVR')
         self.balance: Balance = Balance.empty('SATORI')
@@ -219,6 +222,7 @@ class Wallet(WalletBase):
         self.pullFullTransactions = pullFullTransactions
         self.lastBalanceAmount = 0
         self.lastCurrencyAmount = 0
+        self.balanceUpdatedCallback = balanceUpdatedCallback
         self.load()
         self.loadCache()
 
@@ -465,24 +469,18 @@ class Wallet(WalletBase):
                     callback=handleNotifiation))
 
     def preSend(self) -> bool:
-        if  (
-            self.useElectrumx and (
-                self.electrumx is None or (
-                    isinstance(self.electrumx, Electrumx) and
-                    not self.electrumx.connected()))
-        ):
+        if  self.useElectrumx and isinstance(self.electrumx, Electrumx):
             if self.electrumx.ensureConnected():
                 return True
-            self.stats = {'status': 'not connected'}
-            self.divisibility = self.divisibility or 8
-            self.banner = 'not connected'
-            self.transactionHistory = self.transactionHistory or []
-            self.unspentCurrency = self.unspentCurrency or []
-            self.unspentAssets = self.unspentAssets or []
-            self.currency = self.currency or 0
-            self.balance = self.balance or 0
-            return False
-        return True
+        self.stats = {'status': 'not connected'}
+        self.divisibility = self.divisibility or 8
+        self.banner = 'not connected'
+        self.transactionHistory = self.transactionHistory or []
+        self.unspentCurrency = self.unspentCurrency or []
+        self.unspentAssets = self.unspentAssets or []
+        self.currency = self.currency or 0
+        self.balance = self.balance or 0
+        return False
 
     def get(self, *args, **kwargs):
         ''' gets data from the blockchain, saves to attributes '''
@@ -512,8 +510,10 @@ class Wallet(WalletBase):
         self.balances = self.electrumx.api.getBalances(scripthash=self.scripthash)
         self.currency = Balance.fromBalances('EVR', self.balances or {})
         self.balance = Balance.fromBalances('SATORI', self.balances or {})
+        if self.balanceUpdatedCallback is not None:
+            self.balanceUpdatedCallback(kind=self.kind, evr=self.currency, satori=self.balance)
 
-    def getReadyToSend(self, balance: bool = True, save: bool = True):
+    def getReadyToSend(self, balance: bool = False, save: bool = True):
         if not self.useElectrumx:
             return
         if balance:

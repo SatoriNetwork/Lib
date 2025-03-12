@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Callable
 import random
 from evrmore import SelectParams
 from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret, P2SHEvrmoreAddress
@@ -69,11 +69,12 @@ class EvrmoreWallet(Wallet):
         password: Union[str, None] = None,
         electrumx: Electrumx = None,
         useElectrumx: bool = True,
-        type: str = 'wallet',
+        kind: str = 'wallet',
         watchAssets: list[str] = None,
         skipSave: bool = False,
         pullFullTransactions: bool = True,
         hostPort: str = None,
+        balanceUpdatedCallback: Union[Callable, None] = None,
     ):
         super().__init__(
             walletPath,
@@ -83,13 +84,14 @@ class EvrmoreWallet(Wallet):
             watchAssets=watchAssets,
             skipSave=skipSave,
             pullFullTransactions=pullFullTransactions,
-            useElectrumx=useElectrumx)
+            useElectrumx=useElectrumx,
+            balanceUpdatedCallback=balanceUpdatedCallback)
 
         if self.useElectrumx:
             self.electrumx = (
                 electrumx or
                 EvrmoreWallet.createElectrumxConnection(hostPort=hostPort))
-        self.type = type
+        self.kind = kind
 
     @property
     def symbol(self) -> str:

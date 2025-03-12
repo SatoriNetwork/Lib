@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Callable
 import random
 from evrmore import SelectParams
 from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret, P2SHEvrmoreAddress
@@ -45,8 +45,8 @@ class EvrmoreWallet(Wallet):
         hostPorts: list[str] = None,
         retry: int = 0,
     ) -> Electrumx:
-        hostports = hostPorts or EvrmoreWallet.electrumxServersWithoutSSL
-        hostPort = hostPort or random.choice(hostports)
+        hostPorts = hostPorts or EvrmoreWallet.electrumxServersWithoutSSL
+        hostPort = hostPort or random.choice(hostPorts)
         try:
             return Electrumx(
                 persistent=persistent,
@@ -57,7 +57,7 @@ class EvrmoreWallet(Wallet):
             if retry < len(hostPorts):
                 return EvrmoreWallet.createElectrumxConnection(
                     persistent=persistent,
-                    hostports=hostports,
+                    hostPorts=hostPorts,
                     retry=retry+1)
             raise e
 
@@ -68,11 +68,13 @@ class EvrmoreWallet(Wallet):
         isTestnet: bool = False,
         password: Union[str, None] = None,
         electrumx: Electrumx = None,
-        type: str = 'wallet',
+        useElectrumx: bool = True,
+        kind: str = 'wallet',
         watchAssets: list[str] = None,
         skipSave: bool = False,
         pullFullTransactions: bool = True,
         hostPort: str = None,
+        balanceUpdatedCallback: Union[Callable, None] = None,
     ):
         super().__init__(
             walletPath,
@@ -81,11 +83,15 @@ class EvrmoreWallet(Wallet):
             password=password,
             watchAssets=watchAssets,
             skipSave=skipSave,
-            pullFullTransactions=pullFullTransactions)
-        self.electrumx = (
-            electrumx or
-            EvrmoreWallet.createElectrumxConnection(hostPort=hostPort))
-        self.type = type
+            pullFullTransactions=pullFullTransactions,
+            useElectrumx=useElectrumx,
+            balanceUpdatedCallback=balanceUpdatedCallback)
+
+        if self.useElectrumx:
+            self.electrumx = (
+                electrumx or
+                EvrmoreWallet.createElectrumxConnection(hostPort=hostPort))
+        self.kind = kind
 
     @property
     def symbol(self) -> str:

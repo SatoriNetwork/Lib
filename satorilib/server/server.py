@@ -487,7 +487,8 @@ class SatoriServerClient(object):
         self,
         vaultSignature: Union[str, bytes],
         vaultPubkey: str,
-        address: str
+        address: str,
+        vaultAddress: str = '',
     ) -> tuple[bool, str]:
         ''' add lend address '''
         try:
@@ -499,6 +500,7 @@ class SatoriServerClient(object):
                 raiseForStatus=False,
                 payload=json.dumps({
                     'vaultSignature': vaultSignature,
+                    'vaultAddress': vaultAddress,
                     'vaultPubkey': vaultPubkey,
                     'address': address}))
             return response.status_code < 400, response.text
@@ -699,6 +701,19 @@ class SatoriServerClient(object):
         except Exception as e:
             logging.warning(
                 'unable to stakeProxyRemove due to connection timeout; try again Later.', e, color='yellow')
+            return False, {}
+
+    def invitedBy(self, address: str) -> tuple[bool, dict]:
+        ''' removes a stream from the server '''
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/invited/by',
+                payload=json.dumps({'referrer': address}))
+            return response.status_code < 400, response.text
+        except Exception as e:
+            logging.warning(
+                'unable to report referrer due to connection timeout; try again Later.', e, color='yellow')
             return False, {}
 
     def publish(
@@ -1054,6 +1069,24 @@ class SatoriServerClient(object):
 
     ## untested ##
 
+    def setPoolSize(self, poolStakeLimit: float) -> tuple[bool, dict]:
+        """
+        Function to set the pool size
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/pool/size/set',
+                payload=json.dumps({"poolStakeLimit": float(poolStakeLimit)}))
+            if response.status_code == 200:
+                return True, response.text
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in poolAcceptingWorkers: {str(e)}"
+            return False, {"error": error_message}
+
     def setPoolWorkerReward(self, rewardPercentage: float) -> tuple[bool, dict]:
         """
         Function to set the pool status to accepting or not accepting
@@ -1063,6 +1096,23 @@ class SatoriServerClient(object):
                 function=requests.post,
                 endpoint='/pool/worker/reward/set',
                 payload=json.dumps({"rewardPercentage": float(rewardPercentage)}))
+            if response.status_code == 200:
+                return True, response.text
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in poolAcceptingWorkers: {str(e)}"
+            return False, {"error": error_message}
+
+    def getPoolSize(self, address: str) -> tuple[bool, dict]:
+        """
+        Function to set the pool status to accepting or not accepting
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint=f'/pool/size/get/{address}')
             if response.status_code == 200:
                 return True, response.text
             else:

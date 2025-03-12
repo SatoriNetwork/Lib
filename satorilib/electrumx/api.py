@@ -35,7 +35,7 @@ class ElectrumxApi():
                 return ElectrumxApi.interpret(response)
             return response
         except Exception as e:
-            logging.error(f"Error during {method}: {str(e)}")
+            logging.debug(f"Error during {method}: {str(e)}")
 
     def sendSubscriptionRequest(
         self,
@@ -47,7 +47,7 @@ class ElectrumxApi():
             return ElectrumxApi.interpret(
                 self.subscribe(method, params or [], callback=callback))
         except Exception as e:
-            logging.error(f"Error during {method}: {str(e)}")
+            logging.debug(f"Error during {method}: {str(e)}")
 
     # endpoints ###############################################################
 

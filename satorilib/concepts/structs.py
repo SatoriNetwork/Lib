@@ -16,9 +16,16 @@ class StreamId:
     def generateUUID(data: Union['StreamId', str, dict] = None) -> uuid:
         namespace = uuid.NAMESPACE_DNS
         if isinstance(data, StreamId):
-            data = data.jsonId
-        elif isinstance(data, dict):
-            data = StreamId.fromMap(data).jsonId
+            #data = data.jsonId
+            data = data.topic(asJson=False)
+        if isinstance(data, dict):
+            #data = StreamId.fromMap(data).jsonId
+            values = [
+                data.get('source'),
+                data.get('author'),
+                data.get('stream'),
+                data.get('target')]
+            data = ':'.join(str(v) for v in values)
         return uuid.uuid5(namespace, data)
 
     @staticmethod
@@ -95,6 +102,31 @@ class StreamId:
             + (self.__stream or "")
             + (self.__target or "")
         )
+
+    def topic(
+        self,
+        asJson: bool = True,
+        authorAsPubkey=False
+    ) -> Union[str, dict[str, str]]:
+        """
+        the topic (id) for this stream.
+        this is how the pubsub system identifies the stream.
+        """
+        if asJson:
+            return self.topicJson(authorAsPubkey=authorAsPubkey)
+        return {
+            "source": self.__source,
+            "pubkey" if authorAsPubkey else "author": self.__author,
+            "stream": self.__stream,
+            "target": self.__target,
+        }
+
+    def topicJson(self, authorAsPubkey=False) -> str:
+        """
+        the topic (id) for this stream.
+        this is how the pubsub system identifies the stream.
+        """
+        return json.dumps(self.topic(asJson=False, authorAsPubkey=authorAsPubkey))
 
     def __repr__(self):
         return str(self.mapId)

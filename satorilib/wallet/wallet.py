@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Callable
 import os
 import json
 import joblib
@@ -172,15 +172,19 @@ class Wallet(WalletBase):
         walletPath: str,
         cachePath: Union[str, None] = None,
         reserve: float = .25,
+        kind: str = 'wallet',
         isTestnet: bool = False,
         password: Union[str, None] = None,
         watchAssets: Union[list[str], None] = None,
         skipSave: bool = False,
         pullFullTransactions: bool = True,
+        useElectrumx: bool = True,
+        balanceUpdatedCallback: Union[Callable, None] = None,
     ):
         if walletPath == cachePath:
             raise Exception('wallet and cache paths cannot be the same')
         super().__init__()
+        self.useElectrumx = useElectrumx
         self.skipSave = skipSave
         self.watchAssets = ['SATORI'] if watchAssets is None else watchAssets
         # at $100 SATORI this is 1 penny (for evr tx fee)
@@ -200,6 +204,7 @@ class Wallet(WalletBase):
         self.reserve = TxUtils.asSats(reserve)
         self.stats = {}
         self.alias = None
+        self.kind = kind
         self.banner = None
         self.currency: Balance = Balance.empty('EVR')
         self.balance: Balance = Balance.empty('SATORI')
@@ -215,6 +220,9 @@ class Wallet(WalletBase):
         self.unspentAssets = None
         self.status = None
         self.pullFullTransactions = pullFullTransactions
+        self.lastBalanceAmount = 0
+        self.lastCurrencyAmount = 0
+        self.balanceUpdatedCallback = balanceUpdatedCallback
         self.load()
         self.loadCache()
 
@@ -261,16 +269,26 @@ class Wallet(WalletBase):
 
     @property
     def account(self) -> 'eth_account.Account':
-        try:
-            from satorilib.wallet.ethereum.wallet import EthereumWallet
-            return EthereumWallet.generateAccount(self._entropy)
-        except Exception as e:
-            logging.error(e)
-            return None
+        if self.isDecrypted:
+            try:
+                from satorilib.wallet.ethereum.wallet import EthereumWallet
+                return EthereumWallet.generateAccount(self._entropy)
+            except Exception as e:
+                logging.error('error with eth account:', e)
+        return None
 
     @property
     def ethAddress(self) -> str:
         return self.account.address
+
+    def shouldPullUnspents(self) -> bool:
+        return not (
+            self.lastBalanceAmount == self.balance.amount or 0 and
+            self.lastCurrencyAmount == self.currency.amount or 0)
+
+    def updateBalances(self):
+        self.lastBalanceAmount = self.balance.amount
+        self.lastCurrencyAmount = self.currency.amount
 
     ### Loading ################################################################
 
@@ -444,30 +462,25 @@ class Wallet(WalletBase):
             self.getUnspentTransactions(threaded=True, then=thenSave)
             return True
 
-        if self.electrumx.ensureConnected():
+        if self.useElectrumx and self.electrumx.ensureConnected():
             return handleResponse(
                 self.electrumx.api.subscribeScripthash(
                     scripthash=self.scripthash,
                     callback=handleNotifiation))
 
     def preSend(self) -> bool:
-        if  (
-            self.electrumx is None or (
-                isinstance(self.electrumx, Electrumx) and
-                not self.electrumx.connected())
-        ):
+        if  self.useElectrumx and isinstance(self.electrumx, Electrumx):
             if self.electrumx.ensureConnected():
                 return True
-            self.stats = {'status': 'not connected'}
-            self.divisibility = self.divisibility or 8
-            self.banner = 'not connected'
-            self.transactionHistory = self.transactionHistory or []
-            self.unspentCurrency = self.unspentCurrency or []
-            self.unspentAssets = self.unspentAssets or []
-            self.currency = self.currency or 0
-            self.balance = self.balance or 0
-            return False
-        return True
+        self.stats = {'status': 'not connected'}
+        self.divisibility = self.divisibility or 8
+        self.banner = 'not connected'
+        self.transactionHistory = self.transactionHistory or []
+        self.unspentCurrency = self.unspentCurrency or []
+        self.unspentAssets = self.unspentAssets or []
+        self.currency = self.currency or 0
+        self.balance = self.balance or 0
+        return False
 
     def get(self, *args, **kwargs):
         ''' gets data from the blockchain, saves to attributes '''
@@ -478,21 +491,31 @@ class Wallet(WalletBase):
         self.getBalances()
 
     def getStats(self):
+        if not self.useElectrumx:
+            return
         self.stats = self.electrumx.api.getStats()
         self.divisibility = Wallet.openSafely(self.stats, 'divisions', 8)
         self.divisibility = self.divisibility if self.divisibility is not None else 8
         self.banner = self.electrumx.api.getBanner()
 
     def getTransactionHistory(self):
+        if not self.useElectrumx:
+            return
         self.transactionHistory = self.electrumx.api.getTransactionHistory(
             scripthash=self.scripthash)
 
     def getBalances(self):
+        if not self.useElectrumx:
+            return
         self.balances = self.electrumx.api.getBalances(scripthash=self.scripthash)
         self.currency = Balance.fromBalances('EVR', self.balances or {})
         self.balance = Balance.fromBalances('SATORI', self.balances or {})
+        if self.balanceUpdatedCallback is not None:
+            self.balanceUpdatedCallback(kind=self.kind, evr=self.currency, satori=self.balance)
 
-    def getReadyToSend(self, balance: bool = True, save: bool = True):
+    def getReadyToSend(self, balance: bool = False, save: bool = True):
+        if not self.useElectrumx:
+            return
         if balance:
             self.getBalances()
         self.getUnspents()
@@ -502,7 +525,12 @@ class Wallet(WalletBase):
             self.saveCache()
 
     def getUnspents(self):
-        self.unspentCurrency = self.electrumx.api.getUnspentCurrency(scripthash=self.scripthash)
+        if not self.useElectrumx:
+            return
+        #import traceback
+        #traceback.print_stack()
+        self.electrumx.ensureConnected()
+        self.unspentCurrency = self.electrumx.api.getUnspentCurrency(scripthash=self.scripthash) or []
         self.unspentCurrency = [
             x for x in self.unspentCurrency
             if x.get('asset') == None]
@@ -512,7 +540,7 @@ class Wallet(WalletBase):
             #self.balanceOnChain = self.electrumx.api.getBalance(scripthash=self.scripthash)
             #logging.debug('self.balanceOnChain', self.balanceOnChain)
             # mempool sends all unspent transactions in currency and assets so we have to filter them here:
-            self.unspentAssets = self.electrumx.api.getUnspentAssets(scripthash=self.scripthash)
+            self.unspentAssets = self.electrumx.api.getUnspentAssets(scripthash=self.scripthash) or []
             self.unspentAssets = [
                 x for x in self.unspentAssets
                 if x.get('asset') != None]
@@ -538,7 +566,7 @@ class Wallet(WalletBase):
                 self.balance or 0,
                 self.divisibility)
 
-    def getUnspentTransactions(self, threaded: bool = True, then: callable = None):
+    def getUnspentTransactions(self, threaded: bool = True, then: callable = None) -> bool:
 
         def run():
             transactionIds = {tx.txid for tx in self.transactions}
@@ -557,6 +585,8 @@ class Wallet(WalletBase):
             if callable(then):
                 then()
 
+        if not self.useElectrumx:
+            return False
         if threaded:
             self.getUnspentTransactionsThread = threading.Thread(
                 target=run, daemon=True)
@@ -572,6 +602,8 @@ class Wallet(WalletBase):
     ### Functions ##############################################################
 
     def appendTransaction(self, txid):
+        if not self.useElectrumx:
+            return
         self.electrumx.ensureConnected()
         if txid not in self._transactions.keys():
             raw = self.electrumx.api.getTransaction(txid)
@@ -642,10 +674,11 @@ class Wallet(WalletBase):
         def invertDivisibility(divisibility: int):
             return (16 + 1) % (divisibility + 8 + 1)
 
-        divisions = self.stats.get('divisions', 8)
-        circulatingCoins = TxUtils.asAmount(int(self.stats.get(
+        stats = (self.stats or {})
+        divisions = stats.get('divisions', 8)
+        circulatingCoins = TxUtils.asAmount(int(stats.get(
             'sats_in_circulation', 100000000000000)))
-        # circulatingSats = self.stats.get(
+        # circulatingSats = stats.get(
         #    'sats_in_circulation', 100000000000000) / int('1' + ('0'*invertDivisibility(int(divisions))))
         # headTail = str(circulatingSats).split('.')
         # if headTail[1] == '0' or headTail[1] == '00000000':
@@ -656,8 +689,8 @@ class Wallet(WalletBase):
         return f'''
     Circulating Supply: {circulatingCoins}
     Decimal Points: {divisions}
-    Reissuable: {self.stats.get('reissuable', False)}
-    Issuing Transactions: {self.stats.get('source', {}).get('tx_hash', self.satoriOriginalTxHash)}
+    Reissuable: {stats.get('reissuable', False)}
+    Issuing Transactions: {stats.get('source', {}).get('tx_hash', self.satoriOriginalTxHash)}
     '''
 
     def authPayload(self, asDict: bool = False, challenge: str = None) -> Union[str, dict]:
@@ -969,6 +1002,8 @@ class Wallet(WalletBase):
         ''' serialize '''
 
     def broadcast(self, txHex: str) -> str:
+        if not self.useElectrumx:
+            return ''
         self.electrumx.ensureConnected()
         return self.electrumx.api.broadcast(txHex)
 
@@ -1760,7 +1795,7 @@ class Wallet(WalletBase):
                 txid = self.sendAllTransaction(address)
             else:
                 txid = self.satoriTransaction(amount=amount, address=address)
-            if len(txid) == 64:
+            if isinstance(txid, str) and len(txid) == 64:
                 return TransactionResult(
                     result=None,
                     success=True,

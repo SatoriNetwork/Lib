@@ -180,6 +180,8 @@ class Electrumx(ElectrumxConnection):
 
     def reconnect(self):
         self.listenerStop.set()
+        while self.listener.is_alive():
+            time.sleep(1)
         if self.persistent:
             self.pingerStop.set()
         with self.lock:

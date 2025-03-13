@@ -86,12 +86,26 @@ class EvrmoreWallet(Wallet):
             pullFullTransactions=pullFullTransactions,
             useElectrumx=useElectrumx,
             balanceUpdatedCallback=balanceUpdatedCallback)
-
-        if self.useElectrumx:
-            self.electrumx = (
-                electrumx or
-                EvrmoreWallet.createElectrumxConnection(hostPort=hostPort))
         self.kind = kind
+        self.maybeConnect(electrumx, hostPort=hostPort)
+
+    def maybeConnect(self, electrumx = None, hostPort: str = None):
+        if self.useElectrumx:
+            if self.electrumx is None:
+                self.electrumx = (
+                    electrumx or
+                    EvrmoreWallet.createElectrumxConnection(hostPort=hostPort))
+                return self.electrumx is not None
+            elif self.electrumx.isConnected:
+                return True
+            else:
+                if self.electrumx.reconnect():
+                    return True
+                else:
+                    self.electrumx = None
+                    return self.maybeConnect(electrumx, hostPort=hostPort)
+        return False
+
 
     @property
     def symbol(self) -> str:

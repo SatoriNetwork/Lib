@@ -90,7 +90,8 @@ class Electrumx(ElectrumxConnection):
             return buffer.partition('\n')
 
         buffer = ''
-        while not self.listenerStop.is_set():
+        #while not self.listenerStop.is_set():
+        while True:
             if not self.isConnected:
                 time.sleep(10)
                 continue
@@ -178,42 +179,60 @@ class Electrumx(ElectrumxConnection):
                 self.connect()
                 self.handshake()
 
-    def reconnect(self):
+    def reconnect(self) -> bool:
         self.listenerStop.set()
-        while self.listener.is_alive():
-            time.sleep(1)
+        #while self.listener.is_alive():
+        #    time.sleep(1)
         if self.persistent:
             self.pingerStop.set()
+        print('reconnecting')
         with self.lock:
-            super().reconnect()
-            self.startListener()
-            self.handshake()
-            if self.persistent:
-                self.startPinger()
-            self.resubscribe()
+            print('reconnecting lock')
+            if super().reconnect():
+                #self.startListener() # no need to restart listener, because we don't kill it when disconnetced now
+                self.handshake()
+                if self.persistent:
+                    self.startPinger()
+                self.resubscribe()
+                return True
+            else:
+                logging.debug('reconnect failed')
+                self.isConnected = False
+        return False
 
     def connected(self) -> bool:
         if not super().connected():
+            print('not connected by super')
             self.isConnected = False
             return False
         try:
             self.connection.settimeout(2)
+            print('pinging')
             response = self.api.ping()
+            import traceback
+            traceback.print_stack()
+            print('pinged', response)
             self.connection.settimeout(self.timeout)
             if response is None:
+                print('not connected by ping')
                 self.isConnected = False
                 return False
+            print('connected')
             self.isConnected = True
             return True
         except Exception as e:
+            print('err', e)
             if not self.persistent:
                 logging.error(f'checking connected - {e}')
             self.isConnected = False
             return False
 
     def ensureConnected(self) -> bool:
+        print('ensure connetced')
         with self.ensureConnectedLock:
+            print('ensure connetced lock')
             if not self.connected():
+                print('ensure connetced lock if ')
                 logging.debug('ensureConnected() revealed wallet is not connected')
                 self.reconnect()
                 return self.connected()

@@ -16,7 +16,7 @@ class Ipns(CliCommunicator):
 
     @property
     def name(self):
-        return self.id.topic()
+        return self.id.jsonId
 
     def associateKeyWithStream(self):
         '''saves locally tells server'''

@@ -56,9 +56,9 @@ class Electrumx(ElectrumxConnection):
         self.lock = threading.Lock()
         self.subscriptions: dict[Subscription, queue.Queue] = {}
         self.responses: dict[str, dict] = {}
-        self.quiet = queue.Queue()
         self.listenerStop = threading.Event()
         self.pingerStop = threading.Event()
+        self.ensureConnectedLock = threading.Lock()
         self.startListener()
         self.lastHandshake = 0
         self.handshaked = None
@@ -90,15 +90,15 @@ class Electrumx(ElectrumxConnection):
             return buffer.partition('\n')
 
         buffer = ''
-        while not self.listenerStop.is_set():
+        #while not self.listenerStop.is_set():
+        while True:
             if not self.isConnected:
-                time.sleep(1)
+                time.sleep(10)
                 continue
             try:
                 raw = self.connection.recv(1024 * 16).decode('utf-8')
                 buffer += raw
                 if raw == '':
-                    self.quiet.put(time.time())
                     self.isConnected = False
                     continue
                 if '\n' in raw:
@@ -128,17 +128,18 @@ class Electrumx(ElectrumxConnection):
                             self.responses[
                                 r.get('id', self._generateCallId())] = r
                     except json.decoder.JSONDecodeError as e:
-                        logging.error((
+                        logging.debug((
                             f"JSONDecodeError: {e} in message: {message} "
                             "error in _receive"))
-                        self.quiet.put(time.time())
             except socket.timeout:
-                logging.warning('no activity for 10 minutes, wallet going to sleep.')
-                self.quiet.put(time.time())
-            # except Exception as e:
-            #    logging.error(f"Socket error during receive: {str(e)}")
-            #    self.quiet.put(time.time())
-            #    self.isConnected = False
+                logging.debug('no activity for 10 minutes, wallet going to sleep.')
+            except OSError as e:
+                # Typically errno = 9 here means 'Bad file descriptor'
+                logging.debug("Socket closed. Marking self.isConnected = False.")
+                self.isConnected = False
+            except Exception as e:
+                logging.debug(f"Socket error during receive: {str(e)}")
+                self.isConnected = False
 
     def listenForSubscriptions(self, method: str, params: list) -> dict:
         return self.subscriptions[Subscription(method, params)].get()
@@ -178,40 +179,64 @@ class Electrumx(ElectrumxConnection):
                 self.connect()
                 self.handshake()
 
-    def reconnect(self):
+    def reconnect(self) -> bool:
         self.listenerStop.set()
+        #while self.listener.is_alive():
+        #    time.sleep(1)
         if self.persistent:
             self.pingerStop.set()
+        print('reconnecting')
         with self.lock:
-            super().reconnect()
-            self.startListener()
-            self.handshake()
-            if self.persistent:
-                self.startPinger()
-            self.resubscribe()
+            print('reconnecting lock')
+            if super().reconnect():
+                #self.startListener() # no need to restart listener, because we don't kill it when disconnetced now
+                self.handshake()
+                if self.persistent:
+                    self.startPinger()
+                self.resubscribe()
+                return True
+            else:
+                logging.debug('reconnect failed')
+                self.isConnected = False
+        return False
 
     def connected(self) -> bool:
         if not super().connected():
+            print('not connected by super')
             self.isConnected = False
             return False
         try:
+            self.connection.settimeout(2)
+            print('pinging')
             response = self.api.ping()
+            import traceback
+            traceback.print_stack()
+            print('pinged', response)
+            self.connection.settimeout(self.timeout)
             if response is None:
+                print('not connected by ping')
                 self.isConnected = False
                 return False
+            print('connected')
             self.isConnected = True
             return True
         except Exception as e:
+            print('err', e)
             if not self.persistent:
                 logging.error(f'checking connected - {e}')
             self.isConnected = False
             return False
 
     def ensureConnected(self) -> bool:
-        if not self.connected():
-            self.reconnect()
-            return self.connected()
-        return True
+        print('ensure connetced')
+        with self.ensureConnectedLock:
+            print('ensure connetced lock')
+            if not self.connected():
+                print('ensure connetced lock if ')
+                logging.debug('ensureConnected() revealed wallet is not connected')
+                self.reconnect()
+                return self.connected()
+            return True
 
     def handshake(self):
         try:
@@ -247,8 +272,7 @@ class Electrumx(ElectrumxConnection):
         self.connection.send(payload)
         if sendOnly:
             return None
-        x = self.listenForResponse(callId)
-        return x
+        return self.listenForResponse(callId)
 
     def subscribe(
         self,

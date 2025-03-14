@@ -5,7 +5,6 @@ from eth_account import Account
 from eth_account.messages import encode_defunct
 from satorilib.disk.wallet import WalletApi
 
-
 class EthereumWallet():
     '''
     instead of inheriting from Wallet like RavencoinWallet and EvrmoreWallet
@@ -108,7 +107,13 @@ class EthereumWallet():
 
     @staticmethod
     def generateAccount(entropy: bytes):
-        return Account.from_key(entropy)
+        account = Account.from_key(entropy)
+        try:
+            from web3 import Web3
+            account.checksum_address = Web3.to_checksum_address(account.address)
+        except Exception as _:
+            account.checksum_address = None
+        return account
 
     def _generatePublicKey(self):
         '''

@@ -34,9 +34,15 @@ class ElectrumxConnection:
         ''' we closed the connection '''
         return self.connection._closed
 
-    def reconnect(self):
-        self.disconnect()
-        self.connect()
+    def reconnect(self) -> bool:
+        try:
+            self.disconnect()
+            self.connect()
+            return True
+        except Exception as e:
+            logging.debug(
+                f'error reconnecting to {self.host}:{str(self.port)} {e}')
+            return False
 
     def connect(self):
         self.connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

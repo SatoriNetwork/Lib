@@ -7,6 +7,77 @@ import base58
 class TxUtils():
     ''' utility methods for transactions '''
 
+    evrBurnMintAddressMain: str = 'EXBurnMintXXXXXXXXXXXXXXXXXXXbdK5E'
+    evrBurnMintAddressTest: str = 'n1BurnMintXXXXXXXXXXXXXXXXXXbVTQiY'
+
+    @staticmethod
+    def estimateMultisigFee(
+        inputCount: int,
+        outputCount: int,
+        signatureCount: int,
+        feeRateSatsPerByte: int = 1900,
+        # 150000 = 470 bytes which is 6
+        # 900000 = 1,914.893617021277 per byte
+        # 1500 per byte would probably be fine, we'll just use 1900 to be safe
+    ) -> int:
+        """
+        Estimate the transaction fee for a multisig P2SH transaction.
+
+        :param inputCount: Number of inputs (UTXOs being spent).
+        :param outputCount: Number of outputs (recipients + change).
+        :param signatureCount: Signatures required for each input.
+        :param feeRateSatsPerByte: Fee rate in satoshis per byte (default 10).
+        :return: Estimated fee in satoshis.
+        """
+        # Redeem script size for a multisig: OP_CHECKMULTISIG and public keys (~105 bytes for 2-of-3).
+        redeemScriptSize = 1 + (signatureCount * 33) + 1 + 1  # Multisig opcode overhead + keys + OP_CHECKMULTISIG
+
+        # Estimate the size of each input
+        inputSize = 32 + 4 + 1 + (signatureCount * 72) + redeemScriptSize + 4
+
+        # Estimate the size of each output
+        outputSize = 34
+
+        # Fixed transaction overhead
+        baseSize = 10  # Version + locktime
+
+        # Total transaction size
+        totalSize = baseSize + (inputCount * inputSize) + (outputCount * outputSize)
+
+        # Calculate fee
+        fee = totalSize * feeRateSatsPerByte
+        return fee
+    
+    @staticmethod
+    def estimateTransactionSize(inputCount: int, outputCount: int, signatureCount: int = 1) -> int:
+        """
+        Estimate the size of a transaction in bytes.
+
+        :param inputCount: Number of inputs.
+        :param outputCount: Number of outputs.
+        :param signatureCount: Number of signatures per input (default is 1 for standard transactions).
+        :return: Estimated transaction size in bytes.
+        """
+        # Typical sizes for transaction components
+        baseSize = 10  # Version (4 bytes) + locktime (4 bytes) + input/output count (2 bytes)
+        inputSize = 32 + 4 + 1 + (signatureCount * 72) + 33 + 4  # txid (32) + vout (4) + scriptSig size (1) + signatures (72 each) + pubkey (33) + sequence (4)
+        outputSize = 8 + 1 + 25  # value (8) + scriptPubKey size (1) + scriptPubKey (25)
+
+        # Calculate total size
+        totalSize = baseSize + (inputCount * inputSize) + (outputCount * outputSize)
+        return totalSize
+
+    @staticmethod
+    def txhexToTxid(txhex:str) -> str:
+        # Decode the hex string into bytes
+        raw = bytes.fromhex(txhex)
+        # Perform double SHA-256 hash
+        hash1 = hashlib.sha256(raw).digest()
+        hash2 = hashlib.sha256(hash1).digest()
+        # Convert to little-endian format for the txid
+        txid = hash2[::-1].hex()
+        return txid
+
     @staticmethod
     def estimatedFee(inputCount: int = 0, outputCount: int = 0, feeRate: int = 150000) -> int:
         '''

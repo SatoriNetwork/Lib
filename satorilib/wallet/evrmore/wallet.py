@@ -1,7 +1,7 @@
-from typing import Union
+from typing import Union, Callable
 import random
 from evrmore import SelectParams
-from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret
+from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret, P2SHEvrmoreAddress
 from evrmore.core.scripteval import VerifyScript, SCRIPT_VERIFY_P2SH
 from evrmore.core.script import CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, OP_EVR_ASSET, OP_DROP, OP_RETURN, SIGHASH_ANYONECANPAY
 from evrmore.core import b2x, lx, COutPoint, CMutableTxOut, CMutableTxIn, CMutableTransaction, Hash160
@@ -15,6 +15,7 @@ from satorilib.wallet.evrmore.sign import signMessage
 from satorilib.wallet.evrmore.verify import verify
 
 
+
 class EvrmoreWallet(Wallet):
 
     electrumxServers: list[str] = [
@@ -24,7 +25,7 @@ class EvrmoreWallet(Wallet):
         'electrum1-mainnet.evrmorecoin.org:50002',
         'electrum2-mainnet.evrmorecoin.org:50002',
         '1-electrum.satorinet.ie:50002', #WilQSL
-        'evr-electrum.wutup.io:50002', #Kasvot Växt
+        #'evr-electrum.wutup.io:50002', #Kasvot Växt
     ]
 
     electrumxServersWithoutSSL: list[str] = [
@@ -41,14 +42,24 @@ class EvrmoreWallet(Wallet):
     def createElectrumxConnection(
         persistent: bool = False,
         hostPort: str = None,
-        hostPorts: list[str] = None
+        hostPorts: list[str] = None,
+        retry: int = 0,
     ) -> Electrumx:
-        hostPort = hostPort or random.choice(
-            hostPorts or EvrmoreWallet.electrumxServers)
-        return Electrumx(
-            persistent=persistent,
-            host=hostPort.split(':')[0],
-            port=int(hostPort.split(':')[1]))
+        hostPorts = hostPorts or EvrmoreWallet.electrumxServersWithoutSSL
+        hostPort = hostPort or random.choice(hostPorts)
+        try:
+            return Electrumx(
+                persistent=persistent,
+                host=hostPort.split(':')[0],
+                port=int(hostPort.split(':')[1]))
+        except Exception as e:
+            logging.error(e)
+            if retry < len(hostPorts):
+                return EvrmoreWallet.createElectrumxConnection(
+                    persistent=persistent,
+                    hostPorts=hostPorts,
+                    retry=retry+1)
+            raise e
 
     def __init__(
         self,
@@ -57,11 +68,13 @@ class EvrmoreWallet(Wallet):
         isTestnet: bool = False,
         password: Union[str, None] = None,
         electrumx: Electrumx = None,
-        type: str = 'wallet',
+        useElectrumx: bool = True,
+        kind: str = 'wallet',
         watchAssets: list[str] = None,
         skipSave: bool = False,
         pullFullTransactions: bool = True,
-        noElectrumx: bool = False,
+        hostPort: str = None,
+        balanceUpdatedCallback: Union[Callable, None] = None,
     ):
         super().__init__(
             walletPath,
@@ -70,11 +83,28 @@ class EvrmoreWallet(Wallet):
             password=password,
             watchAssets=watchAssets,
             skipSave=skipSave,
-            pullFullTransactions=pullFullTransactions)
-        self.electrumx = electrumx or (
-            None if noElectrumx else
-            EvrmoreWallet.createElectrumxConnection())
-        self.type = type
+            pullFullTransactions=pullFullTransactions,
+            useElectrumx=useElectrumx,
+            balanceUpdatedCallback=balanceUpdatedCallback)
+        self.kind = kind
+        self.maybeConnect(electrumx, hostPort=hostPort)
+
+    def maybeConnect(self, electrumx = None, hostPort: str = None):
+        if self.useElectrumx:
+            if self.electrumx is None:
+                self.electrumx = (
+                    electrumx or
+                    EvrmoreWallet.createElectrumxConnection(hostPort=hostPort))
+                return self.electrumx is not None
+            elif self.electrumx.isConnected:
+                return True
+            else:
+                if self.electrumx.reconnect():
+                    return True
+                else:
+                    self.electrumx = None
+                    return self.maybeConnect(electrumx, hostPort=hostPort)
+        return False
 
     @property
     def symbol(self) -> str:
@@ -105,6 +135,18 @@ class EvrmoreWallet(Wallet):
     def satoriOriginalTxHash(self) -> str:
         # SATORI/TEST 15dd33886452c02d58b500903441b81128ef0d21dd22502aa684c002b37880fe
         return 'df745a3ee1050a9557c3b449df87bdd8942980dff365f7f5a93bc10cb1080188'
+
+    @property
+    def ethaddress(self) -> Union[str, None]:
+        try:
+            account = self.account
+            return (
+                account.checksum_address
+                if hasattr(account, 'checksum_address') else None
+            ) or account.address
+        except Exception as e:
+            logging.error(e)
+            return None
 
     # signature ###############################################################
 
@@ -139,7 +181,7 @@ class EvrmoreWallet(Wallet):
 
     def _checkSatoriValue(self, output: CMutableTxOut, amount: float=None) -> bool:
         '''
-        returns true if the output is a satori output of self.mundoFee
+        returns true if the output is a satori output of amount or self.mundoFee
         '''
         nextOne = False
         for i, x in enumerate(output.scriptPubKey):
@@ -220,9 +262,8 @@ class EvrmoreWallet(Wallet):
             txout = CMutableTxOut(
                 0,
                 CScript([
-                    OP_DUP, OP_HASH160,
-                    TxUtils.addressToH160Bytes(address),
-                    OP_EQUALVERIFY, OP_CHECKSIG, OP_EVR_ASSET,
+                    *CEvrmoreAddress(address).to_scriptPubKey(),
+                    OP_EVR_ASSET,
                     bytes.fromhex(
                         AssetTransaction.satoriHex(self.symbol) +
                         TxUtils.padHexStringTo8Bytes(
@@ -247,9 +288,8 @@ class EvrmoreWallet(Wallet):
             return CMutableTxOut(
                 0,
                 CScript([
-                    OP_DUP, OP_HASH160,
-                    TxUtils.addressToH160Bytes(self.address),
-                    OP_EQUALVERIFY, OP_CHECKSIG, OP_EVR_ASSET,
+                    *CEvrmoreAddress(self.address).to_scriptPubKey(),
+                    OP_EVR_ASSET,
                     bytes.fromhex(
                         AssetTransaction.satoriHex(self.symbol) +
                         TxUtils.padHexStringTo8Bytes(
@@ -275,6 +315,7 @@ class EvrmoreWallet(Wallet):
             txout = CMutableTxOut(
                 currencyChange,
                 scriptPubKey or self._addressObj.to_scriptPubKey())
+            # use *CEvrmoreAddress(self.address).to_scriptPubKey()? # supports P2SH automatically
             if returnSats:
                 return txout, currencyChange
             return txout

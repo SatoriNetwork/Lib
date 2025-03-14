@@ -1172,3 +1172,136 @@ class SatoriServerClient(object):
         except Exception as e:
             error_message = f"Error in setMiningMode: {str(e)}"
             return False, {"error": error_message}
+
+    def loopbackCheck(self, ipAddress:Union[str, None], port: Union[int, None]) -> bool:
+        """
+        asks the central server (could ask fellow Neurons) if our own dataserver
+        is publically reachable.
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.post,
+                endpoint='/api/v0/loopback/check',
+                payload=json.dumps({
+                    **({'ip': str(ipAddress)} if ipAddress is not None else {}),
+                    **({'port': port} if port is not None else {})}))
+            if response.status_code == 200:
+                try:
+                    return response.json().get('port_open', False)
+                except Exception as e:
+                    return False
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False
+        except Exception as e:
+            error_message = f"Error in setMiningMode: {str(e)}"
+            return False
+
+    def getSubscribers(self) -> tuple[bool, list]:
+        """
+        asks the central server (could ask fellow Neurons) if our own dataserver
+        is publically reachable.
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/api/v0/get/subscribers')
+            if response.status_code == 200:
+                return True, response.json()
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in setMiningMode: {str(e)}"
+            return False, {"error": error_message}
+
+    def getStreamsSubscribers(self, streams:list[str]) -> tuple[bool, list]:
+        """
+        asks the central server (could ask fellow Neurons) if our own dataserver
+        is publically reachable.
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.post,
+                endpoint='/api/v0/get/stream/subscribers',
+                payload=json.dumps({'streams': streams}))
+            if 200 <= response.status_code < 400:
+                return True, response.json()
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in setMiningMode: {str(e)}"
+            return False, {"error": error_message}
+
+    def getStreamsPublishers(self, streams:list[str]) -> tuple[bool, list]:
+        """
+        asks the central server (could ask fellow Neurons) if our own dataserver
+        is publically reachable.
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.post,
+                endpoint='/api/v0/get/stream/publisher',
+                payload=json.dumps({'streams': streams}))
+            if 200 <= response.status_code < 400:
+                return True, response.json()
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in setMiningMode: {str(e)}"
+            return False, {"error": error_message}
+
+
+    def getDataManagerPort(self) -> tuple[bool, list]:
+        """
+        gets the datamanager port for a wallet
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.t,
+                endpoint='/api/v0/datamanager/port/get')
+            if 200 <= response.status_code < 400:
+                return True, response.json()
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in setMiningMode: {str(e)}"
+            return False, {"error": error_message}
+
+    def getDataManagerPortByAddress(self, address:str) -> tuple[bool, list]:
+        """
+        gets the datamanager port for a wallet
+        """
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/api/v0/datamanager/port/get/{address}')
+            if 200 <= response.status_code < 400:
+                return True, response.json()
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in setMiningMode: {str(e)}"
+            return False, {"error": error_message}
+
+    def setDataManagerPort(self, port: int) -> tuple[bool, list]:
+        """
+        asks the central server (could ask fellow Neurons) if our own dataserver
+        is publically reachable.
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint=f'/api/v0/datamanager/port/set/{port}')
+            if 200 <= response.status_code < 400:
+                return True, response.json()
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in setMiningMode: {str(e)}"
+            return False, {"error": error_message}

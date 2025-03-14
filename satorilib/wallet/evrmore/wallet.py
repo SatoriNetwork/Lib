@@ -106,7 +106,6 @@ class EvrmoreWallet(Wallet):
                     return self.maybeConnect(electrumx, hostPort=hostPort)
         return False
 
-
     @property
     def symbol(self) -> str:
         return 'evr'

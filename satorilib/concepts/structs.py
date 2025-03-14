@@ -8,7 +8,6 @@ from functools import partial
 # from satorilib.utils.hash import generatePathId
 # from enum import Enum
 
-
 class StreamId:
     """unique identifier for a stream"""
 
@@ -91,6 +90,10 @@ class StreamId:
     def strId(self) -> str:
         return str((self.__source, self.__author, self.__stream, self.__target)).replace("'", '')
 
+    @property
+    def cleanId(self):
+        return self.strId
+  
     # TODO: remove after datamanager is live, this is used to determine the
     #       location of the dataset on disk as a csv, if we ever do save to
     #       disk we should use something else anyway
@@ -221,10 +224,10 @@ class StreamId:
 
 
 class StreamUuid(StreamId):
-    '''unique identifier for a stream'''
+    """unique identifier for a stream"""
 
-    def __init__(self, uuid: str):
-        super().__init__(source='', author='', stream='', target='')
+    def __init__(self, uuid: str, source: str='', author: str='', stream: str='', target: str=''):
+        super().__init__(source=source, author=author, stream=stream, target=target)
         self.uuid = uuid
 
 
@@ -461,6 +464,7 @@ class StreamOverview:
                     if k != "streamId" and k != "pinned"
                 },
                 **{
+                    "uuid": self.streamId.uuid,
                     "pinned": 1 if self.pinned else 0,
                     "hashed": self.hashed,
                     "source": self.streamId.source,
@@ -575,13 +579,14 @@ class Observation:
         return str(vars(self))
 
     def __repr__(self):
-        return f"Observation of {self.streamId}: " + str(
-            {
-                "time": self.time,
-                "data": self.value,
-                "hash": self.observationHash,
-            }
-        )
+        return f"Observation of {self.streamId}: " + str(self.dictionary)
+
+    @property
+    def dictionary(self):
+        return {
+            "time": self.time,
+            "data": self.value,
+            "hash": self.observationHash}
 
     @staticmethod
     def parse(raw):

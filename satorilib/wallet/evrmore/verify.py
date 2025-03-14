@@ -1,5 +1,5 @@
 from typing import Union
-from evrmore.signmessage import EvrmoreMessage, VerifyMessage
+from evrmore.signmessage import EvrmoreMessage
 
 
 def generateAddress(publicKey: Union[bytes, str]) -> str:
@@ -25,7 +25,13 @@ def verify(
         (publicKey is None and address is None)
     ):
         return False
-    return VerifyMessage(
-        address or generateAddress(publicKey),
-        EvrmoreMessage(message) if isinstance(message, str) else message,
-        signature if isinstance(signature, bytes) else signature.encode())
+    #return VerifyMessage(
+    #    address or generateAddress(publicKey),
+    #    EvrmoreMessage(message) if isinstance(message, str) else message,
+    #    signature if isinstance(signature, bytes) else signature.encode())
+    message = EvrmoreMessage(message) if isinstance(message, str) else message
+    return message.verify(
+        pubkey=publicKey,
+        address=address, #or generateAddress(publicKey),
+        signature=signature if isinstance(signature, bytes) else signature.encode())
+

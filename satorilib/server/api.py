@@ -146,6 +146,7 @@ class CheckinDetails:
         self.publications: str = raw.get('publications')
         self.pins: str = raw.get('pins')
         self.stakeRequired: str = raw.get('stakeRequired')
+
     def __str__(self):
         return (
             'CheckinDetails('

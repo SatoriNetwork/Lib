@@ -175,7 +175,8 @@ class DataClient:
     async def disconnect(self, peer: ConnectedPeer) -> None:
         peer.stop.set()
         await peer.websocket.close()
-        del self.peers[peer.hostPort]
+        if peer.hostPort in self.peers:
+            del self.peers[peer.hostPort]
 
     async def disconnectAll(self):
         ''' Disconnect from all peers and stop the server '''

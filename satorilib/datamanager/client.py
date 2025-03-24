@@ -103,15 +103,34 @@ class DataClient:
             error('Unable to set data in server: ', e)
 
     async def handleMessageForSubscriberClients(self, message: Message):
+        '''
+        DEBUGGING:
+            encountered this error:
+                2025-03-24 18:30:21,399 - ERROR - Task exception was never retrieved
+                future: <Task finished name='Task-136' coro=<DataClient.handlePeerMessage() done, defined at /Satori/Lib/satorilib/datamanager/client.py:89> exception=ValueError('too many values to unpack (expected 2)')>
+                Traceback (most recent call last):
+                File "/Satori/Lib/satorilib/datamanager/client.py", line 91, in handlePeerMessage
+                    await self.handleMessageForOwner(message, peer)
+                File "/Satori/Lib/satorilib/datamanager/client.py", line 123, in handleMessageForOwner
+                    await self.handleMessageForSubscriberClients(message)
+                File "/Satori/Lib/satorilib/datamanager/client.py", line 107, in handleMessageForSubscriberClients
+                    host, port = hostPort.split(':')
+                ValueError: too many values to unpack (expected 2)
+            added if statement below and not sure what to do about ipv6:
+        '''
         for hostPort in message.streamInfo:
-            host, port = hostPort.split(':')
-            try:
-                await self.send(
-                    peerAddr=(str(host), int(port)), 
-                    request=message
-                )
-            except Exception as e:
-                debug('Unable to sent data to external client: ', e, color='cyan')
+            x = hostPort.split(':')
+            if len(x) == 2: # ipv4
+                host, port = x
+                try:
+                    await self.send(
+                        peerAddr=(str(host), int(port)),
+                        request=message)
+                except Exception as e:
+                    debug('Unable to sent data to external client: ', e, color='cyan')
+                    pass
+            elif len(x) > 2: # ipv6
+                # TODO: how do we handle sending to ipv6 addresses?
                 pass
 
     async def handleMessageForOwner(self, message: Message, peer: ConnectedPeer) -> None:
@@ -235,7 +254,7 @@ class DataClient:
     async def insertStreamData(self, uuid: str, data: pd.DataFrame, replace: bool = False, isSub: bool = False) -> Message:
         ''' sends the observation/prediction data to the server '''
         return await self.send((self.serverHostPort), Message(DataServerApi.insertStreamData.createRequest(uuid, data, replace, isSub=isSub)))
-    
+
     async def authenticate(self, peerHost: Union[str, None] = None, peerPort: Union[int, None] = None, islocal: str = None) -> Message:
         ''' client initiates the auth process '''
         peerHost = peerHost if peerHost is not None else self.serverHostPort[0]

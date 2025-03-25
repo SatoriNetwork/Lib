@@ -49,7 +49,14 @@ class DataClient:
 
     async def connectToPeer(self, peerHost: str, peerPort: int = 24600) -> bool:
         '''Connect to other Peers'''
-        if ':' in peerHost and not peerHost.startswith('['):
+        import socket
+        try:
+            socket.inet_pton(socket.AF_INET6, peerHost)
+            is_ipv6 = True
+        except (socket.error, OSError):
+            is_ipv6 = False
+        # if ':' in peerHost and not peerHost.startswith('['):
+        if is_ipv6 and not peerHost.startswith('['):
             uri = f'ws://[{peerHost}]:{peerPort}'
         else:
             uri = f'ws://{peerHost}:{peerPort}'
@@ -119,18 +126,19 @@ class DataClient:
             added if statement below and not sure what to do about ipv6:
         '''
         for hostPort in message.streamInfo:
-            x = hostPort.split(':')
-            if len(x) == 2: # ipv4
-                host, port = x
-                try:
-                    await self.send(
-                        peerAddr=(str(host), int(port)),
-                        request=message)
-                except Exception as e:
-                    debug('Unable to sent data to external client: ', e, color='cyan')
-                    pass
-            elif len(x) > 2: # ipv6
-                # TODO: how do we handle sending to ipv6 addresses?
+            if hostPort.count(':') > 1:
+                last_colon = hostPort.rindex(':')
+                host = hostPort[:last_colon]
+                port = hostPort[last_colon + 1:]
+            else:
+                host, port = hostPort.split(':')
+            try:
+                await self.send(
+                    peerAddr=(str(host), int(port)), 
+                    request=message
+                )
+            except Exception as e:
+                debug('Unable to sent data to external client: ', e, color='cyan')
                 pass
 
     async def handleMessageForOwner(self, message: Message, peer: ConnectedPeer) -> None:

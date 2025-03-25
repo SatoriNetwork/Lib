@@ -15,21 +15,21 @@ async def main():
 
     walletPath = config.walletPath('wallet.yaml')
     # dataClient = DataClient('188.166.4.120', identity=EvrmoreIdentity(walletPath))
-    dataClient = DataClient('188.166.4.120', identity=EvrmoreIdentity(walletPath))
-    msg = Message({
-                    'method': DataServerApi.insertStreamData.value,
-                    'status': 'success',
-                    'sub': True,
-                    'params': {'uuid': '9b672d88-f38f-5522-8fe5-4d16d9fe1fe3'},
-                    'data': df,
-                    # **({'stream_info': self.dataManager.transferProtocolPayload[request.uuid] if request.uuid in self.dataManager.transferProtocolPayload else []} 
-                    #     if self.dataManager.transferProtocol == 'p2p-proactive' and self.connectedClients[peerAddr].isLocal else {})
-                })
+    dataClient = DataClient('23.160.72.62', identity=EvrmoreIdentity(walletPath))
+    # msg = Message({
+    #                 'method': DataServerApi.insertStreamData.value,
+    #                 'status': 'success',
+    #                 'sub': True,
+    #                 'params': {'uuid': '9b672d88-f38f-5522-8fe5-4d16d9fe1fe3'},
+    #                 'data': df,
+    #                 # **({'stream_info': self.dataManager.transferProtocolPayload[request.uuid] if request.uuid in self.dataManager.transferProtocolPayload else []} 
+    #                 #     if self.dataManager.transferProtocol == 'p2p-proactive' and self.connectedClients[peerAddr].isLocal else {})
+    #             })
     # try:
-    response = await dataClient.send(
-        peerAddr=('::', 24600),
-        request=msg
-        )
+    # response = await dataClient.send(
+    #     peerAddr=('::', 24600),
+    #     request=msg
+    #     )
     # await dataClient.insertStreamDataForRemote(
     #     '::',
     #     24600,
@@ -44,7 +44,8 @@ async def main():
     # response: Message = await dataClient.insertStreamData('9b672d88-f38f-5522-8fe5-4d16d9fe1fe3', 
     #                                                       df, 
     #                                                       isSub=True)
-    # response: Message = await dataClient.addActiveStream('009bb819-b737-55f5-b4d7-d851316eceae')
+    response: Message = await dataClient.addActiveStream('009bb819-b737-55f5-b4d7-d851316eceae')
+    print(response)
     # response: Message = await dataClient.isStreamActive('159.65.144.150', '009bb819-b737-55f5-b4d7-d851316eceae')
     # await asyncio.sleep(20)
     # df = pd.DataFrame({

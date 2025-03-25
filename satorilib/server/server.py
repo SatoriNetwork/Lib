@@ -1187,20 +1187,25 @@ class SatoriServerClient(object):
             error_message = f"Error in getContentCreated: {str(e)}"
             return False, {"error": error_message}
 
-    def approveInviters(self, approved: list[int]) -> tuple[bool, dict]:
+    def approveInviters(self, approved: list[int]) -> tuple[bool, list]:
         try:
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/api/v0/inviters/approve',
                 payload=json.dumps({"approved": approved}))
+            print(response)
+            print(response.text)
             if response.status_code == 200:
+                print('huh?')
                 return True, response.text
             else:
+                print('huh?2')
                 error_message = f"Server returned status code {response.status_code}: {response.text}"
+                print('huh?3')
                 return False, {"error": error_message}
         except Exception as e:
-            error_message = f"Error in setMiningMode: {str(e)}"
-            return False, {"error": error_message}
+            print('huh?4')
+            return False, {"error": f"Error in setMiningMode: {str(e)}"}
 
     def disapproveInviters(self, disapproved: list[int]) -> tuple[bool, dict]:
         try:

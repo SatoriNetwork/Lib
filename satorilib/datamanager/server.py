@@ -207,6 +207,8 @@ class DataServer:
                     self.dataManager.transferProtocol = request.uuid.get(k, {})
                 elif k == 'transferProtocolPayload':
                     self.dataManager.transferProtocolPayload = request.uuid.get(k, {})
+                elif k == 'transferProtocolKey':
+                    self.dataManager.transferProtocolKey = request.uuid.get(k, {})
                 else:
                     self.dataManager.pubSubMapping[k] = v
             return DataServerApi.statusSuccess.createResponse('Pub-Sub map set in Server', request.id)
@@ -215,7 +217,8 @@ class DataServer:
             ''' this request fetches related pub-sub streams '''
             pubSubInfo = {'pubSubMapping': _convertPeerInfoDict(self.dataManager.pubSubMapping),
                           'transferProtocol': self.dataManager.transferProtocol,
-                          'transferProtocolPayload': self.dataManager.transferProtocolPayload}
+                          'transferProtocolPayload': self.dataManager.transferProtocolPayload,
+                          'transferProtocolKey': self.dataManager.transferProtocolKey}
             return DataServerApi.statusSuccess.createResponse('Pub-Sub map fetched from server', request.id, streamInfo=pubSubInfo)
 
         elif request.method == DataServerApi.isStreamActive.value:

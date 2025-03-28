@@ -13,6 +13,7 @@ class DataManager:
         self.pubSubMapping: dict[str, dict] = {}
         self.transferProtocol: Union[dict, None] = None
         self.transferProtocolPayload: Union[list[dict], None] = None
+        self.transferProtocolKey: str = ''
         self.db = SqliteDatabase(db_path, db_name)
         self.db.importFromDataFolder()  # can be disabled if new rows are added to the Database and new rows recieved are inside the database
 

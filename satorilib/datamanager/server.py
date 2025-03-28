@@ -335,7 +335,7 @@ class DataServer:
                             'params': {'uuid': request.uuid},
                             'data': dataForSubscribers
                         }
-                        if self.dataManager.transferProtocol == 'p2p-proactive' and self.connectedClients[peerAddr].isLocal:
+                        if self.dataManager.transferProtocol == 'p2p-proactive-pubsub' and self.connectedClients[peerAddr].isLocal:
                             proactiveDict = broadcastDict.copy()
                             proactiveDict['method'] = DataServerApi.insertStreamData.value
                             if request.uuid in self.dataManager.transferProtocolPayload:

@@ -1172,3 +1172,67 @@ class SatoriServerClient(object):
         except Exception as e:
             error_message = f"Error in setMiningMode: {str(e)}"
             return False, {"error": error_message}
+
+    def getContentCreated(self) -> tuple[bool, dict]:
+        try:
+            response = self._makeUnauthenticatedCall(
+                function=requests.get,
+                endpoint='/api/v0/content/created/get')
+            if response.status_code == 200:
+                return True, response.json()
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in getContentCreated: {str(e)}"
+            return False, {"error": error_message}
+
+    def approveInviters(self, approved: list[int]) -> tuple[bool, list]:
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/api/v0/inviters/approve',
+                payload=json.dumps({"approved": approved}))
+            print(response)
+            print(response.text)
+            if response.status_code == 200:
+                print('huh?')
+                return True, response.text
+            else:
+                print('huh?2')
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                print('huh?3')
+                return False, {"error": error_message}
+        except Exception as e:
+            print('huh?4')
+            return False, {"error": f"Error in setMiningMode: {str(e)}"}
+
+    def disapproveInviters(self, disapproved: list[int]) -> tuple[bool, dict]:
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/api/v0/inviters/disapprove',
+                payload=json.dumps({"disapproved": disapproved}))
+            if response.status_code == 200:
+                return True, response.text
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in setMiningMode: {str(e)}"
+            return False, {"error": error_message}
+
+    def deleteContent(self, deleted: list[int]) -> tuple[bool, dict]:
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/api/v0/content/delete',
+                payload=json.dumps({"deleted": deleted}))
+            if response.status_code == 200:
+                return True, response.text
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in setMiningMode: {str(e)}"
+            return False, {"error": error_message}

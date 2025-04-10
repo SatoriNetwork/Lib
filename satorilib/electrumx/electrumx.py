@@ -90,7 +90,8 @@ class Electrumx(ElectrumxConnection):
             return buffer.partition('\n')
 
         buffer = ''
-        while not self.listenerStop.is_set():
+        #while not self.listenerStop.is_set():
+        while True:
             if not self.isConnected:
                 time.sleep(10)
                 continue
@@ -178,17 +179,24 @@ class Electrumx(ElectrumxConnection):
                 self.connect()
                 self.handshake()
 
-    def reconnect(self):
+    def reconnect(self) -> bool:
         self.listenerStop.set()
+        #while self.listener.is_alive():
+        #    time.sleep(1)
         if self.persistent:
             self.pingerStop.set()
         with self.lock:
-            super().reconnect()
-            self.startListener()
-            self.handshake()
-            if self.persistent:
-                self.startPinger()
-            self.resubscribe()
+            if super().reconnect():
+                #self.startListener() # no need to restart listener, because we don't kill it when disconnetced now
+                self.handshake()
+                if self.persistent:
+                    self.startPinger()
+                self.resubscribe()
+                return True
+            else:
+                logging.debug('reconnect failed')
+                self.isConnected = False
+        return False
 
     def connected(self) -> bool:
         if not super().connected():
@@ -197,6 +205,8 @@ class Electrumx(ElectrumxConnection):
         try:
             self.connection.settimeout(2)
             response = self.api.ping()
+            #import traceback
+            #traceback.print_stack()
             self.connection.settimeout(self.timeout)
             if response is None:
                 self.isConnected = False

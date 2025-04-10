@@ -282,9 +282,12 @@ class Wallet(WalletBase):
         return self.account.address
 
     def shouldPullUnspents(self) -> bool:
+        print(not (
+            self.lastBalanceAmount == (self.balance.amount or 0) and
+            self.lastCurrencyAmount == (self.currency.amount or 0)))
         return not (
-            self.lastBalanceAmount == self.balance.amount or 0 and
-            self.lastCurrencyAmount == self.currency.amount or 0)
+            self.lastBalanceAmount == (self.balance.amount or 0) and
+            self.lastCurrencyAmount == (self.currency.amount or 0))
 
     def updateBalances(self):
         self.lastBalanceAmount = self.balance.amount
@@ -462,16 +465,16 @@ class Wallet(WalletBase):
             self.getUnspentTransactions(threaded=True, then=thenSave)
             return True
 
-        if self.useElectrumx and self.electrumx.ensureConnected():
-            return handleResponse(
-                self.electrumx.api.subscribeScripthash(
-                    scripthash=self.scripthash,
-                    callback=handleNotifiation))
+        #if self.useElectrumx and self.electrumx.ensureConnected():
+        return handleResponse(
+            self.electrumx.api.subscribeScripthash(
+                scripthash=self.scripthash,
+                callback=handleNotifiation))
 
     def preSend(self) -> bool:
-        if  self.useElectrumx and isinstance(self.electrumx, Electrumx):
-            if self.electrumx.ensureConnected():
-                return True
+        #if  self.useElectrumx and isinstance(self.electrumx, Electrumx):
+            #if self.electrumx.ensureConnected():
+            #    return True
         self.stats = {'status': 'not connected'}
         self.divisibility = self.divisibility or 8
         self.banner = 'not connected'
@@ -484,11 +487,15 @@ class Wallet(WalletBase):
 
     def get(self, *args, **kwargs):
         ''' gets data from the blockchain, saves to attributes '''
-        if not self.preSend():
-            return
-        self.getStats()
-        self.getTransactionHistory()
-        self.getBalances()
+        try:
+            self.maybeConnect()
+            if self.banner is None or self.banner == 'not connected':
+                self.getStats()
+                self.getTransactionHistory()
+            self.getBalances()
+            self.updateBalances()
+        except Exception as e:
+            logging.debug('unable to get balances', e)
 
     def getStats(self):
         if not self.useElectrumx:
@@ -516,20 +523,24 @@ class Wallet(WalletBase):
     def getReadyToSend(self, balance: bool = False, save: bool = True):
         if not self.useElectrumx:
             return
-        if balance:
-            self.getBalances()
-        self.getUnspents()
-        self.getUnspentTransactions(threaded=False)
-        self.getUnspentSignatures()
-        if save:
-            self.saveCache()
+        try:
+            self.maybeConnect()
+            if balance:
+                self.getBalances()
+            self.getUnspents()
+            self.getUnspentTransactions(threaded=False)
+            self.getUnspentSignatures()
+            if save:
+                self.saveCache()
+        except Exception as e:
+            logging.debug('unable to get reaedy to send', e)
 
     def getUnspents(self):
         if not self.useElectrumx:
             return
         #import traceback
         #traceback.print_stack()
-        self.electrumx.ensureConnected()
+        #self.electrumx.ensureConnected()
         self.unspentCurrency = self.electrumx.api.getUnspentCurrency(scripthash=self.scripthash) or []
         self.unspentCurrency = [
             x for x in self.unspentCurrency
@@ -604,7 +615,7 @@ class Wallet(WalletBase):
     def appendTransaction(self, txid):
         if not self.useElectrumx:
             return
-        self.electrumx.ensureConnected()
+        #self.electrumx.ensureConnected()
         if txid not in self._transactions.keys():
             raw = self.electrumx.api.getTransaction(txid)
             if raw is not None:
@@ -1004,7 +1015,7 @@ class Wallet(WalletBase):
     def broadcast(self, txHex: str) -> str:
         if not self.useElectrumx:
             return ''
-        self.electrumx.ensureConnected()
+        self.maybeConnect()
         return self.electrumx.api.broadcast(txHex)
 
     ### Transactions ###########################################################

@@ -133,7 +133,7 @@ class EvrmoreWallet(Wallet):
             except Exception as e:
                 logging.warning(f"Error reading cached peers: {str(e)}")
 
-        if len(weightedPeers) < 3:
+        if weightedPeers is None or len(weightedPeers) == 1:
             weightedPeers = [w[0] for w in weightedPeers] + (
                 EvrmoreWallet.electrumxServers if use_ssl 
                 else EvrmoreWallet.electrumxServersWithoutSSL)

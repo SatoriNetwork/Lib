@@ -64,7 +64,7 @@ class EvrmoreWallet(Wallet):
 
     electrumxServers: list[str] = [
         '128.199.1.149:50002',
-        '146.190.149.237:50002',
+        #'146.190.149.237:50002',
         '146.190.38.120:50002',
         'electrum1-mainnet.evrmorecoin.org:50002',
         'electrum2-mainnet.evrmorecoin.org:50002',
@@ -133,8 +133,8 @@ class EvrmoreWallet(Wallet):
             except Exception as e:
                 logging.warning(f"Error reading cached peers: {str(e)}")
 
-        if len(weightedPeers) < 3:
-            weightedPeers = [w[0] for w in weightedPeers] + (
+        if weightedPeers is None or len(weightedPeers) < 3:
+            weightedPeers = [w[0] for w in (weightedPeers or [])] + (
                 EvrmoreWallet.electrumxServers if use_ssl 
                 else EvrmoreWallet.electrumxServersWithoutSSL)
         

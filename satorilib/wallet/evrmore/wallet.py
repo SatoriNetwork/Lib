@@ -1,5 +1,9 @@
 from typing import Union, Callable
+import os
+import time
 import random
+import numpy as np
+import pandas as pd
 from evrmore import SelectParams
 from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret, P2SHEvrmoreAddress
 from evrmore.core.scripteval import VerifyScript, SCRIPT_VERIFY_P2SH
@@ -13,10 +17,6 @@ from satorilib.wallet.utils.transaction import TxUtils
 from satorilib.wallet.wallet import Wallet
 from satorilib.wallet.evrmore.sign import signMessage
 from satorilib.wallet.evrmore.verify import verify
-import os
-import pandas as pd
-import time
-import numpy as np
 
 
 
@@ -134,16 +134,12 @@ class EvrmoreWallet(Wallet):
                 logging.warning(f"Error reading cached peers: {str(e)}")
 
         if weightedPeers is None or len(weightedPeers) == 1:
-            weightedPeers = [w[0] for w in weightedPeers] + (
+            weightedPeers = [w[0] for w in (weightedPeers or [])] + (
                 EvrmoreWallet.electrumxServers if use_ssl 
                 else EvrmoreWallet.electrumxServersWithoutSSL)
         
-        
         # If no hostPort selected from cache, use provided or fall back to hardcoded list
-        hostPorts = hostPorts or weightedPeers or (
-            EvrmoreWallet.electrumxServers if use_ssl 
-            else EvrmoreWallet.electrumxServersWithoutSSL)
-            
+        hostPorts = hostPorts or weightedPeers
         hostPort = hostPort or (
             random.choice(hostPorts) 
             if isinstance(hostPorts[0], str) 

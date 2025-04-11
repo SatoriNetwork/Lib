@@ -13,10 +13,54 @@ from satorilib.wallet.utils.transaction import TxUtils
 from satorilib.wallet.wallet import Wallet
 from satorilib.wallet.evrmore.sign import signMessage
 from satorilib.wallet.evrmore.verify import verify
+import os
+import pandas as pd
+import time
+import numpy as np
 
 
 
 class EvrmoreWallet(Wallet):
+    #electrumxServers = pd.DataFrame({
+    #    'ip': [
+    #        '128.199.1.149',
+    #        '146.190.149.237',
+    #        '146.190.38.120',
+    #        'electrum1-mainnet.evrmorecoin.org',
+    #        'electrum2-mainnet.evrmorecoin.org',
+    #        'electrumx.satorinet.ie',
+    #        '1-electrum.satorinet.ie',
+    #        'evr-electrum.wutup.io',
+    #        '128.199.1.149',
+    #        '146.190.149.237',
+    #        '146.190.38.120',
+    #        'electrum1-mainnet.evrmorecoin.org',
+    #        'electrum2-mainnet.evrmorecoin.org',
+    #        '135.181.212.189', #WilQSL
+    #        'evr-electrum.wutup.io', #Kasvot Växt
+    #    ],
+    #    'domain': [
+    #        '128.199.1.149',
+    #        '146.190.149.237',
+    #        '146.190.38.120',
+    #        'electrum1-mainnet.evrmorecoin.org',
+    #        'electrum2-mainnet.evrmorecoin.org',
+    #        'electrumx.satorinet.ie',
+    #        '1-electrum.satorinet.ie',
+    #        'evr-electrum.wutup.io',
+    #        '128.199.1.149',
+    #        '146.190.149.237',
+    #        '146.190.38.120',
+    #        'electrum1-mainnet.evrmorecoin.org',
+    #        'electrum2-mainnet.evrmorecoin.org',
+    #        '135.181.212.189', #WilQSL
+    #        'evr-electrum.wutup.io', #Kasvot Växt
+    #    ],
+    #    'version': ['v1.10','v1.10','v1.10','v1.10','v1.10','v1.10','v1.10','v1.10','v1.10','v1.10','v1.10','v1.10','v1.10','v1.10','v1.10'],
+    #    'port': ['50002','50002','50002','50002','50002','50002','50002','50002','50001','50001','50001','50001','50001','50001','50001'],
+    #    'port_type': ['s','s','s','s','s','s','s','s','t','t','t','t','t','t','t'],
+    #    'timestamp': ['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0']
+    #})
 
     electrumxServers: list[str] = [
         '128.199.1.149:50002',
@@ -24,10 +68,12 @@ class EvrmoreWallet(Wallet):
         '146.190.38.120:50002',
         'electrum1-mainnet.evrmorecoin.org:50002',
         'electrum2-mainnet.evrmorecoin.org:50002',
-        '1-electrum.satorinet.ie:50002', #WilQSL
+        'electrumx.satorinet.ie:50002', #WilQSL
+        #'1-electrum.satorinet.ie:50002', #WilQSL
         #'evr-electrum.wutup.io:50002', #Kasvot Växt
     ]
 
+    # subscriptions work better without ssl for some reason
     electrumxServersWithoutSSL: list[str] = [
         '128.199.1.149:50001',
         '146.190.149.237:50001',
@@ -42,23 +88,90 @@ class EvrmoreWallet(Wallet):
     def createElectrumxConnection(
         persistent: bool = False,
         hostPort: str = None,
-        hostPorts: list[str] = None,
-        retry: int = 0,
+        hostPorts: Union[list[str], None] = None,
+        use_ssl: bool = True,
     ) -> Electrumx:
-        hostPorts = hostPorts or EvrmoreWallet.electrumxServersWithoutSSL
-        hostPort = hostPort or random.choice(hostPorts)
+        weightedPeers = None
+        cachedPeersFile = '/Satori/Neuron/wallet/peers.csv'
+        if hostPorts is None or len(hostPorts) == 0:
+            # First try to get peers from cache
+            try:
+                if os.path.exists(cachedPeersFile):
+                    df = pd.read_csv(cachedPeersFile)
+                    if not df.empty:
+                        # Filter by port type if needed - 's' for SSL, 't' for TCP
+                        port_type = 's' if use_ssl else 't'
+                        
+                        # Use both types if port_type column exists, otherwise assume all are SSL
+                        if 'port_type' in df.columns:
+                            if use_ssl:
+                                # If SSL requested, prefer SSL ports but include TCP if needed
+                                ssl_df = df[df['port_type'] == 's']
+                                if not ssl_df.empty:
+                                    df = ssl_df
+                            else:
+                                # If no SSL requested, prefer TCP ports but include SSL if needed
+                                tcp_df = df[df['port_type'] == 't']
+                                if not tcp_df.empty:
+                                    df = tcp_df
+                        
+                        # Sort by timestamp to try most recent peers first
+                        df = df.sort_values('timestamp', ascending=False)
+                        
+                        # Calculate weights based on timestamp
+                        currentTime = time.time()
+                        # Convert timestamps to weights - more recent = higher weight
+                        # Using exponential decay: weight = e^(-k * (currentTime - timestamp))
+                        # where k controls how quickly the weight decays
+                        k = 0.1  # Adjust this value to control the decay rate
+                        df['weight'] = np.exp(-k * (currentTime - df['timestamp']))
+                        # Normalize weights to sum to 1
+                        df['weight'] = df['weight'] / df['weight'].sum()
+                        # Convert to list of tuples (peer, weight)
+                        weightedPeers = [(f"{row['ip']}:{row['port']}", row['weight']) 
+                                        for _, row in df.iterrows()]
+            except Exception as e:
+                logging.warning(f"Error reading cached peers: {str(e)}")
+
+        if len(weightedPeers) < 3:
+            weightedPeers = [w[0] for w in weightedPeers] + (
+                EvrmoreWallet.electrumxServers if use_ssl 
+                else EvrmoreWallet.electrumxServersWithoutSSL)
+        
+        
+        # If no hostPort selected from cache, use provided or fall back to hardcoded list
+        hostPorts = hostPorts or weightedPeers or (
+            EvrmoreWallet.electrumxServers if use_ssl 
+            else EvrmoreWallet.electrumxServersWithoutSSL)
+            
+        hostPort = hostPort or (
+            random.choice(hostPorts) 
+            if isinstance(hostPorts[0], str) 
+            else random.choices(
+                [p[0] for p in hostPorts],
+                weights=[p[1] for p in hostPorts],
+                k=1)[0]) 
         try:
             return Electrumx(
                 persistent=persistent,
                 host=hostPort.split(':')[0],
-                port=int(hostPort.split(':')[1]))
+                port=int(hostPort.split(':')[1]),
+                cachedPeers=cachedPeersFile)
         except Exception as e:
             logging.error(e)
-            if retry < len(hostPorts):
-                return EvrmoreWallet.createElectrumxConnection(
-                    persistent=persistent,
-                    hostPorts=hostPorts,
-                    retry=retry+1)
+            if len(hostPorts) > 0:
+                # Filter out the failed host, handling both string and tuple hostPorts
+                if isinstance(hostPorts[0], str):
+                    hostPorts = [i for i in hostPorts if i != hostPort]
+                else:
+                    # For weighted peers (tuples), filter by the host part
+                    hostPorts = [p for p in hostPorts if p[0] != hostPort]
+                
+                if len(hostPorts) > 0:
+                    return EvrmoreWallet.createElectrumxConnection(
+                        persistent=persistent,
+                        hostPorts=hostPorts,
+                        use_ssl=use_ssl)
             raise e
 
     def __init__(

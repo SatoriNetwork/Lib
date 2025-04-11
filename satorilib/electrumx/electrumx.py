@@ -1,10 +1,12 @@
 from typing import Union
-import logging
-import socket
+import os
 import json
 import time
 import queue
+import socket
+import logging
 import threading
+import pandas as pd
 from satorilib.electrumx import ElectrumxConnection
 from satorilib.electrumx import ElectrumxApi
 
@@ -49,6 +51,7 @@ class Electrumx(ElectrumxConnection):
         self,
         *args,
         persistent: bool = False,
+        cachedPeers: str = '/Satori/Neuron/wallet/peers.csv',
         **kwargs,
     ):
         super(type(self), self).__init__(*args, **kwargs)
@@ -63,10 +66,120 @@ class Electrumx(ElectrumxConnection):
         self.lastHandshake = 0
         self.handshaked = None
         self.handshake()
-        self.persistent = persistent
+        self.persistent: bool = persistent
+        self.cachedPeers: str = cachedPeers
         if self.persistent:
             self.startPinger()
+        self.managePeers()
 
+    def managePeers(self):
+        if self.cachedPeers != '':
+            try:
+                # Get peers from API
+                self.peers = self.api.getPeers()
+                if not self.peers:
+                    logging.warning("No peers returned from API")
+                    return
+                
+                # Process peers into a structured format
+                processed_peers = []
+                current_time = time.time()
+                for peer in self.peers:
+                    try:
+                        # Validate peer structure
+                        if not isinstance(peer, list) or len(peer) != 3:
+                            logging.warning(f"Invalid peer structure: {peer}")
+                            continue
+                            
+                        ip, domain, features = peer
+                        if not isinstance(features, list):
+                            logging.warning(f"Invalid features format for peer {ip}: {features}")
+                            continue
+                            
+                        version = None
+                        ports = []
+                        port_types = []
+                        
+                        # Extract version and ports from features
+                        for feature in features:
+                            if feature.startswith('v'):
+                                version = feature
+                            elif feature.startswith('s') or feature.startswith('t'):
+                                # Save both SSL (s) and TCP (t) ports
+                                port_type = feature[0]  # 's' or 't'
+                                port = feature[1:]     # The port number
+                                ports.append(port)
+                                port_types.append(port_type)
+                        
+                        # Add peer data with all available ports
+                        for i, port in enumerate(ports):
+                            processed_peers.append({
+                                'ip': ip,
+                                'domain': domain,
+                                'version': version,
+                                'port': port,
+                                'port_type': port_types[i],  # 's' for SSL, 't' for TCP
+                                'timestamp': current_time
+                            })
+                    except Exception as e:
+                        logging.warning(f"Error processing peer {peer}: {str(e)}")
+                        continue
+                
+                # Create DataFrame from processed peers
+                new_peers_df = pd.DataFrame(processed_peers)
+                
+                if new_peers_df.empty:
+                    logging.warning("No valid peers processed")
+                    return
+                
+                # Handle existing cache file
+                if self.cacheFileExists():
+                    try:
+                        # Read existing peers
+                        cache_df = pd.read_csv(self.cachedPeers)
+                        
+                        # Add port_type column if it doesn't exist in older cache files
+                        if 'port_type' not in cache_df.columns:
+                            # Default to 's' for backwards compatibility
+                            cache_df['port_type'] = 's'
+                            
+                        # Create a unique key for each peer for efficient lookup
+                        new_peers_df['key'] = new_peers_df['ip'] + ':' + new_peers_df['port'].astype(str) + ':' + new_peers_df['port_type']
+                        if 'key' not in cache_df.columns:
+                            cache_df['key'] = cache_df['ip'] + ':' + cache_df['port'].astype(str) + ':' + cache_df['port_type']
+                        
+                        # Create combined dataframe with all peers
+                        combined_df = pd.concat([cache_df, new_peers_df])
+                        
+                        # Sort by timestamp descending (newest first) and drop duplicates by key
+                        # keeping only the first occurrence (which will be the newest)
+                        result_df = combined_df.sort_values('timestamp', ascending=False) \
+                                             .drop_duplicates(subset='key', keep='first') \
+                                             .drop(columns=['key']) \
+                                             .reset_index(drop=True)
+                        
+                        # Save updated peers
+                        result_df.to_csv(self.cachedPeers, index=False)
+                        logging.debug(f"Successfully updated peer cache with {len(result_df)} peers")
+                    except Exception as e:
+                        logging.error(f"Error updating cache file: {str(e)}")
+                        # If there's an error with the cache, just write the new peers
+                        if 'key' in new_peers_df.columns:
+                            new_peers_df = new_peers_df.drop(columns=['key'])
+                        new_peers_df.to_csv(self.cachedPeers, index=False)
+                else:
+                    # No cache exists, create new one
+                    new_peers_df.to_csv(self.cachedPeers, index=False)
+                    logging.debug(f"Created new peer cache with {len(new_peers_df)} peers")
+                    
+            except Exception as e:
+                logging.error(f"Error in managePeers: {str(e)}")
+                return
+
+    def cacheFileExists(self):
+        if self.cachedPeers != '':
+            return os.path.exists(self.cachedPeers)
+    
     def findSubscription(self, subscription: Subscription) -> Subscription:
         for s in self.subscriptions.keys():
             if s == subscription:

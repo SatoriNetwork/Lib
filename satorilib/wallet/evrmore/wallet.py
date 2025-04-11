@@ -124,12 +124,19 @@ class EvrmoreWallet(Wallet):
                         # Using exponential decay: weight = e^(-k * (currentTime - timestamp))
                         # where k controls how quickly the weight decays
                         k = 0.1  # Adjust this value to control the decay rate
+                        # Calculate raw weights
                         df['weight'] = np.exp(-k * (currentTime - df['timestamp']))
-                        # Normalize weights to sum to 1
-                        df['weight'] = df['weight'] / df['weight'].sum()
-                        # Convert to list of tuples (peer, weight)
-                        weightedPeers = [(f"{row['ip']}:{row['port']}", row['weight']) 
-                                        for _, row in df.iterrows()]
+
+                        # Check if total weight is usable
+                        total_weight = df['weight'].sum()
+                        if not np.isfinite(total_weight) or total_weight == 0:
+                            weightedPeers = None
+                        else:
+                            df['weight'] = df['weight'] / total_weight
+                            # Convert to list of tuples (peer, weight)
+                            weightedPeers = [(f"{row['ip']}:{row['port']}", row['weight']) 
+                                            for _, row in df.iterrows()]
+
             except Exception as e:
                 logging.warning(f"Error reading cached peers: {str(e)}")
 

@@ -1,9 +1,4 @@
 from typing import Union, Callable
-import os
-import time
-import random
-import numpy as np
-import pandas as pd
 from evrmore import SelectParams
 from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret, P2SHEvrmoreAddress
 from evrmore.core.scripteval import VerifyScript, SCRIPT_VERIFY_P2SH
@@ -21,161 +16,7 @@ from satorilib.wallet.evrmore.verify import verify
 
 
 class EvrmoreWallet(Wallet):
-    #electrumxServers = pd.DataFrame({
-    #    'ip': [
-    #        '128.199.1.149',
-    #        '146.190.149.237',
-    #        '146.190.38.120',
-    #        'electrum1-mainnet.evrmorecoin.org',
-    #        'electrum2-mainnet.evrmorecoin.org',
-    #        'electrumx.satorinet.ie',
-    #        '1-electrum.satorinet.ie',
-    #        'evr-electrum.wutup.io',
-    #        '128.199.1.149',
-    #        '146.190.149.237',
-    #        '146.190.38.120',
-    #        'electrum1-mainnet.evrmorecoin.org',
-    #        'electrum2-mainnet.evrmorecoin.org',
-    #        '135.181.212.189', #WilQSL
-    #        'evr-electrum.wutup.io', #Kasvot Växt
-    #    ],
-    #    'domain': [
-    #        '128.199.1.149',
-    #        '146.190.149.237',
-    #        '146.190.38.120',
-    #        'electrum1-mainnet.evrmorecoin.org',
-    #        'electrum2-mainnet.evrmorecoin.org',
-    #        'electrumx.satorinet.ie',
-    #        '1-electrum.satorinet.ie',
-    #        'evr-electrum.wutup.io',
-    #        '128.199.1.149',
-    #        '146.190.149.237',
-    #        '146.190.38.120',
-    #        'electrum1-mainnet.evrmorecoin.org',
-    #        'electrum2-mainnet.evrmorecoin.org',
-    #        '135.181.212.189', #WilQSL
-    #        'evr-electrum.wutup.io', #Kasvot Växt
-    #    ],
-    #    'version': ['v1.10','v1.10','v1.10','v1.10','v1.10','v1.10','v1.10','v1.10','v1.10','v1.10','v1.10','v1.10','v1.10','v1.10','v1.10'],
-    #    'port': ['50002','50002','50002','50002','50002','50002','50002','50002','50001','50001','50001','50001','50001','50001','50001'],
-    #    'port_type': ['s','s','s','s','s','s','s','s','t','t','t','t','t','t','t'],
-    #    'timestamp': ['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0']
-    #})
 
-    electrumxServers: list[str] = [
-        '128.199.1.149:50002',
-        '146.190.149.237:50002',
-        '146.190.38.120:50002',
-        'electrum1-mainnet.evrmorecoin.org:50002',
-        'electrum2-mainnet.evrmorecoin.org:50002',
-        'electrumx.satorinet.ie:50002', #WilQSL
-        #'1-electrum.satorinet.ie:50002', #WilQSL
-        #'evr-electrum.wutup.io:50002', #Kasvot Växt
-    ]
-
-    # subscriptions work better without ssl for some reason
-    electrumxServersWithoutSSL: list[str] = [
-        '128.199.1.149:50001',
-        '146.190.149.237:50001',
-        '146.190.38.120:50001',
-        'electrum1-mainnet.evrmorecoin.org:50001',
-        'electrum2-mainnet.evrmorecoin.org:50001',
-        #'135.181.212.189:50001', #WilQSL
-        #'evr-electrum.wutup.io:50001', #Kasvot Växt
-    ]
-
-    @staticmethod
-    def createElectrumxConnection(
-        persistent: bool = False,
-        hostPort: str = None,
-        hostPorts: Union[list[str], None] = None,
-        use_ssl: bool = True,
-    ) -> Electrumx:
-        weightedPeers = None
-        cachedPeersFile = '/Satori/Neuron/wallet/peers.csv'
-        if hostPorts is None or len(hostPorts) == 0:
-            # First try to get peers from cache
-            try:
-                if os.path.exists(cachedPeersFile):
-                    df = pd.read_csv(cachedPeersFile)
-                    if not df.empty:
-                        # Filter by port type if needed - 's' for SSL, 't' for TCP
-                        port_type = 's' if use_ssl else 't'
-                        
-                        # Use both types if port_type column exists, otherwise assume all are SSL
-                        if 'port_type' in df.columns:
-                            if use_ssl:
-                                # If SSL requested, prefer SSL ports but include TCP if needed
-                                ssl_df = df[df['port_type'] == 's']
-                                if not ssl_df.empty:
-                                    df = ssl_df
-                            else:
-                                # If no SSL requested, prefer TCP ports but include SSL if needed
-                                tcp_df = df[df['port_type'] == 't']
-                                if not tcp_df.empty:
-                                    df = tcp_df
-                        
-                        # Sort by timestamp to try most recent peers first
-                        df = df.sort_values('timestamp', ascending=False)
-                        
-                        # Calculate weights based on timestamp
-                        currentTime = time.time()
-                        # Convert timestamps to weights - more recent = higher weight
-                        # Using exponential decay: weight = e^(-k * (currentTime - timestamp))
-                        # where k controls how quickly the weight decays
-                        k = 0.1  # Adjust this value to control the decay rate
-                        # Calculate raw weights
-                        df['weight'] = np.exp(-k * (currentTime - df['timestamp']))
-
-                        # Check if total weight is usable
-                        total_weight = df['weight'].sum()
-                        if not np.isfinite(total_weight) or total_weight == 0:
-                            weightedPeers = None
-                        else:
-                            df['weight'] = df['weight'] / total_weight
-                            # Convert to list of tuples (peer, weight)
-                            weightedPeers = [(f"{row['ip']}:{row['port']}", row['weight']) 
-                                            for _, row in df.iterrows()]
-
-            except Exception as e:
-                logging.warning(f"Error reading cached peers: {str(e)}")
-
-        if weightedPeers is None or len(weightedPeers) == 1:
-            weightedPeers = [w[0] for w in (weightedPeers or [])] + (
-                EvrmoreWallet.electrumxServers if use_ssl 
-                else EvrmoreWallet.electrumxServersWithoutSSL)
-        
-        # If no hostPort selected from cache, use provided or fall back to hardcoded list
-        hostPorts = hostPorts or weightedPeers
-        hostPort = hostPort or (
-            random.choice(hostPorts) 
-            if isinstance(hostPorts[0], str) 
-            else random.choices(
-                [p[0] for p in hostPorts],
-                weights=[p[1] for p in hostPorts],
-                k=1)[0]) 
-        try:
-            return Electrumx(
-                persistent=persistent,
-                host=hostPort.split(':')[0],
-                port=int(hostPort.split(':')[1]),
-                cachedPeers=cachedPeersFile)
-        except Exception as e:
-            logging.error(e)
-            if len(hostPorts) > 0:
-                # Filter out the failed host, handling both string and tuple hostPorts
-                if isinstance(hostPorts[0], str):
-                    hostPorts = [i for i in hostPorts if i != hostPort]
-                else:
-                    # For weighted peers (tuples), filter by the host part
-                    hostPorts = [p for p in hostPorts if p[0] != hostPort]
-                
-                if len(hostPorts) > 0:
-                    return EvrmoreWallet.createElectrumxConnection(
-                        persistent=persistent,
-                        hostPorts=hostPorts,
-                        use_ssl=use_ssl)
-            raise e
 
     def __init__(
         self,
@@ -210,7 +51,7 @@ class EvrmoreWallet(Wallet):
             if self.electrumx is None:
                 self.electrumx = (
                     electrumx or
-                    EvrmoreWallet.createElectrumxConnection(hostPort=hostPort))
+                    Electrumx.createElectrumxConnection(hostPort=hostPort))
                 return self.electrumx is not None
             elif self.electrumx.isConnected:
                 return True

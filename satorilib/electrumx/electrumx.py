@@ -115,7 +115,7 @@ class Electrumx(ElectrumxConnection):
     ]
 
     @staticmethod
-    def createElectrumxConnection(
+    def create(
         persistent: bool = False,
         hostPort: str = None,
         hostPorts: Union[list[str], None] = None,
@@ -128,7 +128,7 @@ class Electrumx(ElectrumxConnection):
             try:
                 if os.path.exists(cachedPeersFile):
                     df = pd.read_csv(cachedPeersFile)
-                    df = df[df['port'] == 't']
+                    #df = df[df['port'] == 't']
                     if not df.empty:
                         # Filter by port type if needed - 's' for SSL, 't' for TCP
                         port_type = 's' if use_ssl else 't'

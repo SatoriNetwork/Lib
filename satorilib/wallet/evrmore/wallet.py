@@ -18,6 +18,37 @@ from satorilib.wallet.evrmore.verify import verify
 class EvrmoreWallet(Wallet):
 
 
+    @staticmethod
+    def create(
+        walletPath: str = '/Satori/Neuron/wallet/wallet.yaml',
+        reserve: float = .25,
+        isTestnet: bool = False,
+        password: Union[str, None] = None,
+        electrumx: Electrumx = None,
+        useElectrumx: bool = True,
+        kind: str = 'wallet',
+        watchAssets: list[str] = None,
+        skipSave: bool = False,
+        pullFullTransactions: bool = True,
+        hostPort: str = None,
+        balanceUpdatedCallback: Union[Callable, None] = None,
+        cachedPeersFile: str = '/Satori/Neuron/wallet/peers.csv',
+    ) -> 'EvrmoreWallet':
+        return EvrmoreWallet(
+            walletPath=walletPath,
+            reserve=reserve,
+            isTestnet=isTestnet,
+            password=password,
+            electrumx=electrumx,
+            useElectrumx=useElectrumx,
+            kind=kind,
+            watchAssets=watchAssets,
+            skipSave=skipSave,
+            pullFullTransactions=pullFullTransactions,
+            hostPort=hostPort,
+            balanceUpdatedCallback=balanceUpdatedCallback,
+            cachedPeersFile=cachedPeersFile)
+
     def __init__(
         self,
         walletPath: str,
@@ -396,3 +427,4 @@ class EvrmoreWallet(Wallet):
 
     def _deserialize(self, serialTx: bytes) -> CMutableTransaction:
         return CMutableTransaction.deserialize(serialTx)
+    

@@ -364,6 +364,7 @@ class Electrumx(ElectrumxConnection):
             return buffer.partition('\n')
 
         buffer = ''
+        now = time.time()
         #while not self.listenerStop.is_set():
         while True:
             if not self.isConnected and time.time() - now < 5:

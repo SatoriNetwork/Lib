@@ -85,7 +85,7 @@ class EvrmoreWallet(Wallet):
             if self.electrumx is None:
                 self.electrumx = (
                     electrumx or
-                    Electrumx.createElectrumxConnection(
+                    Electrumx.create(
                         hostPort=self.hostPort, 
                         cachedPeersFile=self.cachedPeersFile))
                 return self.electrumx is not None

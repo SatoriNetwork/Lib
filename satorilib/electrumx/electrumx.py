@@ -202,7 +202,7 @@ class Electrumx(ElectrumxConnection):
                     hostPorts = [p for p in hostPorts if p[0] != hostPort]
                 
                 if len(hostPorts) > 0:
-                    return Electrumx.createElectrumxConnection(
+                    return Electrumx.create(
                         persistent=persistent,
                         hostPorts=hostPorts,
                         use_ssl=use_ssl)

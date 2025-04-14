@@ -366,12 +366,12 @@ class Electrumx(ElectrumxConnection):
         buffer = ''
         #while not self.listenerStop.is_set():
         while True:
-            if not self.isConnected:
-                time.sleep(10)
-                continue
+            if not self.isConnected and time.time() - now < 5:
+                time.sleep(5)
             try:
                 # Set a shorter timeout for recv
                 #self.connection.settimeout(30)  # 30 second timeout for recv
+                now = time.time()
                 raw = self.connection.recv(1024 * 16).decode('utf-8')
                 buffer += raw
                 if raw == '':
@@ -497,8 +497,9 @@ class Electrumx(ElectrumxConnection):
             self.isConnected = False
             return False
         try:
-            self.connection.settimeout(5)
+            self.connection.settimeout(1)
             response = self.api.ping()
+
             #import traceback
             #traceback.print_stack()
             self.connection.settimeout(self.timeout)

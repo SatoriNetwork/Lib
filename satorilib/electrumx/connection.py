@@ -11,7 +11,7 @@ class ElectrumxConnection:
         host: str,
         port: int,
         ssl: bool = False,
-        timeout: int = 10*60,
+        timeout: int = 30,
     ):
         self.host = host
         self.port = port

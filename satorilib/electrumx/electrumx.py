@@ -446,7 +446,7 @@ class Electrumx(ElectrumxConnection):
 
     def stayConnected(self):
         while not self.pingerStop.is_set():
-            time.sleep(60*3)
+            time.sleep(59)
             if not self.connected():
                 self.connect()
                 self.handshake()

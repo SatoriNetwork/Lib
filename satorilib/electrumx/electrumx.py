@@ -362,7 +362,6 @@ class Electrumx(ElectrumxConnection):
             return buffer.partition('\n')
 
         buffer = ''
-        logged = False
         #while not self.listenerStop.is_set():
         while True:
             if not self.isConnected:
@@ -406,13 +405,12 @@ class Electrumx(ElectrumxConnection):
                         logging.debug((
                             f"JSONDecodeError: {e} in message: {message} "
                             "error in _receive"))
-                    logged = False
-                    logging.debug(f'loggedf:{logged}')
             except socket.timeout:
-                logging.debug(f'logged:{logged}')
-                if not logged:
-                    logging.debug('no activity for 10 minutes, wallet going to sleep.')
-                logged = True
+                #logging.debug(f'logged:{logged}')
+                #if not logged:
+                #    logging.debug('no activity, wallet going to sleep.')
+                #logged = True
+                continue
             except OSError as e:
                 # Typically errno = 9 here means 'Bad file descriptor'
                 logging.debug("Socket closed. Marking self.isConnected = False.")

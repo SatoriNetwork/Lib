@@ -32,6 +32,7 @@ class EvrmoreWallet(Wallet):
         pullFullTransactions: bool = True,
         hostPort: str = None,
         balanceUpdatedCallback: Union[Callable, None] = None,
+        cachedPeersFile='/Satori/Mundo/wallet/peers.csv',
     ):
         super().__init__(
             walletPath,
@@ -44,14 +45,18 @@ class EvrmoreWallet(Wallet):
             useElectrumx=useElectrumx,
             balanceUpdatedCallback=balanceUpdatedCallback)
         self.kind = kind
-        self.maybeConnect(electrumx, hostPort=hostPort)
+        self.cachedPeersFile = cachedPeersFile
+        self.hostPort = hostPort
+        self.maybeConnect(electrumx)
 
-    def maybeConnect(self, electrumx = None, hostPort: str = None):
+    def maybeConnect(self, electrumx = None):
         if self.useElectrumx:
             if self.electrumx is None:
                 self.electrumx = (
                     electrumx or
-                    Electrumx.createElectrumxConnection(hostPort=hostPort))
+                    Electrumx.createElectrumxConnection(
+                        hostPort=self.hostPort, 
+                        cachedPeersFile=self.cachedPeersFile))
                 return self.electrumx is not None
             elif self.electrumx.isConnected:
                 return True
@@ -60,9 +65,8 @@ class EvrmoreWallet(Wallet):
                     return True
                 else:
                     self.electrumx = None
-                    return self.maybeConnect(electrumx, hostPort=hostPort)
+                    return self.maybeConnect(electrumx)
         return False
-
 
     @property
     def symbol(self) -> str:

@@ -407,7 +407,9 @@ class Electrumx(ElectrumxConnection):
                             f"JSONDecodeError: {e} in message: {message} "
                             "error in _receive"))
                     logged = False
+                    logging.debug(f'loggedf:{logged}')
             except socket.timeout:
+                logging.debug(f'logged:{logged}')
                 if not logged:
                     logging.debug('no activity for 10 minutes, wallet going to sleep.')
                 logged = True

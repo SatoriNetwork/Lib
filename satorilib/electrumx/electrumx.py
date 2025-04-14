@@ -365,9 +365,11 @@ class Electrumx(ElectrumxConnection):
         #while not self.listenerStop.is_set():
         while True:
             if not self.isConnected:
-                time.sleep(10)
+                time.sleep(1)  # Reduced sleep time when not connected
                 continue
             try:
+                # Set a shorter timeout for recv
+                #self.connection.settimeout(30)  # 30 second timeout for recv
                 raw = self.connection.recv(1024 * 16).decode('utf-8')
                 buffer += raw
                 if raw == '':
@@ -405,6 +407,7 @@ class Electrumx(ElectrumxConnection):
                             "error in _receive"))
             except socket.timeout:
                 logging.debug('no activity for 10 minutes, wallet going to sleep.')
+                self.isConnected = False
             except OSError as e:
                 # Typically errno = 9 here means 'Bad file descriptor'
                 logging.debug("Socket closed. Marking self.isConnected = False.")
@@ -446,10 +449,19 @@ class Electrumx(ElectrumxConnection):
 
     def stayConnected(self):
         while not self.pingerStop.is_set():
-            time.sleep(29)
-            if not self.connected():
-                self.connect()
-                self.handshake()
+            try:
+                if not self.connected():
+                    logging.debug("Connection lost, attempting to reconnect...")
+                    self.connect()
+                    self.handshake()
+                    self.resubscribe()
+                #else:
+                    # Send a ping to keep the connection alive
+                    #self.api.ping()
+            except Exception as e:
+                logging.debug(f"Error in stayConnected: {str(e)}")
+                self.isConnected = False
+            time.sleep(29)  # Keep the 29 second interval for pings
 
     def reconnect(self) -> bool:
         self.listenerStop.set()
@@ -475,7 +487,7 @@ class Electrumx(ElectrumxConnection):
             self.isConnected = False
             return False
         try:
-            self.connection.settimeout(2)
+            self.connection.settimeout(5)
             response = self.api.ping()
             #import traceback
             #traceback.print_stack()

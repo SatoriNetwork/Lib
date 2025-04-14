@@ -362,6 +362,7 @@ class Electrumx(ElectrumxConnection):
             return buffer.partition('\n')
 
         buffer = ''
+        logged = False
         #while not self.listenerStop.is_set():
         while True:
             if not self.isConnected:

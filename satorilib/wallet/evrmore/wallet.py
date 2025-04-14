@@ -31,6 +31,7 @@ class EvrmoreWallet(Wallet):
         skipSave: bool = False,
         pullFullTransactions: bool = True,
         hostPort: str = None,
+        persistent: bool = False,
         balanceUpdatedCallback: Union[Callable, None] = None,
         cachedPeersFile: str = '/Satori/Neuron/wallet/peers.csv',
     ) -> 'EvrmoreWallet':
@@ -46,6 +47,7 @@ class EvrmoreWallet(Wallet):
             skipSave=skipSave,
             pullFullTransactions=pullFullTransactions,
             hostPort=hostPort,
+            persistent=persistent,
             balanceUpdatedCallback=balanceUpdatedCallback,
             cachedPeersFile=cachedPeersFile)
 
@@ -62,6 +64,7 @@ class EvrmoreWallet(Wallet):
         skipSave: bool = False,
         pullFullTransactions: bool = True,
         hostPort: str = None,
+        persistent: bool = False,
         balanceUpdatedCallback: Union[Callable, None] = None,
         cachedPeersFile='/Satori/Mundo/wallet/peers.csv',
     ):
@@ -76,6 +79,7 @@ class EvrmoreWallet(Wallet):
             useElectrumx=useElectrumx,
             balanceUpdatedCallback=balanceUpdatedCallback)
         self.kind = kind
+        self.persistent = persistent
         self.cachedPeersFile = cachedPeersFile
         self.hostPort = hostPort
         self.maybeConnect(electrumx)
@@ -87,6 +91,7 @@ class EvrmoreWallet(Wallet):
                     electrumx or
                     Electrumx.create(
                         hostPort=self.hostPort, 
+                        persistent= self.persistent,
                         cachedPeersFile=self.cachedPeersFile))
                 return self.electrumx is not None
             elif self.electrumx.isConnected:

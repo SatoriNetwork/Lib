@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 from satorilib.electrumx import ElectrumxConnection
 from satorilib.electrumx import ElectrumxApi
+import ssl
 
 
 class Subscription:
@@ -127,6 +128,7 @@ class Electrumx(ElectrumxConnection):
             try:
                 if os.path.exists(cachedPeersFile):
                     df = pd.read_csv(cachedPeersFile)
+                    df = df[df['port'] == 't']
                     if not df.empty:
                         # Filter by port type if needed - 's' for SSL, 't' for TCP
                         port_type = 's' if use_ssl else 't'
@@ -411,6 +413,11 @@ class Electrumx(ElectrumxConnection):
                 #    logging.debug('no activity, wallet going to sleep.')
                 #logged = True
                 continue
+            except ssl.SSLError as e:
+                if 'EOF' in str(e):
+                    logging.debug("SSL connection closed by server, reconnecting...")
+                    self.isConnected = False
+                    continue
             except OSError as e:
                 # Typically errno = 9 here means 'Bad file descriptor'
                 logging.debug("Socket closed. Marking self.isConnected = False.")

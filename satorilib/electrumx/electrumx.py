@@ -457,7 +457,7 @@ class Electrumx(ElectrumxConnection):
                     logging.debug("Connection lost, attempting to reconnect...")
                     self.connect()
                     self.handshake()
-                    self.resubscribe()
+                    #self.resubscribe()
                 #else:
                     # Send a ping to keep the connection alive
                     #self.api.ping()

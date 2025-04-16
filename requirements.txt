@@ -42,3 +42,6 @@ web3==7.7.0
 
 # for api validation
 marshmallow==3.22.0
+
+# for validation
+ipaddress==1.0.23

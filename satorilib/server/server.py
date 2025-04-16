@@ -202,14 +202,16 @@ class SatoriServerClient(object):
             endpoint='/remove/stream',
             payload=payload or json.dumps(stream or {}))
 
-    def checkin(self, referrer: str = None) -> dict:
+    def checkin(self, referrer: str = None, ip: str = None) -> dict:
         challenge = self._getChallenge()
         response = self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/checkin',
             payload=self.wallet.registerPayload(challenge=challenge),
             challenge=challenge,
-            extraHeaders={'referrer': referrer} if referrer else {},
+            extraHeaders={
+                **({'referrer': referrer} if referrer else {}),
+                **({'ip': ip} if ip else {})},
             raiseForStatus=False)
         try:
             response.raise_for_status()

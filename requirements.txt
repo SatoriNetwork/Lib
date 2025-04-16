@@ -49,3 +49,7 @@ marshmallow==3.22.0
 
 # for data manager
 cryptography==44.0.2
+
+
+# for validation
+ipaddress==1.0.23

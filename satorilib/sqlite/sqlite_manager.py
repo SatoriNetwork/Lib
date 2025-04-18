@@ -195,7 +195,7 @@ class SqliteDatabase:
                     self.conn.commit()
                     imported_count += 1
                 except Exception as e:
-                    error(f"Error importing {csv_file}: {e}")
+                    debug(f"Error importing {csv_file}: {e}")
                     self.conn.rollback()
                     continue
         info(f"\nImport complete. Successfully processed {imported_count} CSV files.")

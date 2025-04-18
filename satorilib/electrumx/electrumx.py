@@ -120,13 +120,13 @@ class Electrumx(ElectrumxConnection):
         hostPort: str = None,
         hostPorts: Union[list[str], None] = None,
         use_ssl: bool = True,
-        cachedPeersFile: str = '/Satori/Neuron/wallet/peers.csv',
+        cachedPeersFile: Union[str, None] = None,
     ) -> 'Electrumx':
         weightedPeers = None
         if hostPorts is None or len(hostPorts) == 0:
             # First try to get peers from cache
             try:
-                if os.path.exists(cachedPeersFile):
+                if isinstance(cachedPeersFile, str) and os.path.exists(cachedPeersFile):
                     df = pd.read_csv(cachedPeersFile)
                     df = df[df['port_type'] == 't']
                     if not df.empty:
@@ -212,7 +212,7 @@ class Electrumx(ElectrumxConnection):
         self,
         *args,
         persistent: bool = False,
-        cachedPeers: str = '/Satori/Neuron/wallet/peers.csv',
+        cachedPeers: Union[str, None] = None,
         **kwargs,
     ):
         super(type(self), self).__init__(*args, **kwargs)
@@ -234,7 +234,7 @@ class Electrumx(ElectrumxConnection):
         self.managePeers()
 
     def managePeers(self):
-        if self.cachedPeers != '':
+        if isinstance(self.cachedPeers, str) and self.cachedPeers != '':
             try:
                 # Get peers from API
                 self.peers = self.api.getPeers()
@@ -338,7 +338,7 @@ class Electrumx(ElectrumxConnection):
                 return
 
     def cacheFileExists(self):
-        if self.cachedPeers != '':
+        if isinstance(self.cachedPeers, str) and self.cachedPeers != '':
             return os.path.exists(self.cachedPeers)
     
     def findSubscription(self, subscription: Subscription) -> Subscription:

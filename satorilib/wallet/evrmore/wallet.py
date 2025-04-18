@@ -33,7 +33,7 @@ class EvrmoreWallet(Wallet):
         hostPort: str = None,
         persistent: bool = False,
         balanceUpdatedCallback: Union[Callable, None] = None,
-        cachedPeersFile: str = '/Satori/Neuron/wallet/peers.csv',
+        cachedPeersFile: Union[str, None] = None,
     ) -> 'EvrmoreWallet':
         return EvrmoreWallet(
             walletPath=walletPath,
@@ -66,7 +66,7 @@ class EvrmoreWallet(Wallet):
         hostPort: str = None,
         persistent: bool = False,
         balanceUpdatedCallback: Union[Callable, None] = None,
-        cachedPeersFile='/Satori/Mundo/wallet/peers.csv',
+        cachedPeersFile: Union[Callable, None] = None,
     ):
         super().__init__(
             walletPath,

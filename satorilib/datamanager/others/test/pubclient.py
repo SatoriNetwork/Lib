@@ -15,7 +15,11 @@ async def main():
 
     walletPath = config.walletPath('wallet.yaml')
     # dataClient = DataClient('188.166.4.120', identity=EvrmoreIdentity(walletPath))
-    dataClient = DataClient('23.160.72.62', identity=EvrmoreIdentity(walletPath))
+    dataClient = DataClient('0.0.0.0', identity=EvrmoreIdentity(walletPath))
+    response = await dataClient.isStreamActive(
+                            peerHost='193.108.116.96',
+                            peerPort=24600,
+                            uuid='f85266a9-1b16-5802-84fe-862611744739')
     # msg = Message({
     #                 'method': DataServerApi.insertStreamData.value,
     #                 'status': 'success',

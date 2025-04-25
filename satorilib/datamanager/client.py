@@ -125,6 +125,31 @@ class DataClient:
                 ValueError: too many values to unpack (expected 2)
             added if statement below and not sure what to do about ipv6:
         '''
+        # for hostPort in message.streamInfo:
+        #     if hostPort.count(':') > 1:
+        #         last_colon = hostPort.rindex(':')
+        #         host = hostPort[:last_colon]
+        #         port = hostPort[last_colon + 1:]
+        #     else:
+        #         host, port = hostPort.split(':')
+        #     try:
+        #         await self.send(
+        #             peerAddr=(str(host), int(port)), 
+        #             request=message
+        #         )
+        #     except Exception as e:
+        #         debug('Unable to sent data to external client: ', e, color='cyan')
+        #         pass
+        async def sendEachPeer(host, port, message):
+            try:
+                await self.send(
+                    peerAddr=(host, port),
+                    request=message
+                )
+            except Exception as e:
+                debug('Unable to send data to external client: ', e, color='cyan')
+        
+        tasks = []
         for hostPort in message.streamInfo:
             if hostPort.count(':') > 1:
                 last_colon = hostPort.rindex(':')
@@ -132,20 +157,21 @@ class DataClient:
                 port = hostPort[last_colon + 1:]
             else:
                 host, port = hostPort.split(':')
-            try:
-                await self.send(
-                    peerAddr=(str(host), int(port)), 
-                    request=message
-                )
-            except Exception as e:
-                debug('Unable to sent data to external client: ', e, color='cyan')
-                pass
+                
+            tasks.append(
+                sendEachPeer(str(host), int(port), message)
+            )
+
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+    
 
     async def handleMessageForOwner(self, message: Message, peer: ConnectedPeer) -> None:
         ''' update state for the calling client '''
         if message.isSubscription:
             if peer.hostPort != self.serverHostPort:
-                await self.handleMessageForServer(message)
+                # await self.handleMessageForServer(message)
+                pass
             elif message.streamInfo is not None:
                 await self.handleMessageForSubscriberClients(message)
             subscription = self._findSubscription(

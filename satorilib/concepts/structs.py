@@ -312,7 +312,7 @@ class StreamIdMap:
 
 class Stream:
 
-    minimumCadence = 60 * 10
+    minimumCadence = 60 * 10 * 6
 
     def __init__(
         self,

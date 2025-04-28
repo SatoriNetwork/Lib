@@ -1,3 +1,3 @@
-stakeRequired: float = 13.0
+stakeRequired: float = 10
 uiPort: int = 24601
 dataManagerPort: int = 24600

@@ -308,40 +308,47 @@ class Message:
         if df is None:
             return None
         try:
-            df_copy = df.copy()
-            if 'ts' in df_copy.columns:
-                df_copy['ts'] = pd.to_datetime(df_copy['ts'], errors='coerce')
-            for col in df_copy.columns:
-                if pd.api.types.is_object_dtype(df_copy[col]):
-                    # Try to detect if the column contains datetime-like strings
-                    sample = df_copy[col].iloc[0] if not df_copy[col].empty else None
-                    if isinstance(sample, str) and any(x in sample for x in ['-', ':', 'T', '/']):
-                        try:
-                            df_copy[col] = pd.to_datetime(df_copy[col], errors='coerce')
-                        except:
-                            pass
-            table = pa.Table.from_pandas(df_copy)
+            # df_copy = df.copy()
+            # if 'ts' in df_copy.columns:
+            #     df_copy['ts'] = pd.to_datetime(df_copy['ts'], errors='coerce')
+            # for col in df_copy.columns:
+            #     if pd.api.types.is_object_dtype(df_copy[col]):
+            #         # Try to detect if the column contains datetime-like strings
+            #         sample = df_copy[col].iloc[0] if not df_copy[col].empty else None
+            #         if isinstance(sample, str) and any(x in sample for x in ['-', ':', 'T', '/']):
+            #             try:
+            #                 df_copy[col] = pd.to_datetime(df_copy[col], errors='coerce')
+            #             except:
+            #                 pass
+            # table = pa.Table.from_pandas(df_copy)
+            # sink = pa.BufferOutputStream()
+            # with pa.ipc.new_stream(sink, table.schema) as writer:
+            #     writer.write(table)
+            # return sink.getvalue().to_pybytes()
             sink = pa.BufferOutputStream()
+            table = pa.Table.from_pandas(df)
             with pa.ipc.new_stream(sink, table.schema) as writer:
                 writer.write(table)
             return sink.getvalue().to_pybytes()
         except Exception as e:
-            try:
-                df_copy = df.copy()
-                for col in df_copy.columns:
-                    if pd.api.types.is_object_dtype(df_copy[col]):
-                        df_copy[col] = df_copy[col].astype(str)
+            raise ValueError(f"Failed to serialize DataFrame: {str(e)}")
+            # try:
+            #     df_copy = df.copy()
+            #     for col in df_copy.columns:
+            #         if pd.api.types.is_object_dtype(df_copy[col]):
+            #             df_copy[col] = df_copy[col].astype(str)
                 
-                table = pa.Table.from_pandas(df_copy)
-                sink = pa.BufferOutputStream()
-                with pa.ipc.new_stream(sink, table.schema) as writer:
-                    writer.write(table)
-                return sink.getvalue().to_pybytes()
-            except Exception as nested_e:
-                try:
-                    return pa.serialize(df).to_buffer().to_pybytes()
-                except:
-                    raise ValueError(f"Failed to serialize DataFrame: {str(e)}\nFallback error: {str(nested_e)}")
+            #     table = pa.Table.from_pandas(df_copy)
+            #     sink = pa.BufferOutputStream()
+            #     with pa.ipc.new_stream(sink, table.schema) as writer:
+            #         writer.write(table)
+            #     return sink.getvalue().to_pybytes()
+            # except Exception as nested_e:
+            #     try:
+            #         return pa.serialize(df).to_buffer().to_pybytes()
+            #     except:
+            #         raise ValueError(f"Failed to serialize DataFrame: {str(e)}\nFallback error: {str(nested_e)}")
+            # raise error(f"Failed to serialize DataFrame: {str(e)}\nFallback error: {str(nested_e)}")
 
     @staticmethod
     def _deserializeDataframe(data: bytes) -> Union[pd.DataFrame, None]:

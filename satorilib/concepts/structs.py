@@ -337,7 +337,7 @@ class Stream:
     ):
         self.streamId = streamId
         self.cadence = cadence
-        self.offset = offset
+        self.offset = offset or kwargs.get('utc_offset')
         self.datatype = datatype
         self.description = description
         self.tags = tags

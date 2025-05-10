@@ -24,7 +24,8 @@ class DataServer:
     @property
     def localClients(self) -> dict[Peer, ConnectedPeer]:
         ''' returns dict of clients that have local flag set as True'''
-        return {k:v for k,v in self.connectedClients.items() if v.isLocal}
+        # return {k:v for k,v in self.connectedClients.items() if v.isLocal}
+        return {k:v for k,v in self.connectedClients.items()}
 
     @property
     def availableStreams(self) -> list[str]:

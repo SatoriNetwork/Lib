@@ -17,9 +17,9 @@ async def main():
     # dataClient = DataClient('188.166.4.120', identity=EvrmoreIdentity(walletPath))
     dataClient = DataClient('0.0.0.0', identity=EvrmoreIdentity(walletPath))
     response = await dataClient.isStreamActive(
-                            peerHost='193.108.116.96',
-                            peerPort=24600,
-                            uuid='f85266a9-1b16-5802-84fe-862611744739')
+                            peerHost='0.0.0.0',
+                            peerPort=24604,
+                            uuid='883f30d2-854c-5dcf-aa0f-1a0e9ad21df7')
     # msg = Message({
     #                 'method': DataServerApi.insertStreamData.value,
     #                 'status': 'success',
@@ -48,8 +48,8 @@ async def main():
     # response: Message = await dataClient.insertStreamData('9b672d88-f38f-5522-8fe5-4d16d9fe1fe3', 
     #                                                       df, 
     #                                                       isSub=True)
-    response: Message = await dataClient.addActiveStream('009bb819-b737-55f5-b4d7-d851316eceae')
-    print(response)
+    # response: Message = await dataClient.addActiveStream('009bb819-b737-55f5-b4d7-d851316eceae')
+    print(response.to_dict())
     # response: Message = await dataClient.isStreamActive('159.65.144.150', '009bb819-b737-55f5-b4d7-d851316eceae')
     # await asyncio.sleep(20)
     # df = pd.DataFrame({

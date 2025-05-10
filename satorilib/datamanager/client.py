@@ -110,44 +110,19 @@ class DataClient:
             error('Unable to set data in server: ', e)
 
     async def handleMessageForSubscriberClients(self, message: Message):
-        '''
-        DEBUGGING:
-            encountered this error:
-                2025-03-24 18:30:21,399 - ERROR - Task exception was never retrieved
-                future: <Task finished name='Task-136' coro=<DataClient.handlePeerMessage() done, defined at /Satori/Lib/satorilib/datamanager/client.py:89> exception=ValueError('too many values to unpack (expected 2)')>
-                Traceback (most recent call last):
-                File "/Satori/Lib/satorilib/datamanager/client.py", line 91, in handlePeerMessage
-                    await self.handleMessageForOwner(message, peer)
-                File "/Satori/Lib/satorilib/datamanager/client.py", line 123, in handleMessageForOwner
-                    await self.handleMessageForSubscriberClients(message)
-                File "/Satori/Lib/satorilib/datamanager/client.py", line 107, in handleMessageForSubscriberClients
-                    host, port = hostPort.split(':')
-                ValueError: too many values to unpack (expected 2)
-            added if statement below and not sure what to do about ipv6:
-        '''
-        # for hostPort in message.streamInfo:
-        #     if hostPort.count(':') > 1:
-        #         last_colon = hostPort.rindex(':')
-        #         host = hostPort[:last_colon]
-        #         port = hostPort[last_colon + 1:]
-        #     else:
-        #         host, port = hostPort.split(':')
-        #     try:
-        #         await self.send(
-        #             peerAddr=(str(host), int(port)), 
-        #             request=message
-        #         )
-        #     except Exception as e:
-        #         debug('Unable to sent data to external client: ', e, color='cyan')
-        #         pass
+        ''' connect to each peer and send subscription data '''
         async def sendEachPeer(host, port, message):
             try:
+                await self.send(
+                    peerAddr=(host, port), 
+                    request=Message(DataServerApi.addActiveStream.createRequest(message.uuid))
+                )
                 await self.send(
                     peerAddr=(host, port),
                     request=message
                 )
             except Exception as e:
-                debug('Unable to send data to external client: ', e, color='cyan')
+                debug('Unable to send data to external client: ', e)
         
         tasks = []
         for hostPort in message.streamInfo:

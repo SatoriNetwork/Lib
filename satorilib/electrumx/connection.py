@@ -12,6 +12,7 @@ class ElectrumxConnection:
         port: int,
         ssl: bool = False,
         timeout: int = 60*10,
+        initializeConnection: bool = True,
     ):
         self.host = host
         self.port = port
@@ -19,7 +20,9 @@ class ElectrumxConnection:
         self.timeout = timeout
         self.isConnected = False
         self.connection: socket.socket = None
-        self.connect()
+        self.createConnectionObject()
+        if initializeConnection:
+            self.connect()
 
     def connected(self) -> bool:
         if self.connection is None:
@@ -44,7 +47,7 @@ class ElectrumxConnection:
                 f'error reconnecting to {self.host}:{str(self.port)} {e}')
             return False
 
-    def connect(self):
+    def createConnectionObject(self):
         self.connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connection.settimeout(self.timeout)
         if self.ssl:
@@ -67,6 +70,9 @@ class ElectrumxConnection:
                 fallback_context.verify_mode = ssl.CERT_NONE
                 self.connection = fallback_context.wrap_socket(
                     self.connection, server_hostname=self.host)
+
+    def connect(self):
+        self.createConnectionObject()
         try:
             self.connection.connect((self.host, self.port))
             self.isConnected = True

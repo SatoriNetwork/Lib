@@ -146,6 +146,7 @@ class CheckinDetails:
         self.publications: str = raw.get('publications')
         self.pins: str = raw.get('pins')
         self.stakeRequired: str = raw.get('stakeRequired')
+        self.rewardAddress: str = raw.get('rewardaddress')
 
     def __str__(self):
         return (
@@ -162,3 +163,10 @@ class CheckinDetails:
 
     def get(self, key: str):
         return self.raw.get(key, self.wallet.get(key))
+
+    def setRewardAddress(self, address: str):
+        if isinstance(self.wallet, dict): 
+            self.wallet['rewardaddress'] = address
+        if isinstance(self.raw, dict): 
+            self.raw['rewardaddress'] = address
+        self.rewardAddress = address

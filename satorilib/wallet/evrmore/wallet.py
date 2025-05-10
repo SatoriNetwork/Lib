@@ -12,11 +12,14 @@ from satorilib.wallet.utils.transaction import TxUtils
 from satorilib.wallet.wallet import Wallet
 from satorilib.wallet.evrmore.sign import signMessage
 from satorilib.wallet.evrmore.verify import verify
-
+from satorilib.wallet.evrmore.valid import isValidEvrmoreAddress
 
 
 class EvrmoreWallet(Wallet):
 
+    @staticmethod
+    def addressIsValid(address: str) -> bool:
+        return isValidEvrmoreAddress(address)
 
     @staticmethod
     def create(
@@ -67,6 +70,7 @@ class EvrmoreWallet(Wallet):
         persistent: bool = False,
         balanceUpdatedCallback: Union[Callable, None] = None,
         cachedPeersFile: Union[Callable, None] = None,
+        **kwargs
     ):
         super().__init__(
             walletPath,
@@ -77,7 +81,8 @@ class EvrmoreWallet(Wallet):
             skipSave=skipSave,
             pullFullTransactions=pullFullTransactions,
             useElectrumx=useElectrumx,
-            balanceUpdatedCallback=balanceUpdatedCallback)
+            balanceUpdatedCallback=balanceUpdatedCallback,
+            **kwargs)
         self.kind = kind
         self.persistent = persistent
         self.cachedPeersFile = cachedPeersFile

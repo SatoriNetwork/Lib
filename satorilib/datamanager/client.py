@@ -251,11 +251,13 @@ class DataClient:
         uuid: str,
         peerPort: Union[int, None] = None,
         publicationUuid: Union[str, None] = None,
-        callback: Union[callable, None] = None) -> Message:
+        callback: Union[callable, None] = None,
+        engineSubscribed: bool = False) -> Message:
         ''' sends a subscription request to external source to recieve subscription updates '''
         if publicationUuid is not None:
             self.publications[uuid] = publicationUuid
-        self._addStreamToServer(uuid, publicationUuid)
+        if engineSubscribed is True:
+            self._addStreamToServer(uuid, publicationUuid)
         subscription = Subscription(uuid, callback)
         self.subscriptions[subscription] = queue.Queue()
         return await self.send((peerHost, peerPort if peerPort is not None else self.serverPort), Message(DataServerApi.subscribe.createRequest(uuid)))
@@ -352,6 +354,7 @@ class DataClient:
 
     async def _addStreamToServer(self, subUuid: str, pubUuid: Union[str, None] = None) -> None:
         ''' Updates server's available streams with local client's subscriptions and predictions streams '''
+        print("Here")
         try:
             await self.addActiveStream(uuid=subUuid)
         except Exception as e:

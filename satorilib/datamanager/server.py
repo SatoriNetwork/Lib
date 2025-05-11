@@ -87,46 +87,46 @@ class DataServer:
             print("Available streams After cleaning:", self.availableStreams)
 
     # TODO: to be cleaned if the updated function works well
-    # async def cleanupConnection(self, peerAddr: Peer):
-    #     '''clean up resources when a connection is closed'''
-    #     if peerAddr in self.connectedClients:
-    #         peer = self.connectedClients[peerAddr]
-    #         for uuid in peer.publications:
-    #             disconnectMsg = Message(DataClientApi.streamInactive.createResponse(uuid))
-    #             await self.updateSubscribers(disconnectMsg)
-    #         if not peer.websocket.closed:
-    #             await peer.websocket.close()
-    #         del self.connectedClients[peerAddr]
-    #         debug(f"Cleaned up connection for peer: {peerAddr}", print=True)
-
     async def cleanupConnection(self, peerAddr: Peer):
         '''clean up resources when a connection is closed'''
         if peerAddr in self.connectedClients:
             peer = self.connectedClients[peerAddr]
-            publicationsToRemove = peer.publications.copy()
-            print("uuid to remove:", publicationsToRemove)
+            for uuid in peer.publications:
+                disconnectMsg = Message(DataClientApi.streamInactive.createResponse(uuid))
+                await self.updateSubscribers(disconnectMsg)
             if not peer.websocket.closed:
                 await peer.websocket.close()
             del self.connectedClients[peerAddr]
-            for uuid in publicationsToRemove:
-                other_publishers_exist = False
-                for client in self.connectedClients.values():
-                    if uuid in client.publications:
-                        other_publishers_exist = True
-                        break
-                if not other_publishers_exist:
-                    disconnectMsg = Message(DataClientApi.streamInactive.createResponse(uuid))
-                    await self.updateSubscribers(disconnectMsg)
-                    for client in self.connectedClients.values():
-                        client.removeSubscription(uuid)
-                    publication_uuid = self.dataManager.pubSubMapping.get(uuid, {}).get('publicationUuid')
-                    if publication_uuid is not None:
-                        pub_disconnectMsg = Message(DataClientApi.streamInactive.createResponse(publication_uuid))
-                        await self.updateSubscribers(pub_disconnectMsg)
-                        for client in self.connectedClients.values():
-                            client.removeSubscription(publication_uuid)
-                            client.removePublication(publication_uuid)
             debug(f"Cleaned up connection for peer: {peerAddr}", print=True)
+
+    # async def cleanupConnection(self, peerAddr: Peer):
+    #     '''clean up resources when a connection is closed'''
+    #     if peerAddr in self.connectedClients:
+    #         peer = self.connectedClients[peerAddr]
+    #         publicationsToRemove = peer.publications.copy()
+    #         print("uuid to remove:", publicationsToRemove)
+    #         if not peer.websocket.closed:
+    #             await peer.websocket.close()
+    #         del self.connectedClients[peerAddr]
+    #         for uuid in publicationsToRemove:
+    #             other_publishers_exist = False
+    #             for client in self.connectedClients.values():
+    #                 if uuid in client.publications:
+    #                     other_publishers_exist = True
+    #                     break
+    #             if not other_publishers_exist:
+    #                 disconnectMsg = Message(DataClientApi.streamInactive.createResponse(uuid))
+    #                 await self.updateSubscribers(disconnectMsg)
+    #                 for client in self.connectedClients.values():
+    #                     client.removeSubscription(uuid)
+    #                 publication_uuid = self.dataManager.pubSubMapping.get(uuid, {}).get('publicationUuid')
+    #                 if publication_uuid is not None:
+    #                     pub_disconnectMsg = Message(DataClientApi.streamInactive.createResponse(publication_uuid))
+    #                     await self.updateSubscribers(pub_disconnectMsg)
+    #                     for client in self.connectedClients.values():
+    #                         client.removeSubscription(publication_uuid)
+    #                         client.removePublication(publication_uuid)
+    #         debug(f"Cleaned up connection for peer: {peerAddr}", print=True)
 
     async def updateSubscribers(self, msg: Message):
         '''

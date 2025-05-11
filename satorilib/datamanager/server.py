@@ -24,13 +24,17 @@ class DataServer:
     @property
     def localClients(self) -> dict[Peer, ConnectedPeer]:
         ''' returns dict of clients that have local flag set as True'''
-        # return {k:v for k,v in self.connectedClients.items() if v.isLocal}
+        return {k:v for k,v in self.connectedClients.items() if v.isLocal}
+
+    @property
+    def allClients(self) -> dict[Peer, ConnectedPeer]:
+        ''' returns dict of clients that have local flag set as True'''
         return {k:v for k,v in self.connectedClients.items()}
 
     @property
     def availableStreams(self) -> list[str]:
         ''' returns a list of streams the server publishes or others can subscribe to '''
-        return list(set().union(*[v.publications for v in self.localClients.values()]))
+        return list(set().union(*[v.publications for v in self.allClients.values()]))
 
     async def startServer(self):
         """ Start the WebSocket server """
@@ -78,9 +82,9 @@ class DataServer:
         except websockets.exceptions.ConnectionClosed:
             error(f"Connection closed with {peerAddr}")
         finally:
-            print(self.availableStreams)
+            print("Available streams Before cleaning:", self.availableStreams)
             await self.cleanupConnection(peerAddr)
-            print(self.availableStreams)
+            print("Available streams After cleaning:", self.availableStreams)
 
     # TODO: to be cleaned if the updated function works well
     # async def cleanupConnection(self, peerAddr: Peer):
@@ -100,6 +104,7 @@ class DataServer:
         if peerAddr in self.connectedClients:
             peer = self.connectedClients[peerAddr]
             publicationsToRemove = peer.publications.copy()
+            print("uuid to remove:", publicationsToRemove)
             if not peer.websocket.closed:
                 await peer.websocket.close()
             del self.connectedClients[peerAddr]
@@ -299,7 +304,13 @@ class DataServer:
         elif request.method == DataServerApi.addActiveStream.value:
             ''' local client tells the server to add a stream to its publication list since the local client is subscribed to that stream '''
             if request.uuid is not None:
-                self.connectedClients[peerAddr].addPublication(request.uuid)
+                publication_exists = False
+                for client in self.connectedClients.values():
+                    if request.uuid in client.publications:
+                        publication_exists = True
+                        break
+                if not publication_exists:
+                    self.connectedClients[peerAddr].addPublication(request.uuid)
                 return DataServerApi.statusSuccess.createResponse('Publication Stream added', request.id)
             return DataServerApi.statusFail.createResponse('UUID must be provided', request.id)
 

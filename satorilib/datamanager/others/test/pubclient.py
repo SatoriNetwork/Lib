@@ -21,10 +21,10 @@ async def main():
     #                 peerAddr=('45.113.226.219', 24603), 
     #                 request=Message(DataServerApi.addActiveStream.createRequest('f85266a9-1b16-5802-84fe-862611744739'))
     #             )
-    # response = await dataClient.send(
-    #                 peerAddr=('0.0.0.0', 24604), 
-    #                 request=Message(DataServerApi.addActiveStream.createRequest('b530edaf-72e3-5d0f-901f-e0cb1011f568'))
-    #             )
+    response = await dataClient.send(
+                    peerAddr=('0.0.0.0', 24604), 
+                    request=Message(DataServerApi.addActiveStream.createRequest('f85266a9-1b16-5802-84fe-862611744739'))
+                )
     # print(response.to_dict())
 
     response = await dataClient.getAvailableSubscriptions(
@@ -35,7 +35,7 @@ async def main():
     #                         peerPort=24603)
     # response = await dataClient.getAvailableSubscriptions(
     #                         peerHost='193.108.116.96',
-    #                         peerPort=24605)
+    #                         peerPort=24611)
                             # uuid='f85266a9-1b16-5802-84fe-862611744739')
     # msg = Message({
     #                 'method': DataServerApi.insertStreamData.value,
@@ -81,6 +81,6 @@ async def main():
     # print(response.to_dict(True))
     # if response.status == DataServerApi.statusSuccess.value:
     # print(response.senderMsg)
-    # await asyncio.Event().wait()
+    await asyncio.Event().wait()
 
 asyncio.run(main())

@@ -159,7 +159,8 @@ class DataClient:
                 q.put(message)
             await subscription(message)
         elif message.isResponse:
-            self.responses[message.id] = message
+            if message.id is not None:
+                self.responses[message.id] = message
 
     async def handleMessageForSelf(self, message: Message) -> None:
         ''' modify self state '''
@@ -265,9 +266,11 @@ class DataClient:
         self.subscriptions[subscription] = queue.Queue()
         return await self.send((peerHost, peerPort if peerPort is not None else self.serverPort), Message(DataServerApi.subscribe.createRequest(uuid)))
 
-    async def insertStreamData(self, uuid: str, data: pd.DataFrame, replace: bool = False, isSub: bool = False) -> Message:
+    async def insertStreamData(self, uuid: str, data: pd.DataFrame, replace: bool = False, isSub: bool = False, sendOnly: bool = False) -> Message:
         ''' sends the observation/prediction data to the server '''
-        return await self.send((self.serverHostPort), Message(DataServerApi.insertStreamData.createRequest(uuid, data, replace, isSub=isSub)))
+        return await self.send(peerAddr=(self.serverHostPort), 
+                               request=Message(DataServerApi.insertStreamData.createRequest(uuid, data, replace, isSub=isSub)),
+                               sendOnly=sendOnly)
 
     async def authenticate(self, peerHost: Union[str, None] = None, peerPort: Union[int, None] = None, islocal: str = None) -> Message:
         ''' client initiates the auth process '''

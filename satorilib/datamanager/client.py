@@ -115,11 +115,13 @@ class DataClient:
             try:
                 await self.send(
                     peerAddr=(host, port), 
-                    request=Message(DataServerApi.addActiveStream.createRequest(message.uuid))
+                    request=Message(DataServerApi.addActiveStream.createRequest(message.uuid)),
+                    sendOnly=True
                 )
                 await self.send(
                     peerAddr=(host, port),
-                    request=message
+                    request=message,
+                    sendOnly=True
                 )
             except Exception as e:
                 debug('Unable to send data to external client: ', e)
@@ -162,6 +164,7 @@ class DataClient:
     async def handleMessageForSelf(self, message: Message) -> None:
         ''' modify self state '''
         if message.status == DataClientApi.streamInactive.value:
+            print(1)
             subscription = self._findSubscription(
                 subscription=Subscription(message.uuid))
             if self.subscriptions.get(subscription) is not None:
@@ -354,7 +357,6 @@ class DataClient:
 
     async def _addStreamToServer(self, subUuid: str, pubUuid: Union[str, None] = None) -> None:
         ''' Updates server's available streams with local client's subscriptions and predictions streams '''
-        print("Here")
         try:
             await self.addActiveStream(uuid=subUuid)
         except Exception as e:

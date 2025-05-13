@@ -251,26 +251,26 @@ class DataClient:
 
     async def subscribe(
         self,
-        peerHost: str,
         uuid: str,
+        peerHost: Union[str, None] = None,
         peerPort: Union[int, None] = None,
         publicationUuid: Union[str, None] = None,
         callback: Union[callable, None] = None,
         engineSubscribed: bool = False) -> Message:
-        ''' sends a subscription request to external source to recieve subscription updates '''
+        ''' sends a subscription request to recieve subscription updates '''
         if publicationUuid is not None:
             self.publications[uuid] = publicationUuid
         if engineSubscribed is True:
             self._addStreamToServer(uuid, publicationUuid)
         subscription = Subscription(uuid, callback)
         self.subscriptions[subscription] = queue.Queue()
-        return await self.send((peerHost, peerPort if peerPort is not None else self.serverPort), Message(DataServerApi.subscribe.createRequest(uuid)))
-
-    async def insertStreamData(self, uuid: str, data: pd.DataFrame, replace: bool = False, isSub: bool = False, sendOnly: bool = False) -> Message:
-        ''' sends the observation/prediction data to the server '''
-        return await self.send(peerAddr=(self.serverHostPort), 
-                               request=Message(DataServerApi.insertStreamData.createRequest(uuid, data, replace, isSub=isSub)),
-                               sendOnly=sendOnly)
+        if peerHost is not None and peerPort is not None:
+            peerAddr = (peerHost, peerPort)
+            auth = True
+        else:
+            peerAddr = None
+            auth = False
+        return await self.send(peerAddr=peerAddr, request=Message(DataServerApi.subscribe.createRequest(uuid)), auth=auth)
 
     async def authenticate(self, peerHost: Union[str, None] = None, peerPort: Union[int, None] = None, islocal: str = None) -> Message:
         ''' client initiates the auth process '''
@@ -306,29 +306,48 @@ class DataClient:
             peer=self.peers.get((peerHost, peerPort), ''))
         return Message(DataServerApi.statusFail.createResponse("Failed to authenticate"))
 
-    async def isLocalNeuronClient(self) -> Message:
-        ''' neuron client tells the server that it is its own neuron client ( authentication done on the client side ) '''
-        return await self.send((self.serverHostPort), Message(DataServerApi.isLocalNeuronClient.createRequest()))
-
-    async def isLocalEngineClient(self) -> Message:
-        ''' engine client tells the server that it is its own engine client ( authentication done on the client side ) '''
-        return await self.send((self.serverHostPort), Message(DataServerApi.isLocalEngineClient.createRequest()))
-
     async def setPubsubMap(self, uuid: dict) -> Message:
         ''' neuron local client gives the server pub/sub mapping info '''
-        return await self.send((self.serverHostPort), Message(DataServerApi.setPubsubMap.createRequest(uuid)))
+        return await self.send((self.serverHostPort), Message(DataServerApi.setPubsubMap.createRequest(uuid)), auth=False)
 
     async def getPubsubMap(self, peerHost: Union[str, None] = None, peerPort: Union[int, None] = None) -> Message:
         ''' engine local client gets pub/sub mapping info from the server '''
-        return await self.send((peerHost, peerPort) if peerHost and peerPort else None, Message(DataServerApi.getPubsubMap.createRequest()))
+        if peerHost is not None and peerPort is not None:
+                peerAddr = (peerHost, peerPort)
+                auth = True
+        else:
+            peerAddr = None
+            auth = False
+        return await self.send(
+            peerAddr=peerAddr, 
+            request=Message(DataServerApi.getPubsubMap.createRequest()), 
+            auth=auth
+        )
 
-    async def isStreamActive(self, peerHost: str, uuid: str, peerPort: Union[int, None] = None) -> Message:
+    async def isStreamActive(self, uuid: str, peerHost: Union[str, None] = None, peerPort: Union[int, None] = None) -> Message:
         ''' checks if the source server has an active stream the client is trying to subscribe to '''
-        return await self.send((peerHost, peerPort if peerPort is not None else self.serverPort), Message(DataServerApi.isStreamActive.createRequest(uuid)))
+        if peerHost is not None and peerPort is not None:
+            peerAddr = (peerHost, peerPort)
+            auth = True
+        else:
+            peerAddr = None
+            auth = False
+        return await self.send(
+            peerAddr=peerAddr, 
+            request=Message(DataServerApi.isStreamActive.createRequest(uuid)), 
+            auth=auth
+        )
 
     async def streamInactive(self, uuid: str) -> Message:
         ''' tells the server that a particular stream is not active anymore '''
         return await self.send((self.serverHostPort), Message(DataServerApi.streamInactive.createRequest(uuid)))
+
+    async def insertStreamData(self, uuid: str, data: pd.DataFrame, replace: bool = False, isSub: bool = False, sendOnly: bool = False) -> Message:
+        ''' sends the observation/prediction data to the server '''
+        return await self.send(peerAddr=(self.serverHostPort), 
+                               request=Message(DataServerApi.insertStreamData.createRequest(uuid, data, replace, isSub=isSub)),
+                               sendOnly=sendOnly,
+                               auth=False)
 
     async def getRemoteStreamData(self, peerHost: str, uuid: str, peerPort: Union[int, None] = None)  -> Message:
         ''' request for data from external server '''
@@ -336,7 +355,7 @@ class DataClient:
 
     async def getLocalStreamData(self, uuid: str)  -> Message:
         ''' request for data from local server '''
-        return await self.send((self.serverHostPort), Message(DataServerApi.getStreamData.createRequest(uuid)))
+        return await self.send((self.serverHostPort), Message(DataServerApi.getStreamData.createRequest(uuid)), auth=False)
 
     async def getAvailableSubscriptions(self, peerHost: str, peerPort: Union[int, None] = None)  -> Message:
         ''' get from external server its list of available subscriptions '''
@@ -360,6 +379,7 @@ class DataClient:
 
     async def _addStreamToServer(self, subUuid: str, pubUuid: Union[str, None] = None) -> None:
         ''' Updates server's available streams with local client's subscriptions and predictions streams '''
+        print("In here")
         try:
             await self.addActiveStream(uuid=subUuid)
         except Exception as e:

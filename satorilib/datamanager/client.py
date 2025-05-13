@@ -363,7 +363,7 @@ class DataClient:
 
     async def addActiveStream(self, uuid: str)  -> Message:
         ''' After confirming a stream is active, its send to its own server for adding it to its available streams '''
-        return await self.send((self.serverHostPort), Message(DataServerApi.addActiveStream.createRequest(uuid)))
+        return await self.send((self.serverHostPort), Message(DataServerApi.addActiveStream.createRequest(uuid)), auth=False)
 
     async def getStreamDataByRange(self, peerHost: str, uuid: str, fromDate: str, toDate: str, peerPort: Union[int, None] = None)  -> Message:
         ''' request for data thats in a specific timestamp range  '''

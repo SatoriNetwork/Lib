@@ -17,10 +17,10 @@ async def main():
     # dataClient = DataClient('188.166.4.120', identity=EvrmoreIdentity(walletPath))
     dataClient = DataClient('0.0.0.0', identity=EvrmoreIdentity(walletPath))
     # await dataClient.addActiveStream('009bb819-b737-55f5-b4d7-d851316eceae')
-    response = await dataClient.send(
-                    peerAddr=('0.0.0.0', 24604), 
-                    request=Message(DataServerApi.addActiveStream.createRequest('168467c1-99a1-5868-83f8-64e817758030'))
-                )
+    # response = await dataClient.send(
+    #                 peerAddr=('0.0.0.0', 24604), 
+    #                 request=Message(DataServerApi.addActiveStream.createRequest('168467c1-99a1-5868-83f8-64e817758030'))
+    #             )
     # response = await dataClient.send(
     #                 peerAddr=('0.0.0.0', 24604), 
     #                 request=Message(DataServerApi.addActiveStream.createRequest('f85266a9-1b16-5802-84fe-862611744739'))
@@ -51,11 +51,11 @@ async def main():
     # try:
     
     # await asyncio.sleep(50)
-    response = await dataClient.send(
-        peerAddr=('0.0.0.0', 24604),
-        request=msg,
-        sendOnly=True
-        )
+    # response = await dataClient.send(
+    #     peerAddr=('0.0.0.0', 24604),
+    #     request=msg,
+    #     sendOnly=True
+    #     )
     # await dataClient.insertStreamDataForRemote(
     #     '::',
     #     24600,

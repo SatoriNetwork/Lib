@@ -365,7 +365,7 @@ class DataServer:
                 if request.data is None:
                     return DataServerApi.statusFail.createResponse('No data provided', request.id)
                 if request.isSubscription:
-                    self.connectedClients[peerAddr].addPublication(request.uuid)
+                    # self.connectedClients[peerAddr].addPublication(request.uuid)
                     provider = self.connectedClients[peerAddr].address
                     if self.connectedClients[peerAddr].isEngine:
                         if 'provider' in request.data.columns:

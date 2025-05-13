@@ -340,7 +340,7 @@ class DataClient:
 
     async def streamInactive(self, uuid: str) -> Message:
         ''' tells the server that a particular stream is not active anymore '''
-        return await self.send((self.serverHostPort), Message(DataServerApi.streamInactive.createRequest(uuid)))
+        return await self.send((self.serverHostPort), Message(DataServerApi.streamInactive.createRequest(uuid)), auth=False)
 
     async def insertStreamData(self, uuid: str, data: pd.DataFrame, replace: bool = False, isSub: bool = False, sendOnly: bool = False) -> Message:
         ''' sends the observation/prediction data to the server '''

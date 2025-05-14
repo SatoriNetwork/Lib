@@ -23,6 +23,7 @@ class DataClient:
         self.publications: dict[str, str] = {}
         self.responses: dict[str, Message] = {}
         self.running = False
+        self.proactiveSubscribers: Dict[str, Set[Tuple[str, int]]] = {}
 
     @property
     def server(self)-> ConnectedPeer:
@@ -111,20 +112,53 @@ class DataClient:
 
     async def handleMessageForSubscriberClients(self, message: Message):
         ''' connect to each peer and send subscription data '''
+
+        if message.uuid not in self.proactiveSubscribers:
+            self.proactiveSubscribers[message.uuid] = set()
+
         async def sendEachPeer(host, port, message):
+            peer_tuple = (host, port)
             try:
-                await self.send(
-                    peerAddr=(host, port), 
-                    request=Message(DataServerApi.addActiveStream.createRequest(message.uuid)),
-                    sendOnly=True
-                )
-                await self.send(
+                is_first_time = peer_tuple not in self.proactiveSubscribers[message.uuid]
+                if is_first_time:
+                    response = await self.send(
+                        peerAddr=(host, port), 
+                        request=Message(DataServerApi.addActiveStream.createRequest(message.uuid)),
+                        sendOnly=True
+                    )
+                    if response is not None:
+                        raise Exception
+                    else:
+                        fullDataResponse = await self.getLocalStreamData(message.uuid)
+                        insertFullDataDict = {
+                            'status': 'success',
+                            'sub': False,
+                            'params': {
+                                'uuid': message.uuid,
+                                'replace': True},
+                            'method': DataServerApi.insertStreamData.value,
+                            'data': fullDataResponse.data
+                        }
+                        responseFromPeer = await self.send(
+                                                peerAddr=(host, port),
+                                                request=Message(insertFullDataDict),
+                                                sendOnly=True
+                                            )
+                        if responseFromPeer is None:
+                            self.proactiveSubscribers[message.uuid].add(peer_tuple)
+                else:
+                    debug(f"Sending stream {message.uuid} to {host}:{port} (subsequent time)")
+                
+                # Send the actual stream data
+                response = await self.send(
                     peerAddr=(host, port),
                     request=message,
                     sendOnly=True
                 )
+
             except Exception as e:
-                debug('Unable to send data to external client: ', e)
+                self.proactiveSubscribers[message.uuid].discard(peer_tuple)
+                debug('Unable to send data to external client: ', e, (host, port))
         
         tasks = []
         for hostPort in message.streamInfo:
@@ -165,7 +199,6 @@ class DataClient:
     async def handleMessageForSelf(self, message: Message) -> None:
         ''' modify self state '''
         if message.status == DataClientApi.streamInactive.value:
-            print(1)
             subscription = self._findSubscription(
                 subscription=Subscription(message.uuid))
             if self.subscriptions.get(subscription) is not None:

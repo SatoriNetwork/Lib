@@ -155,6 +155,8 @@ class DataClient:
                     request=message,
                     sendOnly=True
                 )
+                if response is not None:
+                    raise Exception
 
             except Exception as e:
                 self.proactiveSubscribers[message.uuid].discard(peer_tuple)

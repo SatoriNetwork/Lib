@@ -28,7 +28,7 @@ import requests
 from satorilib import logging
 from satorilib.utils.time import timeToTimestamp
 from satorilib.wallet import Wallet
-from satorilib.concepts.structs import Stream
+from satorilib.concepts.structs import Stream, StreamId
 from satorilib.server.api import ProposalSchema, VoteSchema
 from satorilib.utils.json import sanitizeJson
 from requests.exceptions import RequestException
@@ -365,6 +365,26 @@ class SatoriServerClient(object):
             function=requests.post,
             endpoint='/clear_vote_on/sanction/incremental',
             payload=json.dumps({'streamId': streamId})).text
+
+    def predictStream(self, streamId: int) -> bool:
+        """
+        Start predicting a stream by sending a request to the server.
+        
+        Args:
+            streamId: A StreamId object containing the stream details to predict
+            
+        Returns:
+            bool: True if the prediction request was successful, False otherwise
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/request/stream/specific',
+                payload={'streamId': streamId})
+            return response.status_code == 200
+        except Exception as e:
+            logging.error(f"Error predicting stream: {str(e)}")
+            return False
 
     def getObservations(self, streamId: str):
         return self._makeAuthenticatedCall(

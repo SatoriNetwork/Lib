@@ -1,5 +1,5 @@
 from typing import Union
-from satorilib.wallet.ethereum.valid_eth import isValidEthereumAddress
+from satorilib.wallet.ethereum.valid import isValidEthereumAddress
 from satorilib.utils.dict import MultiKeyDict
 
 class TransactionStruct():

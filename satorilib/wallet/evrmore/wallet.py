@@ -1,9 +1,10 @@
 from typing import Union, Callable
-import random
 from evrmore import SelectParams
 from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret, P2SHEvrmoreAddress
 from evrmore.core.scripteval import VerifyScript, SCRIPT_VERIFY_P2SH
-from evrmore.core.script import CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, OP_EVR_ASSET, OP_DROP, OP_RETURN, SIGHASH_ANYONECANPAY
+from evrmore.core.script import (
+    CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, 
+    OP_EVR_ASSET, OP_DROP, OP_RETURN, SIGHASH_ANYONECANPAY)
 from evrmore.core import b2x, lx, COutPoint, CMutableTxOut, CMutableTxIn, CMutableTransaction, Hash160
 from evrmore.core.scripteval import EvalScriptError
 from satorilib import logging
@@ -13,53 +14,49 @@ from satorilib.wallet.utils.transaction import TxUtils
 from satorilib.wallet.wallet import Wallet
 from satorilib.wallet.evrmore.sign import signMessage
 from satorilib.wallet.evrmore.verify import verify
+from satorilib.wallet.evrmore.valid import isValidEvrmoreAddress
+from satorilib.wallet.evrmore.scripts import P2SHRedeemScripts
 
 
 
 class EvrmoreWallet(Wallet):
 
-    electrumxServers: list[str] = [
-        '128.199.1.149:50002',
-        '146.190.149.237:50002',
-        '146.190.38.120:50002',
-        'electrum1-mainnet.evrmorecoin.org:50002',
-        'electrum2-mainnet.evrmorecoin.org:50002',
-        '1-electrum.satorinet.ie:50002', #WilQSL
-        #'evr-electrum.wutup.io:50002', #Kasvot Växt
-    ]
-
-    electrumxServersWithoutSSL: list[str] = [
-        '128.199.1.149:50001',
-        '146.190.149.237:50001',
-        '146.190.38.120:50001',
-        'electrum1-mainnet.evrmorecoin.org:50001',
-        'electrum2-mainnet.evrmorecoin.org:50001',
-        #'135.181.212.189:50001', #WilQSL
-        #'evr-electrum.wutup.io:50001', #Kasvot Växt
-    ]
+    @staticmethod
+    def addressIsValid(address: str) -> bool:
+        return isValidEvrmoreAddress(address)
 
     @staticmethod
-    def createElectrumxConnection(
-        persistent: bool = False,
+    def create(
+        walletPath: str = '/Satori/Neuron/wallet/wallet.yaml',
+        reserve: float = 0,
+        isTestnet: bool = False,
+        password: Union[str, None] = None,
+        electrumx: Electrumx = None,
+        useElectrumx: bool = True,
+        kind: str = 'wallet',
+        watchAssets: list[str] = None,
+        skipSave: bool = False,
+        pullFullTransactions: bool = True,
         hostPort: str = None,
-        hostPorts: list[str] = None,
-        retry: int = 0,
-    ) -> Electrumx:
-        hostPorts = hostPorts or EvrmoreWallet.electrumxServersWithoutSSL
-        hostPort = hostPort or random.choice(hostPorts)
-        try:
-            return Electrumx(
-                persistent=persistent,
-                host=hostPort.split(':')[0],
-                port=int(hostPort.split(':')[1]))
-        except Exception as e:
-            logging.error(e)
-            if retry < len(hostPorts):
-                return EvrmoreWallet.createElectrumxConnection(
-                    persistent=persistent,
-                    hostPorts=hostPorts,
-                    retry=retry+1)
-            raise e
+        persistent: bool = False,
+        balanceUpdatedCallback: Union[Callable, None] = None,
+        cachedPeersFile: Union[str, None] = None,
+    ) -> 'EvrmoreWallet':
+        return EvrmoreWallet(
+            walletPath=walletPath,
+            reserve=reserve,
+            isTestnet=isTestnet,
+            password=password,
+            electrumx=electrumx,
+            useElectrumx=useElectrumx,
+            kind=kind,
+            watchAssets=watchAssets,
+            skipSave=skipSave,
+            pullFullTransactions=pullFullTransactions,
+            hostPort=hostPort,
+            persistent=persistent,
+            balanceUpdatedCallback=balanceUpdatedCallback,
+            cachedPeersFile=cachedPeersFile)
 
     def __init__(
         self,
@@ -74,7 +71,10 @@ class EvrmoreWallet(Wallet):
         skipSave: bool = False,
         pullFullTransactions: bool = True,
         hostPort: str = None,
+        persistent: bool = False,
         balanceUpdatedCallback: Union[Callable, None] = None,
+        cachedPeersFile: Union[Callable, None] = None,
+        **kwargs
     ):
         super().__init__(
             walletPath,
@@ -85,16 +85,24 @@ class EvrmoreWallet(Wallet):
             skipSave=skipSave,
             pullFullTransactions=pullFullTransactions,
             useElectrumx=useElectrumx,
-            balanceUpdatedCallback=balanceUpdatedCallback)
+            balanceUpdatedCallback=balanceUpdatedCallback,
+            **kwargs)
         self.kind = kind
-        self.maybeConnect(electrumx, hostPort=hostPort)
+        self.persistent = persistent
+        self.cachedPeersFile = cachedPeersFile
+        self.hostPort = hostPort
+        self.maybeConnect(electrumx)
+        self.scripts = P2SHRedeemScripts()
 
-    def maybeConnect(self, electrumx = None, hostPort: str = None):
+    def maybeConnect(self, electrumx = None):
         if self.useElectrumx:
             if self.electrumx is None:
                 self.electrumx = (
                     electrumx or
-                    EvrmoreWallet.createElectrumxConnection(hostPort=hostPort))
+                    Electrumx.create(
+                        hostPort=self.hostPort, 
+                        persistent= self.persistent,
+                        cachedPeersFile=self.cachedPeersFile))
                 return self.electrumx is not None
             elif self.electrumx.isConnected:
                 return True
@@ -103,7 +111,7 @@ class EvrmoreWallet(Wallet):
                     return True
                 else:
                     self.electrumx = None
-                    return self.maybeConnect(electrumx, hostPort=hostPort)
+                    return self.maybeConnect(electrumx)
         return False
 
     @property
@@ -167,6 +175,11 @@ class EvrmoreWallet(Wallet):
             pubkey = bytes.fromhex(pubkey)
         return str(P2PKHEvrmoreAddress.from_pubkey(pubkey))
 
+    @staticmethod
+    def generateP2SHAddress(redeem_script: CScript) -> str:
+        """Generate a P2SH address from a redeem script."""
+        return str(P2SHEvrmoreAddress.from_redeemScript(redeem_script))
+
     def _generatePrivateKey(self, compressed: bool = True):
         SelectParams('mainnet')
         return CEvrmoreSecret.from_secret_bytes(self._entropy, compressed=compressed)
@@ -211,47 +224,75 @@ class EvrmoreWallet(Wallet):
         self,
         gatheredCurrencyUnspents: list = None,
         gatheredSatoriUnspents: list = None,
+        redeem_scripts: dict[str, CScript] = None,  # Map of tx_hash:pos to redeem script
     ) -> tuple[list, list]:
         # currency vins
         txins = []
         txinScripts = []
         for utxo in (gatheredCurrencyUnspents or []):
-            txin = CMutableTxIn(COutPoint(lx(
-                utxo.get('tx_hash')),
-                utxo.get('tx_pos')))
+            tx_hash = utxo.get('tx_hash')
+            tx_pos = utxo.get('tx_pos')
+            txin = CMutableTxIn(COutPoint(lx(tx_hash), tx_pos))
+            
+            # If we have a scriptPubKey in the UTXO, use it directly
             if 'scriptPubKey' in utxo:
-                txinScriptPubKey = CScript(
-                    bytes.fromhex(utxo.get('scriptPubKey')))
+                txinScriptPubKey = CScript(bytes.fromhex(utxo.get('scriptPubKey')))
             else:
-                txinScriptPubKey = CScript([
-                    OP_DUP,
-                    OP_HASH160,
-                    Hash160(self.publicKeyBytes),
-                    OP_EQUALVERIFY,
-                    OP_CHECKSIG])
+                # No scriptPubKey provided, we need to construct one
+                utxo_key = f"{tx_hash}:{tx_pos}"
+                if redeem_scripts and utxo_key in redeem_scripts:
+                    # Construct P2SH scriptPubKey from redeem script
+                    redeem_script = redeem_scripts[utxo_key]
+                    txinScriptPubKey = P2SHEvrmoreAddress.from_redeemScript(redeem_script).to_scriptPubKey()
+                else:
+                    # Construct standard P2PKH scriptPubKey
+                    txinScriptPubKey = CScript([
+                        OP_DUP,
+                        OP_HASH160,
+                        Hash160(self.publicKeyBytes),
+                        OP_EQUALVERIFY,
+                        OP_CHECKSIG])
             txins.append(txin)
             txinScripts.append(txinScriptPubKey)
+
         # satori vins
         for utxo in (gatheredSatoriUnspents or []):
-            txin = CMutableTxIn(COutPoint(lx(
-                utxo.get('tx_hash')),
-                utxo.get('tx_pos')))
+            tx_hash = utxo.get('tx_hash')
+            tx_pos = utxo.get('tx_pos')
+            txin = CMutableTxIn(COutPoint(lx(tx_hash), tx_pos))
+            
+            # If we have a scriptPubKey in the UTXO, use it directly
             if 'scriptPubKey' in utxo:
-                txinScriptPubKey = CScript(
-                    bytes.fromhex(utxo.get('scriptPubKey')))
+                txinScriptPubKey = CScript(bytes.fromhex(utxo.get('scriptPubKey')))
             else:
-                txinScriptPubKey = CScript([
-                    OP_DUP,
-                    OP_HASH160,
-                    Hash160(self.publicKeyBytes),
-                    OP_EQUALVERIFY,
-                    OP_CHECKSIG,
-                    OP_EVR_ASSET,
-                    bytes.fromhex(
-                        AssetTransaction.satoriHex(self.symbol) +
-                        TxUtils.padHexStringTo8Bytes(
-                            TxUtils.intToLittleEndianHex(int(utxo.get('value'))))),
-                    OP_DROP])
+                # No scriptPubKey provided, we need to construct one
+                utxo_key = f"{tx_hash}:{tx_pos}"
+                if redeem_scripts and utxo_key in redeem_scripts:
+                    # Construct P2SH scriptPubKey from redeem script and add asset data
+                    redeem_script = redeem_scripts[utxo_key]
+                    base_script = P2SHEvrmoreAddress.from_redeemScript(redeem_script).to_scriptPubKey()
+                    txinScriptPubKey = CScript([
+                        *base_script,
+                        OP_EVR_ASSET,
+                        bytes.fromhex(
+                            AssetTransaction.satoriHex(self.symbol) +
+                            TxUtils.padHexStringTo8Bytes(
+                                TxUtils.intToLittleEndianHex(int(utxo.get('value'))))),
+                        OP_DROP])
+                else:
+                    # Construct standard P2PKH scriptPubKey with asset data
+                    txinScriptPubKey = CScript([
+                        OP_DUP,
+                        OP_HASH160,
+                        Hash160(self.publicKeyBytes),
+                        OP_EQUALVERIFY,
+                        OP_CHECKSIG,
+                        OP_EVR_ASSET,
+                        bytes.fromhex(
+                            AssetTransaction.satoriHex(self.symbol) +
+                            TxUtils.padHexStringTo8Bytes(
+                                TxUtils.intToLittleEndianHex(int(utxo.get('value'))))),
+                        OP_DROP])
             txins.append(txin)
             txinScripts.append(txinScriptPubKey)
         return txins, txinScripts
@@ -336,15 +377,28 @@ class EvrmoreWallet(Wallet):
                 ]))
         return None
 
-    def _createTransaction(self, txins: list, txinScripts: list, txouts: list) -> CMutableTransaction:
+    def _createTransaction(
+        self,
+        txins: list,
+        txinScripts: list,
+        txouts: list,
+        redeem_scripts: dict[str, CScript] = None,
+        signatures: dict[str, list[bytes]] = None,  # Map of tx_hash:pos to list of signatures
+    ) -> CMutableTransaction:
         tx = CMutableTransaction(txins, txouts)
         for i, (txin, txinScriptPubKey) in enumerate(zip(txins, txinScripts)):
+            utxo_key = f"{b2x(txin.prevout.hash)}:{txin.prevout.n}"
+            redeem_script = redeem_scripts.get(utxo_key) if redeem_scripts else None
+            other_sigs = signatures.get(utxo_key) if signatures else None
+            
             self._signInput(
                 tx=tx,
                 i=i,
                 txin=txin,
                 txinScriptPubKey=txinScriptPubKey,
-                sighashFlag=SIGHASH_ALL)
+                sighashFlag=SIGHASH_ALL,
+                redeem_script=redeem_script,
+                signatures=other_sigs)
         return tx
 
     def _createPartialOriginatorSimple(self, txins: list, txinScripts: list, txouts: list) -> CMutableTransaction:
@@ -386,15 +440,49 @@ class EvrmoreWallet(Wallet):
         i: int,
         txin: CMutableTxIn,
         txinScriptPubKey: CScript,
-        sighashFlag: int
+        sighashFlag: int,
+        redeem_script: CScript = None,
+        signatures: list[bytes] = None,  # For multi-sig, list of signatures from other signers
     ):
-        sighash = SignatureHash(txinScriptPubKey, tx, i, sighashFlag)
-        sig = self._privateKeyObj.sign(sighash) + bytes([sighashFlag])
-        txin.scriptSig = CScript([sig, self._privateKeyObj.pub])
+        """Sign a transaction input.
+        
+        Args:
+            tx: The transaction to sign
+            i: Input index
+            txin: The transaction input
+            txinScriptPubKey: The scriptPubKey of the input
+            sighashFlag: The sighash flag to use
+            redeem_script: For P2SH inputs, the redeem script
+            signatures: For multi-sig, list of signatures from other signers
+        """
+        if redeem_script:
+            # This is a P2SH input
+            sighash = SignatureHash(redeem_script, tx, i, sighashFlag)
+            sig = self._privateKeyObj.sign(sighash) + bytes([sighashFlag])
+            
+            if signatures:
+                # Multi-sig case
+                # Combine our signature with other signatures
+                all_sigs = signatures + [sig]
+                # Sort signatures by public key (required by Bitcoin)
+                all_sigs.sort()
+                # Create scriptSig: [sig1, sig2, ..., redeem_script]
+                txin.scriptSig = CScript(all_sigs + [redeem_script])
+            else:
+                # Single-sig P2SH case
+                txin.scriptSig = CScript([sig, redeem_script])
+        else:
+            # Regular P2PKH input
+            sighash = SignatureHash(txinScriptPubKey, tx, i, sighashFlag)
+            sig = self._privateKeyObj.sign(sighash) + bytes([sighashFlag])
+            txin.scriptSig = CScript([sig, self._privateKeyObj.pub])
+
         try:
+            # For P2SH, we need to verify against the redeem script
+            script_to_verify = redeem_script if redeem_script else txinScriptPubKey
             VerifyScript(
                 txin.scriptSig,
-                txinScriptPubKey,
+                script_to_verify,
                 tx, i, (SCRIPT_VERIFY_P2SH,))
         except EvalScriptError as e:
             # python-ravencoinlib doesn't support OP_RVN_ASSET in txinScriptPubKey
@@ -434,3 +522,378 @@ class EvrmoreWallet(Wallet):
 
     def _deserialize(self, serialTx: bytes) -> CMutableTransaction:
         return CMutableTransaction.deserialize(serialTx)
+
+
+
+    def createP2SHTransaction(
+        self,
+        outputs: list[tuple[str, float]],  # List of (address, amount) tuples
+        redeem_scripts: dict[str, CScript],  # Map of tx_hash:pos to redeem script
+        utxos: list = None,  # Optional list of UTXOs to use
+        signatures: dict[str, list[bytes]] = None,  # Optional map of tx_hash:pos to list of signatures
+        memo: str = None,
+    ) -> str:
+        """Create and sign a P2SH transaction.
+
+        *** NOTE ***
+            this is unused, it's an example, and it doesn't handle fees or change correctly so don't use it.
+        
+        Args:
+            outputs: List of (address, amount) tuples for the outputs
+            redeem_scripts: Map of tx_hash:pos to redeem script for each P2SH input
+            utxos: Optional list of UTXOs to use. If not provided, will select from available UTXOs
+            signatures: Optional map of tx_hash:pos to list of signatures for multi-sig inputs
+            memo: Optional memo to include in the transaction
+            
+        Returns:
+            Hex string of the signed transaction
+        """
+        # Gather UTXOs if not provided
+        utxos = utxos or self.gatherUnspents()
+            
+        # Compile inputs
+        txins, txinScripts = self._compileInputs(
+            gatheredCurrencyUnspents=utxos,
+            redeem_scripts=redeem_scripts
+        )
+        
+        # Calculate total output amount
+        total_output = sum(amount for _, amount in outputs)
+        
+        # Compile outputs
+        txouts = []
+        for address, amount in outputs:
+            txouts.extend(self._compileCurrencyOutputs(
+                TxUtils.asSats(amount),
+                address
+            ))
+            
+        # Add memo output if provided
+        if memo:
+            memo_output = self._compileMemoOutput(memo)
+            if memo_output:
+                txouts.append(memo_output)
+                
+        # Create and sign transaction
+        tx = self._createTransaction(
+            txins=txins,
+            txinScripts=txinScripts,
+            txouts=txouts,
+            redeem_scripts=redeem_scripts,
+            signatures=signatures)
+        
+        raise Exception("this function is an example, and it doesn't handle fees or change correctly so don't use it.")
+    
+        return self._txToHex(tx)
+
+
+    def p2shFlow(self):
+        '''
+        # Let's say we have 3 participants in a 2-of-3 multi-sig
+        from evrmore import CEvrmoreSecret  # For private keys
+        from evrmore.core import SignatureHash, SIGHASH_ALL
+
+        # Each participant has their own private/public key pair
+        privkey1 = CEvrmoreSecret.from_secret_bytes(b'participant1_secret', compressed=True)
+        privkey2 = CEvrmoreSecret.from_secret_bytes(b'participant2_secret', compressed=True)
+        privkey3 = CEvrmoreSecret.from_secret_bytes(b'participant3_secret', compressed=True)
+
+        pubkey1 = privkey1.pub
+        pubkey2 = privkey2.pub
+        pubkey3 = privkey3.pub
+
+        # Create the 2-of-3 redeem script
+        redeem_script = wallet.scripts.multiSig([pubkey1, pubkey2, pubkey3], 2)
+
+        # Create the P2SH address
+        p2sh_address = wallet.generateP2SHAddress(redeem_script)
+
+        # Later, when spending...
+        # First, create the transaction without signatures
+        tx = CMutableTransaction(txins, txouts)
+
+        # Each participant signs the transaction
+        # Participant 1 signs
+        sighash1 = SignatureHash(redeem_script, tx, 0, SIGHASH_ALL)
+        sig1 = privkey1.sign(sighash1) + bytes([SIGHASH_ALL])
+
+        # Participant 2 signs
+        sighash2 = SignatureHash(redeem_script, tx, 0, SIGHASH_ALL)
+        sig2 = privkey2.sign(sighash2) + bytes([SIGHASH_ALL])
+
+        # Now we have both signatures needed
+        signatures = {
+            'tx_hash:tx_pos': [sig1, sig2]  # These are the actual signatures from participants 1 and 2
+        }
+
+        # Create the final transaction with these signatures
+        tx_hex = wallet.createP2SHTransaction(
+            outputs=[(destination_address, amount)],
+            redeem_scripts={'tx_hash:tx_pos': redeem_script},
+            signatures=signatures
+        )    
+        '''
+        # example
+        #In a real-world scenario:
+        #Each participant would have their own wallet with their private key
+        #They would each sign the transaction independently
+        #The signatures would be shared between participants (often through some secure channel)
+        #Once you have enough signatures (2 in this case), you can broadcast the transaction
+        #The actual process might look more like this in practice:
+        '''
+        # Participant 1's wallet
+        def sign_transaction(tx_hex, redeem_script):
+            tx = CMutableTransaction.deserialize(bytes.fromhex(tx_hex))
+            sighash = SignatureHash(redeem_script, tx, 0, SIGHASH_ALL)
+            sig = my_privkey.sign(sighash) + bytes([SIGHASH_ALL])
+            return sig.hex()
+
+        # Participant 2's wallet
+        def sign_transaction(tx_hex, redeem_script):
+            # Same process, but with their private key
+            ...
+
+        # Coordinator's wallet
+        # 1. Create unsigned transaction
+        tx_hex = wallet.createP2SHTransaction(
+            outputs=[(destination_address, amount)],
+            redeem_scripts={'tx_hash:tx_pos': redeem_script},
+            signatures=None  # No signatures yet
+        )
+
+        # 2. Send tx_hex to participants
+        # 3. Collect signatures from participants
+        sig1_hex = participant1.sign_transaction(tx_hex, redeem_script)
+        sig2_hex = participant2.sign_transaction(tx_hex, redeem_script)
+
+        # 4. Create final transaction with signatures
+        signatures = {
+            'tx_hash:tx_pos': [
+                bytes.fromhex(sig1_hex),
+                bytes.fromhex(sig2_hex)
+            ]
+        }
+
+        final_tx_hex = wallet.createP2SHTransaction(
+            outputs=[(destination_address, amount)],
+            redeem_scripts={'tx_hash:tx_pos': redeem_script},
+            signatures=signatures
+        )
+        '''
+
+    # 1. redeem-script generator  ───────────────────────────────────────────────────
+    # see self.scripts
+    
+    # 2. funding (opens the channel)  ───────────────────────────────────────────────
+    def generatePaymentChannel(
+        self, 
+        redeemScript: CScript,
+        amount: float, 
+    ) -> tuple[CScript, str, str]:
+        """
+        
+        Returns (redeem_script, p2sh_address, funding_tx_hex)
+
+        Example Usage:
+        ```
+        redeem_script, p2sh_address, funding_tx_hex = wallet.generatePaymentChannel(
+            amount=24,
+            redeemScript=wallet.scripts.renewable_light_channel(
+                sender=wallet.publicKeyBytes,
+                receiver=other.pubkey,
+                blocks=60*60*24))
+        tx = wallet.broadcast(funding_tx_hex)
+        reported = wallet.thunder.reportChannelOpened(
+            sender=wallet.address,
+            receiver=other.address,
+            redeem=redeem_script,
+            address=p2sh_address,
+            fundingTx=funding_tx_hex,
+            tx=tx)
+        wallet.remember(reported)
+        ```
+        """
+        sats = TxUtils.asSats(amount)
+        p2shAddress = self.generateP2SHAddress(redeemScript)
+
+        # choose inputs
+        if utxos is None:
+            utxos = self.gatherUnspents()
+        txins, txinScripts = self._compileInputs(gatheredCurrencyUnspents=utxos)
+        # output = lock <amount_sats> into channel P2SH
+        txouts = [CMutableTxOut(sats, CEvrmoreAddress(p2shAddress).to_scriptPubKey())]
+
+        # add change + fee optimisation as usual
+        change = self._compileCurrencyChangeOutput(
+            currencySats=sats,
+            gatheredCurrencySats=sum(u['value'] for u in utxos),
+            inputCount=len(txins),
+            outputCount=len(txouts))
+        
+        if change:
+            txouts.append(change)
+
+        tx = self._createTransaction(txins, txinScripts, txouts)
+        return redeemScript, p2shAddress, self._txToHex(tx)
+
+
+    # 3. Alice creates a one-sig "commitment" tx  ───────────────────────────────────
+    def generateCommitmentTx(
+        self, 
+        funding_txid: str, 
+        vout: int,
+        funding_value: int,
+        redeem_script: CScript,
+        pay_to_receiver_sats: int, 
+        receiver_addr: str,
+        tx_fee_sats: int = 12000,  # Default fee of 0.00012 EVR (12000 satoshis)
+        dust_threshold_multiple: int = 3,  # Multiple of tx fee considered dust
+        respect_dust_zone: bool = True,
+        #p2sh_addr: str = None, 
+    ) -> str:
+        """
+        Creates a commitment transaction for a payment channel where:
+        - A portion of the funds (pay_to_receiver_sats) is sent to the receiver
+        - The remainder may stay locked in the payment channel based on amount
+        - Transaction fees are handled according to the following logic:
+          1. If remainder is zero (sending everything) - take fee from receiver amount
+          2. If remainder is dust (< 2x tx fee) - send everything to receiver minus fee
+          3. If remainder is significant - take fee from the remainder
+
+        Args:
+            funding_txid: Transaction ID of the funding transaction
+            vout: Output index in the funding transaction
+            funding_value: Total value of the funding output in satoshis
+            redeem_script: The redeem script for the payment channel
+            pay_to_receiver_sats: Amount to pay to the receiver in satoshis (before fee adjustment)
+            receiver_addr: Address of the receiver
+            tx_fee_sats: Transaction fee in satoshis
+            dust_threshold_multiple: Multiple of tx fee below which change is considered dust
+            respect_dust_zone: If true the transaction will fail to create when 0 < change < result of dust_threshold_multiple 
+            p2sh_addr: Optional payment channel address, calculated from redeem_script if not provided
+            
+        Returns:
+            Hex of partially-signed transaction (Alice's sig only)
+        """
+        # Validate the transaction fee
+        if tx_fee_sats <= 0:
+            raise ValueError("Transaction fee must be positive")
+        
+        # Validate the payment amount
+        if not 0 < pay_to_receiver_sats <= funding_value:
+            raise ValueError("Payment amount must be positive and not exceed the funding value")
+        
+        # Calculate the potential remainder (before considering fees)
+        remainder = funding_value - pay_to_receiver_sats
+        
+        # Define dust threshold (e.g., 3x transaction fee) 
+        # assumes 1 input 1 outputs is total fee for typical tx
+        dust_threshold = (tx_fee_sats * 3) * dust_threshold_multiple 
+        
+        # Create the input that spends from the funding transaction
+        txin = CMutableTxIn(COutPoint(lx(funding_txid), vout))
+        
+        # Get or calculate the P2SH address from the redeem script
+        #p2sh_addr = p2sh_addr or self.generateP2SHAddress(redeem_script)
+        
+        # Get the scriptPubKey for the P2SH address
+        script_pub = P2SHEvrmoreAddress.from_redeemScript(redeem_script).to_scriptPubKey()
+
+        # Create outputs based on the different cases
+        txouts = []
+        
+        # Case 1 & 2 & 3: No remainder or remainder is dust - send everything to receiver minus fee
+        if remainder  == 0 or remainder < dust_threshold:
+            if remainder > 0 and respect_dust_zone:
+                raise ValueError(f"In Dust Zone.")
+
+            # in this case we have 1 input and 1 output
+            tx_fee_sats = tx_fee_sats * 2
+
+            # Send everything to receiver minus fee
+            actual_receiver_amount = funding_value - tx_fee_sats
+            
+            if actual_receiver_amount <= 0:
+                raise ValueError(f"Fee ({tx_fee_sats} sats) exceeds available funds ({funding_value} sats)")
+            
+            txouts.append(CMutableTxOut(
+                actual_receiver_amount,
+                CEvrmoreAddress(receiver_addr).to_scriptPubKey()
+            ))
+        
+        # Case 4: Remainder is significant - take fee from remainder
+        else:
+            # in this case we have 1 input and 2 output
+            tx_fee_sats = tx_fee_sats * 3
+
+            # Receiver gets exactly what was specified
+            txouts.append(CMutableTxOut(
+                pay_to_receiver_sats,
+                CEvrmoreAddress(receiver_addr).to_scriptPubKey()
+            ))
+            
+            # Channel gets remainder minus fee
+            change_amount = remainder - tx_fee_sats
+            
+            if change_amount <= 0:
+                raise ValueError(f"Fee ({tx_fee_sats} sats) exceeds remainder ({remainder} sats)")
+            
+            txouts.append(CMutableTxOut(
+                change_amount,
+                script_pub  # Using same P2SH address for the remainder
+            ))
+
+        # Check that we have at least one output
+        if not txouts:
+            raise ValueError("Transaction must have at least one output after fee deduction")
+        
+        # Create the transaction with Alice's signature
+        tx = self._createPartialOriginatorSimple([txin], [script_pub], txouts)
+        return self._txToHex(tx)
+
+    # 4. Bob finalises & broadcasts  ────────────────────────────────────────────────
+    def finaliseCommitmentTx(
+        self, 
+        partial_tx_hex: str,
+        redeem_script: CScript
+    ) -> str:
+        """
+        Adds Bob's signature, returns fully-signed tx hex.
+        """
+        tx = self._deserialize(bytes.fromhex(partial_tx_hex))
+        txin = tx.vin[0]
+        script_pub = P2SHEvrmoreAddress.from_redeemScript(redeem_script).to_scriptPubKey()
+
+        # extract Alice's existing sig
+        old_sigs = [e for e in txin.scriptSig if isinstance(e, bytes)]
+
+        # add Bob's sig
+        self._signInput(tx, 0, txin, script_pub, SIGHASH_ALL,
+                        redeem_script=redeem_script,
+                        signatures=old_sigs)
+
+        return self._txToHex(tx)
+#Usage sketch
+#
+#python
+#Copy
+#Edit
+#alice = EvrmoreWallet.create(...)
+#bob   = EvrmoreWallet.create(...)
+#
+## open channel (Alice side)
+#redeem, chan_addr, fund_hex = alice.openPaymentChannel(
+#    bob_pub=bob._privateKeyObj.pub,
+#    amount_sats=100_000_000,             # 1 EVR
+#    abs_timeout=height_or_time)
+#
+## after fund_hex is mined …
+#commit_hex = alice.createCommitmentTx(
+#    funding_txid=<txid>, vout=<n>, funding_value=100_000_000,
+#    redeem_script=redeem,
+#    pay_sats=3_000_000,                 # 0.03 EVR
+#    bob_addr=bob.address)
+#
+## Bob finishes and broadcasts
+#final_hex = bob.finaliseCommitmentTx(commit_hex, redeem)
+#electrumx.broadcast(final_hex)    

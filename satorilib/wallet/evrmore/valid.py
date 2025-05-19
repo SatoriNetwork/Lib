@@ -29,6 +29,10 @@ def base58_check_decode(address: Union[str, bytes]) -> tuple[bool, Union[int, No
 
 def isValidEvrmoreAddress(address: str) -> bool:
     ''' Validate Evrmore address using Base58Check. '''
+    if address is None:
+        return False
+    if isinstance(address, str) and (len(address) != 34 or not address.startswith('E')):
+        return False
     try:
         from evrmore.wallet import CEvrmoreAddress
         CEvrmoreAddress(address)

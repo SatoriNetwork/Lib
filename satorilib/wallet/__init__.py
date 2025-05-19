@@ -1,5 +1,6 @@
 from satorilib.wallet.wallet import Wallet
 from satorilib.wallet.evrmore import EvrmoreWallet
+from satorilib.wallet.ethereum.wallet import EthereumWallet
 from satorilib.wallet.ravencoin import RavencoinWallet
 from satorilib.wallet.utils.transaction import TxUtils
 from satorilib.wallet.utils.validate import Validate

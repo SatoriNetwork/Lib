@@ -176,6 +176,16 @@ class ElectrumxApi():
 
     def getBanner(self) -> dict:
         return self.sendRequest(method='server.banner')
+    
+    def getPeers(self) -> dict:
+        # [
+        #   ['66.179.209.140', 'aethyn.org', ['v1.11', 's50002', 't50001']],
+        #   ['208.113.135.64', 'electrum2-mainnet.evrmorecoin.org', ['v1.11', 's50002', 't50001']],
+        #   ['136.53.187.90', 'evr-electrum.wutup.io', ['v1.11', 's50002', 't50001']],
+        #   ['65.21.174.185', 'electrumx.satorinet.ie', ['v1.11', 's50002']],
+        #   ['208.113.167.244', 'electrum1-mainnet.evrmorecoin.org', ['v1.11', 's50002', 't50001']]
+        # ]
+        return self.sendRequest(method='server.peers.subscribe')
 
     def getUnspentCurrency(self, scripthash: str, extraParam: bool = False) -> list:
         return self.sendRequest(

@@ -25,6 +25,7 @@ def verify(
         (publicKey is None and address is None)
     ):
         return False
+<<<<<<< HEAD
     #return VerifyMessage(
     #    address or generateAddress(publicKey),
     #    EvrmoreMessage(message) if isinstance(message, str) else message,
@@ -35,3 +36,9 @@ def verify(
         address=address, #or generateAddress(publicKey),
         signature=signature if isinstance(signature, bytes) else signature.encode())
 
+=======
+    return VerifyMessage(
+        address or generateAddress(publicKey),
+        EvrmoreMessage(message) if isinstance(message, str) else message,
+        signature if isinstance(signature, bytes) else signature.encode())
+>>>>>>> main

@@ -28,7 +28,7 @@ import requests
 from satorilib import logging
 from satorilib.utils.time import timeToTimestamp
 from satorilib.wallet import Wallet
-from satorilib.concepts.structs import Stream
+from satorilib.concepts.structs import Stream, StreamId
 from satorilib.server.api import ProposalSchema, VoteSchema
 from satorilib.utils.json import sanitizeJson
 from requests.exceptions import RequestException
@@ -202,12 +202,13 @@ class SatoriServerClient(object):
             endpoint='/remove/stream',
             payload=payload or json.dumps(stream or {}))
 
-    def checkin(self, referrer: str = None, ip: str = None) -> dict:
+    def checkin(self, referrer: str = None, vaultInfo: dict = None) -> dict:
         challenge = self._getChallenge()
+        ip = None
         response = self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/checkin',
-            payload=self.wallet.registerPayload(challenge=challenge),
+            payload=self.wallet.registerPayload(challenge=challenge, vaultInfo=vaultInfo),
             challenge=challenge,
             extraHeaders={
                 **({'referrer': referrer} if referrer else {}),
@@ -368,12 +369,37 @@ class SatoriServerClient(object):
             endpoint='/clear_vote_on/sanction/incremental',
             payload=json.dumps({'streamId': streamId})).text
 
+    def predictStream(self, streamId: int) -> bool:
+        """
+        Start predicting a stream by sending a request to the server.
+        
+        Args:
+            streamId: A StreamId object containing the stream details to predict
+            
+        Returns:
+            bool: True if the prediction request was successful, False otherwise
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/request/stream/specific',
+                payload={'streamId': streamId})
+            return response.status_code == 200
+        except Exception as e:
+            logging.error(f"Error predicting stream: {str(e)}")
+            return False
+
     def getObservations(self, streamId: str):
         return self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/observations/list',
             payload=json.dumps({'streamId': streamId})).text
 
+    def getPowerBalance(self):
+        return self._makeAuthenticatedCall(
+            function=requests.get,
+            endpoint='/api/v0/balance/get').text
+    
     def submitMaifestVote(self, wallet: Wallet, votes: dict[str, int]):
         # todo authenticate the vault instead
         return self._makeAuthenticatedCall(
@@ -1323,7 +1349,7 @@ class SatoriServerClient(object):
             error_message = f"Error in getContentCreated: {str(e)}"
             return False, {"error": error_message}
 
-    def approveInviters(self, approved: list[int]) -> tuple[bool, dict]:
+    def approveInviters(self, approved: list[int]) -> tuple[bool, list]:
         try:
             response = self._makeAuthenticatedCall(
                 function=requests.post,
@@ -1335,8 +1361,7 @@ class SatoriServerClient(object):
                 error_message = f"Server returned status code {response.status_code}: {response.text}"
                 return False, {"error": error_message}
         except Exception as e:
-            error_message = f"Error in setMiningMode: {str(e)}"
-            return False, {"error": error_message}
+            return False, {"error": f"Error in setMiningMode: {str(e)}"}
 
     def disapproveInviters(self, disapproved: list[int]) -> tuple[bool, dict]:
         try:

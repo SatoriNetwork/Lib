@@ -90,10 +90,6 @@ class StreamId:
     def strId(self) -> str:
         return str((self.__source, self.__author, self.__stream, self.__target)).replace("'", '')
 
-    @property
-    def cleanId(self):
-        return self.strId
-  
     # TODO: remove after datamanager is live, this is used to determine the
     #       location of the dataset on disk as a csv, if we ever do save to
     #       disk we should use something else anyway
@@ -224,10 +220,10 @@ class StreamId:
 
 
 class StreamUuid(StreamId):
-    """unique identifier for a stream"""
+    '''unique identifier for a stream'''
 
-    def __init__(self, uuid: str, source: str='', author: str='', stream: str='', target: str=''):
-        super().__init__(source=source, author=author, stream=stream, target=target)
+    def __init__(self, uuid: str):
+        super().__init__(source='', author='', stream='', target='')
         self.uuid = uuid
 
 
@@ -315,7 +311,7 @@ class StreamIdMap:
 
 class Stream:
 
-    minimumCadence = 60 * 10
+    minimumCadence = 60 * 10 * 6
 
     def __init__(
         self,
@@ -340,7 +336,7 @@ class Stream:
     ):
         self.streamId = streamId
         self.cadence = cadence
-        self.offset = offset
+        self.offset = offset or kwargs.get('utc_offset')
         self.datatype = datatype
         self.description = description
         self.tags = tags

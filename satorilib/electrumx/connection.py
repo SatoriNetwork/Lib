@@ -11,7 +11,8 @@ class ElectrumxConnection:
         host: str,
         port: int,
         ssl: bool = False,
-        timeout: int = 10*60,
+        timeout: int = 60*10,
+        initializeConnection: bool = True,
     ):
         self.host = host
         self.port = port
@@ -19,7 +20,9 @@ class ElectrumxConnection:
         self.timeout = timeout
         self.isConnected = False
         self.connection: socket.socket = None
-        self.connect()
+        self.createConnectionObject()
+        if initializeConnection:
+            self.connect()
 
     def connected(self) -> bool:
         if self.connection is None:
@@ -44,35 +47,44 @@ class ElectrumxConnection:
                 f'error reconnecting to {self.host}:{str(self.port)} {e}')
             return False
 
-    def connect(self):
+    def createConnectionObject(self):
         self.connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connection.settimeout(self.timeout)
         if self.ssl:
-            # # Create a SSL context with a specific protocol
-            # # context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            # # Optionally, set up more specific SSL options if needed
-            # # context.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1  # Example to disable TLSv1 and TLSv1.1
-            # # Wrap the socket with the SSL context
-            # # self.connection = context.wrap_socket(self.connection, server_hostname=self.host)
-            # self.connection = ssl.wrap_socket(self.connection)
-            #
-            # Create an SSL context that does not verify certificates
-            # context = ssl.create_default_context()
-            # This ignores certificate verification
+            # Create a more robust SSL context
             context = ssl._create_unverified_context()
-            # context.check_hostname = True
-            # context.verify_mode = ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3 | ssl.CERT_NONE | ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1 | ssl.OP_NO_TLSv1_2 | ssl.OP_NO_TLSv1_3 | ssl.CERT_OPTIONAL | ssl.OP_NO_COMPRESSION | ssl.OP_NO_TICKET | ssl.CERT_REQUIRED
-            # context.verify_mode = ssl.CERT_OPTIONAL
-            #
-            # Wrap the socket with the SSL context
-            self.connection = context.wrap_socket(
-                self.connection, server_hostname=self.host)
+            # Set SSL options to be more permissive and resilient
+            context.options |= ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3  # Disable insecure SSL versions
+            context.verify_mode = ssl.CERT_NONE  # Don't verify certificate
+            
+            # Explicitly handle different TLS versions if needed
+            try:
+                # Wrap the socket with the SSL context
+                self.connection = context.wrap_socket(
+                    self.connection, server_hostname=self.host)
+            except ssl.SSLError as e:
+                logging.warning(f"SSL error creating context: {str(e)}, trying fallback")
+                # Try a more permissive fallback
+                fallback_context = ssl._create_unverified_context()
+                fallback_context.check_hostname = False
+                fallback_context.verify_mode = ssl.CERT_NONE
+                self.connection = fallback_context.wrap_socket(
+                    self.connection, server_hostname=self.host)
+
+    def connect(self):
+        self.createConnectionObject()
         try:
             self.connection.connect((self.host, self.port))
             self.isConnected = True
-        except Exception as e:
+        except (socket.error, ssl.SSLError) as e:
             logging.error(
                 f'error connecting to {self.host}:{str(self.port)} {e}')
+            self.isConnected = False
+            raise e
+        except Exception as e:
+            logging.error(
+                f'unexpected error connecting to {self.host}:{str(self.port)} {e}')
+            self.isConnected = False
             raise e
 
     def disconnect(self):

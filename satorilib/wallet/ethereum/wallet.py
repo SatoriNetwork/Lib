@@ -4,6 +4,7 @@ from eth_keys import keys
 from eth_account import Account
 from eth_account.messages import encode_defunct
 from satorilib.disk.wallet import WalletApi
+from satorilib.wallet.ethereum.valid import isValidEthereumAddress
 
 class EthereumWallet():
     '''
@@ -18,6 +19,10 @@ class EthereumWallet():
     If they're wrapping tokens to trade they'll probably know how to use
     metamask already...
     '''
+
+    @staticmethod
+    def addressIsValid(address: str) -> bool:
+        return isValidEthereumAddress(address)
 
     def __init__(
         self,

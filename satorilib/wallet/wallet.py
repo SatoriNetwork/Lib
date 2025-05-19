@@ -712,10 +712,16 @@ class Wallet(WalletBase):
             return payload
         return json.dumps(payload)
 
-    def registerPayload(self, asDict: bool = False, challenge: str = None) -> Union[str, dict]:
+    def registerPayload(
+        self,
+        asDict: bool = False,
+        challenge: str = None,
+        vaultInfo:dict = None,
+    ) -> Union[str, dict]:
         payload = {
             **authenticate.authPayload(self, challenge),
-            **system.devicePayload(asDict=True)}
+            **system.devicePayload(asDict=True), 
+            **(vaultInfo or {})}
         if asDict:
             return payload
         return json.dumps(payload)

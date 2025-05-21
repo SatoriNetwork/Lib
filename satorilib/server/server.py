@@ -386,6 +386,24 @@ class SatoriServerClient(object):
             logging.error(f"Error predicting stream: {str(e)}")
             return False
 
+    def flagStream(self, streamId: int) -> bool:
+        """
+        Flag a stream as inappropriate or bad by sending a request to the server.
+        Args:
+            streamId: The stream ID to flag
+        Returns:
+            bool: True if the flag request was successful, False otherwise
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/flag/stream',
+                payload={'streamId': streamId})
+            return response.status_code == 200
+        except Exception as e:
+            logging.error(f"Error flagging stream: {str(e)}")
+            return False
+
     def getObservations(self, streamId: str):
         return self._makeAuthenticatedCall(
             function=requests.post,

@@ -65,38 +65,44 @@ class WalletBase():
         self.publicKey = yaml.get('publicKey', '')
         self.address = yaml.get(self.symbol, {}).get('address')
         self.scripthash = yaml.get('scripthash', '')
-        self.generateObjects()
+        self.generateObjects(fromYaml=True)
 
     def verify(self) -> bool:
-        if self._entropy is None:
+        if self._entropy is None and self._privateKeyObj is None:
             return False
         _entropy = self._entropy
         _entropyStr = b64encode(_entropy).decode('utf-8')
         _privateKeyObj = self._generatePrivateKey()
-        if _privateKeyObj is None:
+        _privateKeyObjFromYaml = self._generatePrivateKey(privkey=self.privateKey)
+        if _privateKeyObj is None and _privateKeyObjFromYaml is None:
             return False
         _addressObj = self._generateAddress(pub=_privateKeyObj.pub)
+        _addressObjFromYaml = self._generateAddress(pub=_privateKeyObjFromYaml.pub)
         words = self._generateWords()
         privateKey = str(_privateKeyObj)
+        privateKeyFromYaml = str(_privateKeyObjFromYaml)
         publicKey = _privateKeyObj.pub.hex()
+        publicKeyFromYaml = _privateKeyObjFromYaml.pub.hex()
         address = str(_addressObj)
+        addressFromYaml = str(_addressObjFromYaml)
         # file might not have the address listed...
         if self.address is None:
             self.address = address
         scripthash = self._generateScripthash(forAddress=address)
+        scripthashFromYaml = self._generateScripthash(forAddress=addressFromYaml)
         return (
             _entropy == self._entropy and
             _entropyStr == self._entropyStr and
-            words == self.words and
-            privateKey == self.privateKey and
-            publicKey == self.publicKey and
-            address == self.address and
-            scripthash == self.scripthash)
+            ((words == self.words) if self.privateKey == privateKey else True) and
+            self.privateKey in (privateKey, privateKeyFromYaml) and
+            self.publicKey in (publicKey, publicKeyFromYaml) and
+            self.address in (address, addressFromYaml) and
+            self.scripthash in (scripthash, scripthashFromYaml))
 
-    def generateObjects(self):
+    def generateObjects(self, fromYaml: bool = False):
         self._entropy = self._entropy or WalletBase.generateEntropy()
         self._entropyStr = b64encode(self._entropy).decode('utf-8')
-        self._privateKeyObj = self._generatePrivateKey()
+        self._privateKeyObj = self._generatePrivateKey(privkey=self.privateKey if fromYaml else None)
         self._addressObj = self._generateAddress()
 
     def generate(self):
@@ -282,9 +288,6 @@ class Wallet(WalletBase):
         return self.account.address
 
     def shouldPullUnspents(self) -> bool:
-        print(not (
-            self.lastBalanceAmount == (self.balance.amount or 0) and
-            self.lastCurrencyAmount == (self.currency.amount or 0)))
         return not (
             self.lastBalanceAmount == (self.balance.amount or 0) and
             self.lastCurrencyAmount == (self.currency.amount or 0))

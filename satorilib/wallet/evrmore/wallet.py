@@ -181,8 +181,17 @@ class EvrmoreWallet(Wallet):
         """Generate a P2SH address from a redeem script."""
         return str(P2SHEvrmoreAddress.from_redeemScript(redeem_script))
 
-    def _generatePrivateKey(self, compressed: bool = True):
+    def _generatePrivateKey(self, compressed: bool = True, privkey: Union[str, bytes, None] = None):
         SelectParams('mainnet')
+        if privkey:
+            if isinstance(privkey, str):
+                #return CEvrmoreSecret.from_secret_bytes(bytes.fromhex(privkey), compressed=compressed) # bytes below
+                #return CEvrmoreSecret.from_hex(privkey) # probably not hex
+                return CEvrmoreSecret(privkey)
+            elif isinstance(privkey, bytes):
+                return CEvrmoreSecret.from_secret_bytes(privkey, compressed=compressed)
+            else:
+                raise ValueError('privkey must be a string or bytes')
         return CEvrmoreSecret.from_secret_bytes(self._entropy, compressed=compressed)
 
     def _generateAddress(self, pub=None):

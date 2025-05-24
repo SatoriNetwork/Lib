@@ -414,7 +414,6 @@ class DataClient:
 
     async def _addStreamToServer(self, subUuid: str, pubUuid: Union[str, None] = None) -> None:
         ''' Updates server's available streams with local client's subscriptions and predictions streams '''
-        print("In here")
         try:
             await self.addActiveStream(uuid=subUuid)
         except Exception as e:

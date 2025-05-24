@@ -182,7 +182,7 @@ class DataPeer:
         self.server = await websockets.serve(
             self.handleConnection, self.host, self.port
         )
-        print(f"Server started on ws://{self.host}:{self.port}")
+        debug(f"Server started on ws://{self.host}:{self.port}", print=True)
 
     async def handleConnection(self, websocket: websockets.WebSocketServerProtocol):
         """Handle incoming connections and messages"""
@@ -218,7 +218,7 @@ class DataPeer:
                         )
                     )
         except websockets.exceptions.ConnectionClosed:
-            print(f"Connection closed with {peerAddr}")
+            debug(f"Connection closed with {peerAddr}", print=True)
         finally:
             # Remove disconnected peer
             for key, cp in list(self.connectedPeers.items()):

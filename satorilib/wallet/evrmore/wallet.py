@@ -363,9 +363,16 @@ class EvrmoreWallet(Wallet):
             inputCount=inputCount,
             outputCount=outputCount)
         if currencyChange > 0:
+            if str(CEvrmoreAddress(self.address)) != self.address:
+                raise TransactionFailure('tx: address mismatch')
+            # allow for overrirde, should probably allow for override as address str:
+            #if str(CEvrmoreAddress(self.address)).to_scriptPubKey() != scriptPubKey:
+            #    raise TransactionFailure('tx: scriptPubKey mismatch')
+            if CEvrmoreAddress(self.address).to_scriptPubKey() != self._addressObj.to_scriptPubKey():
+                raise TransactionFailure('tx: scriptPubKey mismatch')
             txout = CMutableTxOut(
                 currencyChange,
-                scriptPubKey or self._addressObj.to_scriptPubKey())
+                scriptPubKey or CEvrmoreAddress(self.address).to_scriptPubKey()) # self._addressObj.to_scriptPubKey())
             # use *CEvrmoreAddress(self.address).to_scriptPubKey()? # supports P2SH automatically
             if returnSats:
                 return txout, currencyChange

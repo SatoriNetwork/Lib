@@ -29,4 +29,3 @@ def setUp(self):
             self.private_keys.append(privkey)
             self.public_keys.append(CPubKey(privkey.get_pubkey()))
 
-044d9091393ab71cfefc7c9170f7f13b1b11d73102b1313ebcd596126384c191881f8bff5d093ffc8fe48fdccc5e9d3b726b029b127ed92e8b0ffc9a74ffc3dbe0

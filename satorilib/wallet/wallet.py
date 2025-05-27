@@ -65,7 +65,7 @@ class WalletBase():
         self.publicKey = yaml.get('publicKey', '')
         self.address = yaml.get(self.symbol, {}).get('address')
         self.scripthash = yaml.get('scripthash', '')
-        self.generateObjects(fromYaml=True)
+        self.generateObjects()
 
     def verify(self) -> bool:
         if self._entropy is None and self._privateKeyObj is None:
@@ -93,10 +93,10 @@ class WalletBase():
             self.address in (address, ) and
             self.scripthash in (scripthash, ))
 
-    def generateObjects(self, fromYaml: bool = False):
+    def generateObjects(self):
         self._entropy = self._entropy or WalletBase.generateEntropy()
         self._entropyStr = b64encode(self._entropy).decode('utf-8')
-        self._privateKeyObj = self._generatePrivateKey(privkey=self.privateKey if fromYaml else None)
+        self._privateKeyObj = self._generatePrivateKey()
         self._addressObj = self._generateAddress()
 
     def generate(self):

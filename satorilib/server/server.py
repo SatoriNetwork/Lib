@@ -193,13 +193,22 @@ class SatoriServerClient(object):
             endpoint='/my/streams',
             payload='{}')
 
-    def removeStream(self, stream: dict = None, payload: str = None):
+    def removeOracleStream(self, stream: dict = None, payload: str = None):
         ''' removes a stream from the server '''
         if payload is None and stream is None:
             raise ValueError('stream or payload must be provided')
         return self._makeAuthenticatedCall(
             function=requests.post,
             endpoint='/remove/stream',
+            payload=payload or json.dumps(stream or {}))
+    
+    def restoreOracleStream(self, stream: dict = None, payload: str = None):
+        ''' removes a stream from the server '''
+        if payload is None and stream is None:
+            raise ValueError('stream or payload must be provided')
+        return self._makeAuthenticatedCall(
+            function=requests.post,
+            endpoint='/restore/stream',
             payload=payload or json.dumps(stream or {}))
 
     def checkin(self, referrer: str = None, vaultInfo: dict = None) -> dict:

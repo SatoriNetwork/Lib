@@ -340,7 +340,7 @@ class DataServer:
                         if 'provider' in request.data.columns:
                             provider = request.data['provider'].values[0]
                     dataForSubscribers = self.dataManager.db._addSubDataToDatabase(request.uuid, request.data, provider)
-                    if not dataForSubscribers.empty:
+                    if not dataForSubscribers.empty and not request.replace:
                         broadcastDict = {
                             'status': 'success',
                             'sub': request.sub,
@@ -357,7 +357,7 @@ class DataServer:
                             await self.connectedClients[peerAddr].websocket.send(Message(proactiveDict).toBytes())
                         await self.updateSubscribers(Message(broadcastDict))
                     return DataServerApi.statusSuccess.createResponse('Subscription data added to server database', request.id)
-                if request.replace:
+                if request.replace and not request.isSubscription:
                     self.dataManager.db.deleteTable(request.uuid)
                     self.dataManager.db.createTable(request.uuid)
                 self.dataManager.db._addDataframeToDatabase(request.uuid, request.data)

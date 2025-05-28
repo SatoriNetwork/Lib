@@ -193,7 +193,7 @@ class SatoriServerClient(object):
             endpoint='/my/streams',
             payload='{}')
 
-    def removeOracleStream(self, stream: dict = None, payload: str = None):
+    def removeStream(self, stream: dict = None, payload: str = None):
         ''' removes a stream from the server '''
         if payload is None and stream is None:
             raise ValueError('stream or payload must be provided')
@@ -202,7 +202,7 @@ class SatoriServerClient(object):
             endpoint='/remove/stream',
             payload=payload or json.dumps(stream or {}))
     
-    def restoreOracleStream(self, stream: dict = None, payload: str = None):
+    def restoreStream(self, stream: dict = None, payload: str = None):
         ''' removes a stream from the server '''
         if payload is None and stream is None:
             raise ValueError('stream or payload must be provided')

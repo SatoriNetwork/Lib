@@ -340,12 +340,12 @@ class DataServer:
                         if 'provider' in request.data.columns:
                             provider = request.data['provider'].values[0]
                     dataForSubscribers = self.dataManager.db._addSubDataToDatabase(request.uuid, request.data, provider)
-                    if not dataForSubscribers.empty and not request.replace:
+                    if not dataForSubscribers.empty:
                         broadcastDict = {
                             'status': 'success',
                             'sub': request.sub,
-                            'params': {'uuid': request.uuid},
-                            'data': dataForSubscribers
+                            'params': {'uuid': request.uuid, 'replace': request.replace}, # replace = False if neuron should publish the data to centralServer
+                            'data': dataForSubscribers,
                         }
                         if self.dataManager.transferProtocol == 'p2p-proactive-pubsub' and self.connectedClients[peerAddr].isLocal:
                             proactiveDict = broadcastDict.copy()

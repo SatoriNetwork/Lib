@@ -299,7 +299,7 @@ class SqliteDatabase:
                 index_col='ts')
             return df
         except ValueError as e:
-            error(f"Table error: {e}")
+            warning(f"Table error: {e}")
         except Exception as e:
             error(f"Database error converting table {table_uuid} to DataFrame: {e}")
 

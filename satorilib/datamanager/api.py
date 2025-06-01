@@ -102,7 +102,7 @@ class DataServerApi(Enum):
         return {
                 'status': self.value,
                 'message': serverMsg,
-                'id': id,
+                'id': id or _generateCallId(),
                 # 'params': {
                 #     'uuid': uuid,
                 # },

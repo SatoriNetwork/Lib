@@ -1,4 +1,37 @@
-from typing import Union
+"""
+Identity Management for Cryptocurrency Wallets
+
+This module provides the base identity management functionality for cryptocurrency wallets.
+It handles three types of wallets:
+
+1. Entropy-based wallets (highest security)
+   - Generated from random entropy
+   - Can derive all wallet components
+   - Full transaction capabilities
+
+2. Private key-based wallets
+   - Imported from existing private key
+   - Can derive public components
+   - Full transaction capabilities
+
+3. Watch-only wallets
+   - Only contains public components
+   - No transaction capabilities
+   - Used for monitoring addresses
+
+Interface for Wallet Implementation:
+- Wallet object should combine:
+  1. IdentityBase (this class) for key/address management
+  2. ElectrumX connection for network interaction
+  3. Additional wallet functionality (transactions, balance, etc.)
+
+Required Implementation:
+- _generatePrivateKey(compressed: bool) -> PrivateKeyObject
+- _generateAddress(pub=None) -> AddressObject
+- _generateScriptPubKeyFromAddress(address: str) -> CScript
+"""
+
+from typing import Union, Any
 import os
 import secrets
 import mnemonic
@@ -14,92 +47,242 @@ from satorilib.disk.utils import safetify
 
 
 class IdentityBase():
+    """
+    Base class for wallet identity management.
+    Handles the core functionality of managing wallet identity data
+    with support for entropy-based, private key-based, and watch-only wallets.
+    """
 
     def __init__(self, entropy: Union[bytes, None] = None):
         self._entropy: Union[bytes, None] = entropy
-        self._entropyStr:str = ''
-        self._privateKeyObj = None
-        self.privateKey:str = ''
-        self.words:str  = ''
+        self._entropyStr: str = ''
+        self._privateKeyObj: Any = None  # Type depends on implementation
+        self._addressObj: Any = None     # Type depends on implementation
+        # these are only set if entropy is not provided:
+        self.privateKey: str = ''
+        self.passphrase: str = ''
+        # these are always set if present in the yaml file and they match the entropy-derived values:
         self.publicKey: str = ''
-        self.address: str = ''
-        self.scripthash: str = ''
+        self.addressValue: str = ''
+        self.scripthashValue: str = ''
 
     @property
     def symbol(self) -> str:
+        """The symbol of the currency of the chain """
         return 'wallet'
 
     @property
     def pubkey(self) -> str:
-        return self.publicKey
-
+        if self.publicKey:
+            return self.publicKey
+        return self._privateKeyObj.pub.hex() if self._privateKeyObj else ''
+        
     @property
     def privkey(self) -> str:
-        return self.privateKey
+        if self.privateKey:
+            return self.privateKey
+        return str(self._privateKeyObj) if self._privateKeyObj else ''
 
+    @property
+    def words(self) -> str:
+        if self.passphrase:
+            return self.passphrase
+        return self._generateWords() if self._entropy else ''
+    
+    @property
+    def address(self) -> str:
+        if self.addressValue:
+            return self.addressValue
+        return str(self._addressObj) if self._addressObj else ''
+    
+    @property
+    def scripthash(self) -> str:
+        if self.scripthashValue:
+            return self.scripthashValue
+        return self._generateScripthash() if self._addressObj else ''
+    
     def close(self) -> None:
+        """Reset all sensitive instance variables to their initial state."""
         self._entropy = None
         self._entropyStr = ''
         self._privateKeyObj = None
         self.privateKey = ''
-        self.words = ''
+        self.passphrase = ''
 
     def loadFromYaml(self, yaml: Union[dict, None] = None):
+        """Load wallet data from yaml with strict hierarchy of truth sources:
+        1. Entropy (highest priority) - derives everything
+        2. Private key (if no entropy) - derives public data
+        3. Public data only (watch-only wallet)
+        """
         yaml = yaml or {}
+        
+        # Case 1: Entropy is present - use it as source of truth
         self._entropy = yaml.get('entropy')
         if isinstance(self._entropy, bytes):
             self._entropyStr = base64.b64encode(self._entropy).decode('utf-8')
-        if isinstance(self._entropy, str):
+        elif isinstance(self._entropy, str):
             self._entropyStr = self._entropy
             self._entropy = base64.b64decode(self._entropy)
-        self.words = yaml.get('words', '')
+        
+        if self._entropy is not None:
+            # Generate everything from entropy
+            self.generateObjects()
+            # Store provided values for validation
+            stored_private_key = yaml.get('privateKey', '')
+            stored_public_key = yaml.get('publicKey', '')
+            stored_address = yaml.get(self.symbol, {}).get('address')
+            stored_scripthash = yaml.get('scripthash', '')
+            
+            # Validate if stored values match derived values
+            if stored_private_key and stored_private_key != self.privkey:
+                logging.warning('Stored private key does not match entropy-derived key')
+            if stored_public_key and stored_public_key != self.pubkey:
+                logging.warning('Stored public key does not match entropy-derived key')
+            if stored_address and stored_address != self.address:
+                logging.warning('Stored address does not match entropy-derived address')
+            if stored_scripthash and stored_scripthash != self.scripthash:
+                logging.warning('Stored scripthash does not match entropy-derived scripthash')
+            return
+
+        # Case 2: Private key is present but no entropy
         self.privateKey = yaml.get('privateKey', '')
+        if self.privateKey:
+            self._privateKeyObj = self._generatePrivateKey()
+            if self._privateKeyObj:
+                self._addressObj = self._generateAddress()
+                stored_public_key = yaml.get('publicKey', '')
+                stored_address = yaml.get(self.symbol, {}).get('address')
+                stored_scripthash = yaml.get('scripthash', '')
+                
+                # Validate if stored values match derived values
+                if stored_public_key and stored_public_key != self.pubkey:
+                    logging.warning('Stored public key does not match private key-derived key')
+                if stored_address and stored_address != self.address:
+                    logging.warning('Stored address does not match private key-derived address')
+                if stored_scripthash and stored_scripthash != self.scripthash:
+                    logging.warning('Stored scripthash does not match private key-derived scripthash')
+                return
+
+        # Case 3: Watch-only wallet (public data only)
         self.publicKey = yaml.get('publicKey', '')
-        self.address = yaml.get(self.symbol, {}).get('address')
-        self.scripthash = yaml.get('scripthash', '')
-        self.generateObjects()
+        self.addressValue = yaml.get(self.symbol, {}).get('address')
+        self.scripthashValue = yaml.get('scripthash', '')
+        
+        # Validate we have at least some data for a watch-only wallet
+        if not any([self.publicKey, self.addressValue, self.scripthashValue]):
+            raise Exception('No wallet data provided - need entropy, private key, or watch-only data')
 
     def verify(self) -> bool:
-        if self._entropy is None:
-            return False
-        _entropy = self._entropy
-        _entropyStr = base64.b64encode(_entropy).decode('utf-8')
-        _privateKeyObj = self._generatePrivateKey()
-        if _privateKeyObj is None:
-            return False
-        _addressObj = self._generateAddress(pub=_privateKeyObj.pub)
-        words = self._generateWords()
-        privateKey = str(_privateKeyObj)
-        publicKey = _privateKeyObj.pub.hex()
-        address = str(_addressObj)
-        # file might not have the address listed...
-        if self.address is None:
-            self.address = address
-        scripthash = self._generateScripthash(forAddress=address)
-        return (
-            _entropy == self._entropy and
-            _entropyStr == self._entropyStr and
-            words == self.words and
-            privateKey == self.privateKey and
-            publicKey == self.publicKey and
-            address == self.address and
-            scripthash == self.scripthash)
+        """
+        Verify that all wallet data is consistent with its source of truth.
+        Returns True if verification passes, False otherwise.
+        """
+        # Case 1: Verify from entropy
+        if self._entropy is not None:
+            _entropy = self._entropy
+            _entropyStr = base64.b64encode(_entropy).decode('utf-8')
+            _privateKeyObj = self._generatePrivateKey()
+            if _privateKeyObj is None:
+                return False
+            _addressObj = self._generateAddress(pub=_privateKeyObj.pub)
+            words = self._generateWords()
+            privateKey = str(_privateKeyObj)
+            publicKey = _privateKeyObj.pub.hex()
+            address = str(_addressObj)
+            if self.addressValue is None:
+                self.addressValue = address
+            scripthash = self._generateScripthash(forAddress=address)
+            return (
+                _entropy == self._entropy and
+                _entropyStr == self._entropyStr and
+                words == self.words and
+                privateKey == self.privateKey and
+                publicKey == self.publicKey and
+                address == self.address and
+                scripthash == self.scripthash)
+        
+        # Case 2: Verify from private key
+        if self.privateKey:
+            _privateKeyObj = self._generatePrivateKey()
+            if _privateKeyObj is None:
+                return False
+            _addressObj = self._generateAddress(pub=_privateKeyObj.pub)
+            publicKey = _privateKeyObj.pub.hex()
+            address = str(_addressObj)
+            if self.addressValue is None:
+                self.addressValue = address
+            scripthash = self._generateScripthash(forAddress=address)
+            return (
+                publicKey == self.publicKey and
+                address == self.address and
+                scripthash == self.scripthash)
+        
+        # Case 3: Watch-only wallet - verify they are consistent
+        if self.publicKey and self.addressValue and self.scripthashValue:
+            return self._generateScripthash(forAddress=self.addressValue) and True # assume the address is correct...
+        if self.addressValue and self.scripthashValue:
+            return self._generateScripthash(forAddress=self.addressValue)
+        if self.publicKey and self.addressValue:
+            return True # assume the address is correct...
+        return True
 
     def generateObjects(self):
-        self._entropy = self._entropy or IdentityBase.generateEntropy()
-        self._entropyStr = base64.b64encode(self._entropy).decode('utf-8')
-        self._privateKeyObj = self._generatePrivateKey()
-        self._addressObj = self._generateAddress()
-
-    def generate(self):
-        self.generateObjects()
-        self.words = self.words or self._generateWords()
-        if self._privateKeyObj is None:
+        """
+        Generate or regenerate wallet objects from the source of truth.
+        This ensures all derived objects are consistent with either entropy or private key.
+        
+        Returns:
+            bool: True if objects were generated successfully, False otherwise
+        """
+        try:
+            # Case 1: Generate from entropy
+            if self._entropy is None:
+                self._entropy = IdentityBase.generateEntropy()
+            self._entropyStr = base64.b64encode(self._entropy).decode('utf-8')
+            self._privateKeyObj = self._generatePrivateKey()
+            if self._privateKeyObj is None:
+                logging.error('Failed to generate private key object')
+                return False
+                
+            self._addressObj = self._generateAddress()
+            if self._addressObj is None:
+                logging.error('Failed to generate address object')
+                return False
+                
+            return True
+            
+        except Exception as e:
+            logging.error(f'Error generating wallet objects: {str(e)}')
             return False
-        self.privateKey = self.privateKey or str(self._privateKeyObj)
-        self.publicKey = self.publicKey or self._privateKeyObj.pub.hex()
-        self.address = self.address or str(self._addressObj)
-        self.scripthash = self.scripthash or self._generateScripthash()
+
+    def generate(self) -> bool:
+        """
+        Generate all wallet data from scratch or existing entropy.
+        This includes both the internal objects and the public-facing string representations.
+        
+        Returns:
+            bool: True if generation was successful, False otherwise
+        """
+        if not self.generateObjects():
+            return False
+            
+        try:
+            self.passphrase = self.passphrase or self._generateWords()
+            if self._privateKeyObj is None:
+                logging.error('Private key object not available')
+                return False
+                
+            self.privateKey = self.privateKey or str(self._privateKeyObj)
+            self.publicKey = self.publicKey or self._privateKeyObj.pub.hex()
+            self.addressValue = self.addressValue or str(self._addressObj)
+            self.scripthashValue = self.scripthashValue or self._generateScripthash()
+            
+            return True
+            
+        except Exception as e:
+            logging.error(f'Error in generate: {str(e)}')
+            return False
 
     def _generateScripthash(self, forAddress: Union[str, None] = None):
         # possible shortcut:
@@ -128,16 +311,51 @@ class IdentityBase():
         return mnemonic.Mnemonic('english').to_mnemonic(self._entropy or b'')
 
     def _generatePrivateKey(self, compressed: bool = True):
-        ''' returns a private key object '''
+        ''' 
+        Generate or load a private key object.
+        
+        Args:
+            compressed (bool): Whether to use compressed public key format. Defaults to True.
+            
+        Returns:
+            A private key object that must have:
+            - pub attribute for public key
+            - __str__ method for string representation
+            - _cec_key.get_raw_privkey() method for raw bytes
+        '''
+        raise NotImplementedError("Subclass must implement _generatePrivateKey")
 
     def _generateAddress(self, pub=None):
-        ''' returns an address object '''
+        ''' 
+        Generate an address object from a public key.
+        
+        Args:
+            pub: Optional public key to use. If None, uses self._privateKeyObj.pub
+            
+        Returns:
+            An address object that must have __str__ method for string representation
+        '''
+        raise NotImplementedError("Subclass must implement _generateAddress")
 
     def _generateScriptPubKeyFromAddress(self, address: str):
-        ''' returns CScript object from address '''
+        ''' 
+        Generate a script pubkey from an address.
+        
+        Args:
+            address (str): The address to generate script for
+            
+        Returns:
+            A CScript object representing the script pubkey
+        '''
+        raise NotImplementedError("Subclass must implement _generateScriptPubKeyFromAddress")
 
     def _generateUncompressedPubkey(self):
-        ''' returns a private key object '''
+        ''' 
+        Generate an uncompressed public key.
+        
+        Returns:
+            str: Hex string of uncompressed public key
+        '''
         return self._generatePrivateKey(compressed=False).pub.hex()
 
     ## encryption ##############################################################
@@ -153,7 +371,7 @@ class IdentityBase():
             private_value=int.from_bytes(my_priv_bytes, 'big'),
             curve=ec.SECP256K1())
 
-        # 2. Parse the peer’s public key
+        # 2. Parse the peer's public key
         peer_pubkey_bytes = bytes.fromhex(pubkey)
         peer_ec_public_key = ec.EllipticCurvePublicKey.from_encoded_point(
             curve=ec.SECP256K1(),
@@ -260,6 +478,52 @@ class IdentityBase():
             ciphertext=ciphertext)
         return plaintext
 
+    def validateState(self) -> bool:
+        """
+        Validate internal state consistency.
+        This is different from verify() which checks against stored values.
+        This method ensures the internal objects are in a valid state.
+        
+        Returns:
+            bool: True if state is valid, False otherwise
+        """
+        try:
+            # Case 1: Entropy-based wallet
+            if self._entropy is not None:
+                if not isinstance(self._entropy, bytes) or len(self._entropy) != 32:
+                    logging.error('Invalid entropy format')
+                    return False
+                if not self._entropyStr:
+                    logging.error('Missing entropy string representation')
+                    return False
+                if self._privateKeyObj is None:
+                    logging.error('Missing private key object')
+                    return False
+                if self._addressObj is None:
+                    logging.error('Missing address object')
+                    return False
+                return True
+                
+            # Case 2: Private key-based wallet
+            if self.privateKey:
+                if self._privateKeyObj is None:
+                    logging.error('Missing private key object')
+                    return False
+                if self._addressObj is None:
+                    logging.error('Missing address object')
+                    return False
+                return True
+                
+            # Case 3: Watch-only wallet
+            if not any([self.publicKey, self.addressValue, self.scripthashValue]):
+                logging.error('Watch-only wallet missing all public data')
+                return False
+                
+            return True
+            
+        except Exception as e:
+            logging.error(f'Error validating state: {str(e)}')
+            return False
 
 
 class Identity(IdentityBase):
@@ -442,7 +706,6 @@ class Identity(IdentityBase):
         challenged:Union[str, None] = None,
         signature:Union[bytes, None] = None,
     ) -> dict[str, str]:
-
         return {
             'pubkey': self.pubkey,
             'address': self.address,

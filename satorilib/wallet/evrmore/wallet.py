@@ -182,6 +182,8 @@ class EvrmoreWallet(Wallet):
 
     def _generatePrivateKey(self, compressed: bool = True, privkey: Union[str, bytes, None] = None):
         SelectParams('mainnet')
+        if not self._entropy:
+            privkey = privkey or self.privateKey
         if privkey:
             if isinstance(privkey, str):
                 #return CEvrmoreSecret.from_secret_bytes(bytes.fromhex(privkey), compressed=compressed) # bytes below

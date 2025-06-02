@@ -408,7 +408,7 @@ class DataClient:
         ''' request for row equal to or before a timestamp  '''
         return await self.send((peerHost, peerPort if peerPort is not None else self.serverPort), Message(DataServerApi.getStreamObservationByTime.createRequest(uuid, toDate=toDate)))
 
-    async def deleteStreamData(self, uuid: str, data: pd.DataFrame)  -> Message:
+    async def deleteStreamData(self, uuid: str, data: Union[pd.DataFrame, None] = None)  -> Message:
         ''' request to delete data from its own server '''
         return await self.send((self.serverHostPort), Message(DataServerApi.deleteStreamData.createRequest(uuid, data)))
 

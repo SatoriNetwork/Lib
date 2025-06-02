@@ -55,6 +55,7 @@ class SqliteDatabase:
             self.cursor = self.conn.cursor()
             self.cursor.execute('PRAGMA foreign_keys = ON;')
             self.cursor.execute('PRAGMA journal_mode = WAL;')
+            self.cursor.execute('PRAGMA wal_autocheckpoint = 100;')
         except Exception as e:
             error("Connection error:", e)
 

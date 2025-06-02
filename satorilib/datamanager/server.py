@@ -381,9 +381,9 @@ class DataServer:
                     for ts in timestamps:
                         self.dataManager.db.editTable('delete', request.uuid, timestamp=ts)
                     return DataServerApi.statusSuccess.createResponse('Delete operation completed', request.id)
-                # else: # TODO : should we delete the whole table?
-                #     self.db.deleteTable(request.uuid)
-                #     return DataServerApi.statusSuccess.createResponse('Table {request.uuid} deleted', request.id)
+                else: # TODO : should we delete the whole table?
+                    self.dataManager.db.deleteTable(request.uuid)
+                    return DataServerApi.statusSuccess.createResponse('Table {request.uuid} deleted', request.id)
             except Exception as e:
                 return DataServerApi.statusFail.createResponse(f'Error deleting data: {str(e)}', request.id)
 

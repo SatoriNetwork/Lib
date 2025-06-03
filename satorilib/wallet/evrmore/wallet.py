@@ -16,6 +16,7 @@ from satorilib.wallet.evrmore.sign import signMessage
 from satorilib.wallet.evrmore.verify import verify
 from satorilib.wallet.evrmore.valid import isValidEvrmoreAddress
 from satorilib.wallet.evrmore.scripts import P2SHRedeemScripts
+from satorilib.wallet.evrmore.identity import EvrmoreIdentity
 
 
 
@@ -27,7 +28,7 @@ class EvrmoreWallet(Wallet):
 
     @staticmethod
     def create(
-        walletPath: str = '/Satori/Neuron/wallet/wallet.yaml',
+        walletPath: str,
         reserve: float = 0,
         isTestnet: bool = False,
         password: Union[str, None] = None,
@@ -43,7 +44,7 @@ class EvrmoreWallet(Wallet):
         cachedPeersFile: Union[str, None] = None,
     ) -> 'EvrmoreWallet':
         return EvrmoreWallet(
-            walletPath=walletPath,
+            identity=identity,
             reserve=reserve,
             isTestnet=isTestnet,
             password=password,
@@ -60,7 +61,7 @@ class EvrmoreWallet(Wallet):
 
     def __init__(
         self,
-        walletPath: str,
+        identity: EvrmoreIdentity,
         reserve: float = .25,
         isTestnet: bool = False,
         password: Union[str, None] = None,

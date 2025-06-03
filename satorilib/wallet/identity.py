@@ -31,7 +31,7 @@ Required Implementation:
 - _generateScriptPubKeyFromAddress(address: str) -> CScript
 """
 
-from typing import Union, Any
+from typing import Union, Any, Callable
 import os
 import secrets
 import mnemonic
@@ -44,6 +44,10 @@ from cryptography.fernet import Fernet
 from satorilib import logging
 from satorilib import config
 from satorilib.disk.utils import safetify
+from satorilib.wallet.utils.transaction import TxUtils
+from satorilib.wallet.balance import Balance
+from satorilib.wallet.transaction import TransactionStruct
+from satorilib.wallet.concepts import authenticate
 
 
 class IdentityBase():
@@ -69,7 +73,7 @@ class IdentityBase():
     @property
     def symbol(self) -> str:
         """The symbol of the currency of the chain """
-        return 'wallet'
+        return ''
 
     @property
     def pubkey(self) -> str:
@@ -173,7 +177,7 @@ class IdentityBase():
         if not any([self.publicKey, self.addressValue, self.scripthashValue]):
             raise Exception('No wallet data provided - need entropy, private key, or watch-only data')
 
-    def verify(self) -> bool:
+    def validateIdentity(self) -> bool:
         """
         Verify that all wallet data is consistent with its source of truth.
         Returns True if verification passes, False otherwise.
@@ -542,17 +546,12 @@ class Identity(IdentityBase):
             logging.error('openSafely err:', supposedDict, e)
             return default
 
-    def __init__(
-        self,
-        walletPath: str,
-        cachePath: Union[str, None] = None,
-        password: Union[str, None] = None,
-    ):
-        if walletPath == cachePath:
-            raise Exception('wallet and cache paths cannot be the same')
+    def __init__(self, walletPath: str, password: Union[str, None] = None):
+        if walletPath == '':
+            raise Exception('wallet paths must be provided')
         super().__init__()
-        self.password = password
         self.walletPath = walletPath
+        self.password = password
         self.alias = None
         self.challenges: dict[str, str] = {}
         self.load()
@@ -564,9 +563,10 @@ class Identity(IdentityBase):
     def __repr__(self):
         return (
             f'{self.chain}Wallet('
+            f'\n  encrypted: {self.isEncrypted},'
             f'\n  publicKey: {self.publicKey},'
-            f'\n  privateKey: {self.privateKey},'
-            f'\n  words: {self.words},'
+            #f'\n  privateKey: {self.privateKey},'
+            #f'\n  words: {self.words},'
             f'\n  address: {self.address},'
             f'\n  scripthash: {self.scripthash})')
 
@@ -609,7 +609,7 @@ class Identity(IdentityBase):
             return False
         self.yaml = self.decryptWallet(self.yaml)
         self.loadFromYaml(self.yaml)
-        if self.isDecrypted and not super().verify():
+        if self.isDecrypted and not super().validateIdentity():
             raise Exception('wallet or vault file corrupt')
         return True
 
@@ -712,3 +712,12 @@ class Identity(IdentityBase):
             **({'challenge': self.challenge(challengeId) if challengeId else {}}),
             **({'signature': self.sign(challenged)} if challenged else {}),
             **({'signature': signature} if signature else {})}
+
+    def hash160ToAddress(self, pubKeyHash: Union[str, bytes]) -> str:
+        return TxUtils.hash160ToAddress(pubKeyHash, self.networkByte)
+
+    def authPayload(self, asDict: bool = False, challenge: str = None) -> Union[str, dict]:
+        payload = authenticate.authPayload(self, challenge)
+        if asDict:
+            return payload
+        return json.dumps(payload)

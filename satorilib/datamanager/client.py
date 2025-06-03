@@ -384,6 +384,12 @@ class DataClient:
                                sendOnly=sendOnly,
                                auth=False)
 
+    async def mergeFromCsv(self, uuid: str, data: pd.DataFrame) -> Message:
+        ''' sends the observation/prediction data to the server '''
+        return await self.send(peerAddr=(self.serverHostPort), 
+                               request=Message(DataServerApi.mergeFromCsv.createRequest(uuid, data)), 
+                               auth=False)
+
     async def getRemoteStreamData(self, peerHost: str, uuid: str, peerPort: Union[int, None] = None)  -> Message:
         ''' request for data from external server '''
         return await self.send((peerHost, peerPort if peerPort is not None else self.serverPort), Message(DataServerApi.getStreamData.createRequest(uuid)))

@@ -41,6 +41,7 @@ class DataServerApi(Enum):
     getStreamDataByRange = 'stream/data/get/range'
     getStreamObservationByTime = 'stream/observation/get/at'
     insertStreamData = 'stream/data/insert'
+    mergeFromCsv = 'stream/data/merge/csv'
     deleteStreamData = 'stream/data/delete'
     unknown = 'unknown'
     statusSuccess = 'success'

@@ -375,6 +375,22 @@ class DataServer:
             except Exception as e:
                 # error(e)
                 return DataServerApi.statusFail.createResponse(e, request.id)
+            
+        elif request.method == DataServerApi.mergeFromCsv.value:
+            ''' merges the csv data into the database '''
+            try:
+                if request.data is None:
+                    return DataServerApi.statusFail.createResponse('No data provided', request.id)
+                data = request.data
+                if data.empty:
+                    return DataServerApi.statusFail.createResponse('Empty dataframe data provided', request.id)
+                _, result = self.dataManager.db.blindMerge(request.uuid, data, self.connectedClients[peerAddr].address)
+                if result:
+                    return DataServerApi.statusSuccess.createResponse('CSV data merged into database', request.id)
+                else:
+                    return DataServerApi.statusFail.createResponse(f'Error merging CSV data: {str(e)}', request.id)
+            except Exception as e:
+                return DataServerApi.statusFail.createResponse(f'Error merging CSV data: {str(e)}', request.id)
 
         elif request.method == DataServerApi.isStreamActive.value:
             ''' client asks the server whether it has the stream its trying to subscribe to in its publication list  '''

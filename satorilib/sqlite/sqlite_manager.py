@@ -433,6 +433,102 @@ class SqliteDatabase:
         except Exception as e:
             error(f"Error getting last hash from table {table_uuid}: {e}")
             return None
+        
+    def blindMerge(self, table_uuid: str, newDf: pd.DataFrame, provider: str) -> Union[pd.DataFrame, bool]:
+        """ Blindly merges a DataFrame into the database table and rehashes all rows after the merge """
+        try:
+            self.cursor.execute(
+                """
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name=?
+                """, (table_uuid,))
+            if not self.cursor.fetchone():
+                debug(f"Table {table_uuid} does not exist, creating it")
+                self.createTable(table_uuid)
+
+            if newDf.empty:
+                warning("Empty DataFrame provided for merge")
+                return pd.DataFrame()
+            
+            if len(newDf.columns) < 2:
+                raise ValueError("DataFrame must have atleast 2 columns: timestamp and value")
+            
+            newDf_copy = newDf.copy()
+            timestamp_col = newDf_copy.columns[0]
+            value_col = newDf_copy.columns[1]
+            
+            # Set timestamp as index and rename value column
+            newDf_copy = newDf_copy.set_index(timestamp_col)
+            newDf_copy = newDf_copy.rename(columns={value_col: 'value'})
+            newDf_copy.index.name = 'ts'
+            
+            # Convert types
+            newDf_copy.index = newDf_copy.index.astype(str)
+            newDf_copy['value'] = newDf_copy['value'].astype(float)
+            newDf_copy['provider'] = provider
+
+            # Get existing data from database
+            existing_df = pd.read_sql_query(
+                f"""
+                SELECT ts, value, provider 
+                FROM "{table_uuid}"
+                ORDER BY ts
+                """, 
+                self.conn,
+                index_col='ts'
+            )
+
+            # Combine existing and new data
+            if not existing_df.empty:
+                # Merge the dataframes
+                combined_df = pd.concat([existing_df, newDf_copy])
+            else:
+                combined_df = newDf_copy
+            
+            combined_df = combined_df.sort_index()
+            combined_df = combined_df[~combined_df.index.duplicated(keep='last')]
+            
+            # Rehash all rows sequentially
+            combined_df['hash'] = ''
+            prev_hash = ''
+            
+            for idx in combined_df.index:
+                row = combined_df.loc[idx]
+                # Create hash from: previous_hash + timestamp + value
+                hash_string = prev_hash + str(idx) + str(row['value'])
+                current_hash = self.hashIt(hash_string)
+                combined_df.loc[idx, 'hash'] = current_hash
+                prev_hash = current_hash
+
+            # Clear the existing table and insert all data
+            self.cursor.execute(f'DELETE FROM "{table_uuid}"')
+            
+            # Insert all the rehashed data
+            for idx, row in combined_df.iterrows():
+                self.cursor.execute(
+                    f'''
+                    INSERT INTO "{table_uuid}" (ts, value, hash, provider) 
+                    VALUES (?, ?, ?, ?)
+                    ''', (
+                        str(idx),
+                        float(row['value']),
+                        str(row['hash']),
+                        str(row['provider'])
+                    ))
+            
+            self.conn.commit()
+            info(f"Successfully merged and rehashed {len(combined_df)} rows in table {table_uuid}")
+            
+            # Return the newly added data with their hashes
+            new_data_indices = newDf_copy.index
+            return combined_df.loc[new_data_indices].copy(), True
+            
+        except Exception as e:
+            error(f"Error in blindMerge for table {table_uuid}: {e}")
+            self.conn.rollback()
+            return pd.DataFrame(), False
+
+            
 
     @staticmethod
     def hashIt(string: str) -> str:

@@ -19,7 +19,6 @@ from satorilib.wallet.evrmore.scripts import P2SHRedeemScripts
 from satorilib.wallet.evrmore.identity import EvrmoreIdentity
 
 
-
 class EvrmoreWallet(Wallet):
 
     @staticmethod

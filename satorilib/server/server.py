@@ -193,7 +193,7 @@ class SatoriServerClient(object):
             endpoint='/my/streams',
             payload='{}')
 
-    def removeOracleStream(self, stream: dict = None, payload: str = None):
+    def removeStream(self, stream: dict = None, payload: str = None):
         ''' removes a stream from the server '''
         if payload is None and stream is None:
             raise ValueError('stream or payload must be provided')
@@ -202,7 +202,7 @@ class SatoriServerClient(object):
             endpoint='/remove/stream',
             payload=payload or json.dumps(stream or {}))
     
-    def restoreOracleStream(self, stream: dict = None, payload: str = None):
+    def restoreStream(self, stream: dict = None, payload: str = None):
         ''' removes a stream from the server '''
         if payload is None and stream is None:
             raise ValueError('stream or payload must be provided')
@@ -1404,7 +1404,7 @@ class SatoriServerClient(object):
             error_message = f"Error in setMiningMode: {str(e)}"
             return False, {"error": error_message}
 
-    def deleteContent(self, deleted: list[int]) -> tuple[bool, dict]:
+    def deleteContent(self, deleted: list[int]) -> tuple[bool, str]:
         try:
             response = self._makeAuthenticatedCall(
                 function=requests.post,
@@ -1412,6 +1412,20 @@ class SatoriServerClient(object):
                 payload=json.dumps({"deleted": deleted}))
             if response.status_code == 200:
                 return True, response.text
+            else:
+                error_message = f"Server returned status code {response.status_code}: {response.text}"
+                return False, {"error": error_message}
+        except Exception as e:
+            error_message = f"Error in setMiningMode: {str(e)}"
+            return False, {"error": error_message}
+
+    def getBalances(self) -> tuple[bool, dict]:
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/api/v0/balances/get')
+            if response.status_code == 200:
+                return True, response.json()
             else:
                 error_message = f"Server returned status code {response.status_code}: {response.text}"
                 return False, {"error": error_message}

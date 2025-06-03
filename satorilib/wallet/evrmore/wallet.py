@@ -1,10 +1,12 @@
 from typing import Union, Callable
+import datetime as dt
 from evrmore import SelectParams
 from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret, P2SHEvrmoreAddress
 from evrmore.core.scripteval import VerifyScript, SCRIPT_VERIFY_P2SH
 from evrmore.core.script import (
     CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, 
-    OP_EVR_ASSET, OP_DROP, OP_RETURN, SIGHASH_ANYONECANPAY)
+    OP_EVR_ASSET, OP_DROP, OP_RETURN, SIGHASH_ANYONECANPAY, OP_IF, OP_ELSE, OP_ENDIF, 
+    OP_CHECKMULTISIG, OP_CHECKLOCKTIMEVERIFY, OP_CHECKSEQUENCEVERIFY)
 from evrmore.core import b2x, lx, COutPoint, CMutableTxOut, CMutableTxIn, CMutableTransaction, Hash160
 from evrmore.core.scripteval import EvalScriptError
 from satorilib import logging
@@ -16,8 +18,6 @@ from satorilib.wallet.evrmore.sign import signMessage
 from satorilib.wallet.evrmore.verify import verify
 from satorilib.wallet.evrmore.valid import isValidEvrmoreAddress
 from satorilib.wallet.evrmore.scripts import P2SHRedeemScripts
-from satorilib.wallet.evrmore.identity import EvrmoreIdentity
-
 
 class EvrmoreWallet(Wallet):
 
@@ -390,7 +390,6 @@ class EvrmoreWallet(Wallet):
             utxo_key = f"{b2x(txin.prevout.hash)}:{txin.prevout.n}"
             redeem_script = redeem_scripts.get(utxo_key) if redeem_scripts else None
             other_sigs = signatures.get(utxo_key) if signatures else None
-            
             self._signInput(
                 tx=tx,
                 i=i,

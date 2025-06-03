@@ -392,6 +392,10 @@ class DataClient:
         ''' request for data from local server '''
         return await self.send((self.serverHostPort), Message(DataServerApi.getStreamData.createRequest(uuid)), auth=False)
 
+    async def getHash(self, uuid: str)  -> Message:
+        ''' request for last hash of a table from local server '''
+        return await self.send((self.serverHostPort), Message(DataServerApi.getHash.createRequest(uuid)), auth=False)
+
     async def getAvailableSubscriptions(self, peerHost: str, peerPort: Union[int, None] = None)  -> Message:
         ''' get from external server its list of available subscriptions '''
         return await self.send((peerHost, peerPort if peerPort is not None else self.serverPort), Message(DataServerApi.getAvailableSubscriptions.createRequest()))

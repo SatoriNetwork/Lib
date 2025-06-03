@@ -418,6 +418,21 @@ class SqliteDatabase:
             error(f"Database error converting DataFrame to table {table_uuid}: {e}")
             self.conn.rollback()
             return False
+        
+    def getLastHash(self, table_uuid: str) -> Union[str, None]:
+        """ Get the last hash from a table """
+        try:
+            self.cursor.execute(
+                f'''
+                SELECT hash FROM "{table_uuid}" 
+                ORDER BY ts DESC 
+                LIMIT 1
+                ''')
+            result = self.cursor.fetchone()
+            return result[0] if result else None
+        except Exception as e:
+            error(f"Error getting last hash from table {table_uuid}: {e}")
+            return None
 
     @staticmethod
     def hashIt(string: str) -> str:

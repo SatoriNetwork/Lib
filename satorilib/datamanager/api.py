@@ -35,6 +35,7 @@ class DataServerApi(Enum):
     streamInactive= 'stream/inactive'
     subscribe = 'stream/subscribe'
     getStreamData = 'stream/data/get'
+    getHash = 'stream/data/hash'
     getAvailableSubscriptions = 'streams/subscriptions/list'
     addActiveStream = 'stream/add'
     getStreamDataByRange = 'stream/data/get/range'
@@ -95,7 +96,7 @@ class DataServerApi(Enum):
         id: int,
         # uuid: Union[str, dict, list, None] = None,
         data: Union[pd.DataFrame, None] = None,
-        streamInfo: Union[dict, list, None] = None,
+        streamInfo: Union[dict, list, str, None] = None,
         auth: Union[dict, None] = None,
         # isSub: bool = False,
     ) -> dict:

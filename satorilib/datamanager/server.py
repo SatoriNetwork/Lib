@@ -286,6 +286,16 @@ class DataServer:
         if request.uuid is None:
             return DataServerApi.statusFail.createResponse('Missing uuid parameter', request.id)
 
+        elif request.method == DataServerApi.getHash.value:
+            ''' fetches the Hash of the last row of the requested dataframe '''
+            try:
+                hash = self.dataManager.db.getLastHash(request.uuid)
+                if hash is None:
+                    return DataServerApi.statusFail.createResponse('Hash not found', request.id)
+                return DataServerApi.statusSuccess.createResponse('Hash fetched for stream', request.id, streamInfo=hash)
+            except Exception as e:
+                return DataServerApi.statusFail.createResponse('Failed to fetch data', request.id)
+            
         elif request.method == DataServerApi.getStreamData.value:
             ''' fetches the whole requested dataframe '''
             try:

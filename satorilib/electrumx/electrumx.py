@@ -15,6 +15,7 @@ import ssl
 
 
 class Subscription:
+
     def __init__(
         self,
         method: str,
@@ -224,14 +225,14 @@ class Electrumx(ElectrumxConnection):
         self.pingerStop = threading.Event()
         self.ensureConnectedLock = threading.Lock()
         self.startListener()
-        self.lastHandshake = 0
-        self.handshaked = None
-        self.handshake()
         self.persistent: bool = persistent
         self.cachedPeers: str = cachedPeers
+        self.lastHandshake = 0
+        self.handshaked = None
         if self.persistent:
+            self.handshake()
             self.startPinger()
-        self.managePeers()
+            self.managePeers()
 
     def managePeers(self):
         if isinstance(self.cachedPeers, str) and self.cachedPeers != '':

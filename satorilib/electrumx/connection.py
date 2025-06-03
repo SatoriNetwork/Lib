@@ -12,7 +12,6 @@ class ElectrumxConnection:
         port: int,
         ssl: bool = False,
         timeout: int = 60*10,
-        initializeConnection: bool = True,
     ):
         self.host = host
         self.port = port
@@ -21,8 +20,6 @@ class ElectrumxConnection:
         self.isConnected = False
         self.connection: socket.socket = None
         self.createConnectionObject()
-        if initializeConnection:
-            self.connect()
 
     def connected(self) -> bool:
         if self.connection is None:

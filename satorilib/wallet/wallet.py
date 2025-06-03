@@ -130,13 +130,13 @@ class Wallet(WalletBase):
     def __init__(
         self,
         walletPath: Union[str,None] = None,
+        password: Union[str,None] = None,
         cachePath: Union[str,None] = None,
         identity: Union[Identity, None] = None,
         reserve: float = 0.25,
         watchAssets: list[str] = None,
         skipSave: bool = False,
         pullFullTransactions: bool = True,
-        useElectrumx: bool = True,
         balanceUpdatedCallback: Union[Callable, None] = None,
     ):
         if walletPath == cachePath and walletPath is not None:
@@ -146,7 +146,7 @@ class Wallet(WalletBase):
         elif identity is not None and walletPath is not None:
             raise Exception('wallet path and identity cannot be provided together')
         elif identity is None and walletPath is not None:
-            identity = Identity(walletPath=walletPath, cachePath=cachePath)
+            identity = Identity(walletPath=walletPath, password=password)
         super().__init__(identity=identity)
         self.useElectrumx = useElectrumx
         self.skipSave = skipSave
@@ -334,7 +334,7 @@ class Wallet(WalletBase):
             logging.debug('unable to get balances', e)
 
     def getStats(self):
-        if not self.useElectrumx:
+        if not self.electrumx.connected():
             return
         self.stats = self.electrumx.api.getStats()
         self.divisibility = Wallet.openSafely(self.stats, 'divisions', 8)
@@ -342,13 +342,13 @@ class Wallet(WalletBase):
         self.banner = self.electrumx.api.getBanner()
 
     def getTransactionHistory(self):
-        if not self.useElectrumx:
+        if not self.electrumx.connected():
             return
         self.transactionHistory = self.electrumx.api.getTransactionHistory(
             scripthash=self.scripthash)
 
     def getBalances(self):
-        if not self.useElectrumx:
+        if not self.electrumx.connected():
             return
         self.balances = self.electrumx.api.getBalances(scripthash=self.scripthash)
         self.currency = Balance.fromBalances('EVR', self.balances or {})
@@ -357,7 +357,7 @@ class Wallet(WalletBase):
             self.balanceUpdatedCallback(kind='wallet', evr=self.currency, satori=self.balance)
 
     def getReadyToSend(self, balance: bool = False, save: bool = True):
-        if not self.useElectrumx:
+        if not self.electrumx.connected():
             return
         try:
             self.maybeConnect()
@@ -372,7 +372,7 @@ class Wallet(WalletBase):
             logging.debug('unable to get reaedy to send', e)
 
     def getUnspents(self):
-        if not self.useElectrumx:
+        if not self.electrumx.connected():
             return
         #import traceback
         #traceback.print_stack()
@@ -432,7 +432,7 @@ class Wallet(WalletBase):
             if callable(then):
                 then()
 
-        if not self.useElectrumx:
+        if not self.electrumx.connected():
             return False
         if threaded:
             self.getUnspentTransactionsThread = threading.Thread(
@@ -447,7 +447,7 @@ class Wallet(WalletBase):
     ### Functions ##############################################################
 
     def appendTransaction(self, txid):
-        if not self.useElectrumx:
+        if not self.electrumx.connected():
             return
         #self.electrumx.ensureConnected()
         if txid not in self._transactions.keys():

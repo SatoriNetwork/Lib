@@ -28,29 +28,28 @@ class EvrmoreWallet(Wallet):
 
     @staticmethod
     def create(
-        walletPath: str,
+        walletPath: Union[str,None] = None,
+        cachePath: Union[str,None] = None,
+        password: Union[str,None] = None,
+        identity: Union[Identity, None] = None,
         reserve: float = 0,
-        isTestnet: bool = False,
-        password: Union[str, None] = None,
-        electrumx: Electrumx = None,
-        useElectrumx: bool = True,
-        kind: str = 'wallet',
         watchAssets: list[str] = None,
         skipSave: bool = False,
         pullFullTransactions: bool = True,
+        balanceUpdatedCallback: Union[Callable, None] = None,
+        electrumx: Electrumx = None,
         hostPort: str = None,
         persistent: bool = False,
-        balanceUpdatedCallback: Union[Callable, None] = None,
         cachedPeersFile: Union[str, None] = None,
     ) -> 'EvrmoreWallet':
         return EvrmoreWallet(
-            identity=identity,
+            identity=identity or EvrmoreIdentity(walletPath=walletPath, password=password),
+            electrumx=electrumx or Electrumx.create(
+                hostPort=hostPort, 
+                persistent=persistent,
+                cachedPeersFile=cachedPeersFile),
+            cachePath=cachePath,
             reserve=reserve,
-            isTestnet=isTestnet,
-            password=password,
-            electrumx=electrumx,
-            useElectrumx=useElectrumx,
-            kind=kind,
             watchAssets=watchAssets,
             skipSave=skipSave,
             pullFullTransactions=pullFullTransactions,
@@ -62,58 +61,41 @@ class EvrmoreWallet(Wallet):
     def __init__(
         self,
         identity: EvrmoreIdentity,
-        reserve: float = .25,
-        isTestnet: bool = False,
-        password: Union[str, None] = None,
         electrumx: Electrumx = None,
-        useElectrumx: bool = True,
-        kind: str = 'wallet',
+        cachePath: Union[str, None] = None,
+        reserve: float = 0,
         watchAssets: list[str] = None,
         skipSave: bool = False,
         pullFullTransactions: bool = True,
-        hostPort: str = None,
-        persistent: bool = False,
         balanceUpdatedCallback: Union[Callable, None] = None,
-        cachedPeersFile: Union[Callable, None] = None,
         **kwargs
     ):
         super().__init__(
-            walletPath,
+            identity=identity,
+            cachePath=cachePath,
             reserve=reserve,
-            isTestnet=isTestnet,
-            password=password,
             watchAssets=watchAssets,
             skipSave=skipSave,
             pullFullTransactions=pullFullTransactions,
-            useElectrumx=useElectrumx,
             balanceUpdatedCallback=balanceUpdatedCallback,
             **kwargs)
-        self.kind = kind
-        self.persistent = persistent
-        self.cachedPeersFile = cachedPeersFile
-        self.hostPort = hostPort
-        self.maybeConnect(electrumx)
         self.scripts = P2SHRedeemScripts()
 
     def maybeConnect(self, electrumx = None):
-        if self.useElectrumx:
-            if self.electrumx is None:
-                self.electrumx = (
-                    electrumx or
-                    Electrumx.create(
-                        hostPort=self.hostPort, 
-                        persistent= self.persistent,
-                        cachedPeersFile=self.cachedPeersFile))
-                return self.electrumx is not None
-            elif self.electrumx.isConnected:
+        if self.electrumx is None:
+            self.electrumx = Electrumx.create(
+                    hostPort=self.hostPort, 
+                    persistent= self.persistent,
+                    cachedPeersFile=self.cachedPeersFile)
+            return self.electrumx is not None
+        elif self.electrumx.isConnected:
+            return True
+        else:
+            if self.electrumx.reconnect():
                 return True
             else:
-                if self.electrumx.reconnect():
-                    return True
-                else:
-                    self.electrumx = None
-                    return self.maybeConnect(electrumx)
-        return False
+                self.electrumx = None
+                return self.maybeConnect(electrumx)
 
     @property
     def symbol(self) -> str:
@@ -541,8 +523,6 @@ class EvrmoreWallet(Wallet):
 
     def _deserialize(self, serialTx: bytes) -> CMutableTransaction:
         return CMutableTransaction.deserialize(serialTx)
-
-
 
     def createP2SHTransaction(
         self,

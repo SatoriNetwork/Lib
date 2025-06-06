@@ -389,7 +389,7 @@ class SatoriServerClient(object):
 
             response = self._makeUnauthenticatedCall(
                 function=requests.post,
-                endpoint='/streams/search',
+                endpoint='/streams/search/paginated',
                 payload=json.dumps(payload),  # This should just be json.dumps(payload)
             )
             response_data = response.json()

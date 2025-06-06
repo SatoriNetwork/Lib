@@ -364,6 +364,60 @@ class SatoriServerClient(object):
                 endpoint='/streams/search',
                 payload=json.dumps({'address': self.wallet.address})).json(),
             searchText=searchText)
+    
+    def getSearchStreamsPaginated(self, searchText: str = None, page: int = 1, per_page: int = 100, 
+                            sort_by: str = 'popularity', order: str = 'desc') -> tuple[list, int]:
+        """ Get streams with full pagination information """
+        def cleanAndSort(streams: list, searchText: str = None):
+            """Clean and sanitize stream data"""
+            return sanitizeJson(streams)
+
+        try:
+            page = max(1, page)
+            per_page = min(max(1, per_page), 200)
+            payload = {
+                'page': page,
+                'per_page': per_page,
+                'sort': sort_by,
+                'order': order
+            }
+            if hasattr(self, 'wallet') and self.wallet and hasattr(self.wallet, 'address'):
+                payload['address'] = self.wallet.address
+            
+            if searchText:
+                payload['search'] = searchText
+
+            response = self._makeUnauthenticatedCall(
+                function=requests.post,
+                endpoint='/streams/search',
+                payload=json.dumps(payload),  # This should just be json.dumps(payload)
+            )
+            response_data = response.json()
+            
+            if isinstance(response_data, dict):
+                if 'streams' in response_data and 'pagination' in response_data:
+                    streams = cleanAndSort(response_data['streams'], searchText)
+                    pagination = response_data['pagination']
+                    total_count = pagination.get('total_count', len(streams))
+                    return streams, total_count
+                
+                elif 'streams' in response_data:
+                    streams = cleanAndSort(response_data['streams'], searchText)
+                    total_count = len(streams)  # Fallback
+                    return streams, total_count
+                    
+            elif isinstance(response_data, list):
+                streams = cleanAndSort(response_data, searchText)
+                total_count = len(streams)
+                return streams, total_count
+                
+            else:
+                logging.warning(f"Unexpected response format: {type(response_data)}")
+                return [], 0
+                    
+        except Exception as e:
+            logging.error(f"Error in getSearchStreamsPaginated: {str(e)}")
+            return [], 0
 
     def incrementVote(self, streamId: str):
         return self._makeAuthenticatedCall(

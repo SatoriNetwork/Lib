@@ -94,7 +94,7 @@ class DataServerApi(Enum):
     def createResponse(
         self,
         serverMsg: str,
-        id: int,
+        id: Union[int, None] = None,
         # uuid: Union[str, dict, list, None] = None,
         data: Union[pd.DataFrame, None] = None,
         streamInfo: Union[dict, list, str, None] = None,

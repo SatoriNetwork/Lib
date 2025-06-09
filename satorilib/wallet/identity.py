@@ -31,7 +31,7 @@ Required Implementation:
 - _generateScriptPubKeyFromAddress(address: str) -> CScript
 """
 
-from typing import Union, Any, Callable
+from typing import Union, Any
 import os
 import secrets
 import mnemonic
@@ -45,8 +45,6 @@ from satorilib import logging
 from satorilib import config
 from satorilib.disk.utils import safetify
 from satorilib.wallet.utils.transaction import TxUtils
-from satorilib.wallet.balance import Balance
-from satorilib.wallet.transaction import TransactionStruct
 from satorilib.wallet.concepts import authenticate
 
 

@@ -4,12 +4,9 @@ import json
 import joblib
 import threading
 from enum import Enum
-from base64 import b64encode, b64decode
 from random import randrange
-import mnemonic
 from decimal import Decimal
 from satorilib import logging
-from satorilib import config
 from satorilib.utils import system
 from satorilib.disk.utils import safetify
 from satorilib.electrumx import Electrumx
@@ -149,7 +146,6 @@ class Wallet(WalletBase):
         elif identity is None and walletPath is not None:
             identity = Identity(walletPath=walletPath, password=password)
         super().__init__(identity=identity)
-        self.useElectrumx = useElectrumx
         self.skipSave = skipSave
         self.watchAssets = ['SATORI'] if watchAssets is None else watchAssets
         # at $100 SATORI this is 1 penny (for evr tx fee)
@@ -160,7 +156,6 @@ class Wallet(WalletBase):
         self.burnAddress: str = TxUtils.evrBurnMintAddressMain #'EXBurnMintXXXXXXXXXXXXXXXXXXXbdK5E'  # real
         self.maxBridgeAmount: float = 500
         #self.burnAddress: str = 'EL1BS6HmwY1KoeqBokKjUMcWbWsn5kamGv' # testing
-        self.isTestnet = isTestnet
         self.password = password
         self.walletPath = walletPath
         self.cachePath = cachePath or walletPath.replace('.yaml', '.cache.joblib')
@@ -303,16 +298,12 @@ class Wallet(WalletBase):
             self.getUnspentTransactions(threaded=True, then=thenSave)
             return True
 
-        #if self.useElectrumx and self.electrumx.ensureConnected():
         return handleResponse(
             self.electrumx.api.subscribeScripthash(
                 scripthash=self.scripthash,
                 callback=handleNotifiation))
 
     def preSend(self) -> bool:
-        #if  self.useElectrumx and isinstance(self.electrumx, Electrumx):
-            #if self.electrumx.ensureConnected():
-            #    return True
         self.stats = {'status': 'not connected'}
         self.divisibility = self.divisibility or 8
         self.banner = 'not connected'
@@ -849,9 +840,6 @@ class Wallet(WalletBase):
         ''' serialize '''
 
     def broadcast(self, txHex: str) -> str:
-        if not self.useElectrumx:
-            return ''
-        self.maybeConnect()
         return self.electrumx.api.broadcast(txHex)
 
     ### Transactions ###########################################################

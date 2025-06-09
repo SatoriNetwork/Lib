@@ -1,4 +1,4 @@
-from typing import Union, Callable
+from typing import Union, Callable, Dict
 import datetime as dt
 from evrmore import SelectParams
 from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret, P2SHEvrmoreAddress
@@ -18,6 +18,8 @@ from satorilib.wallet.evrmore.sign import signMessage
 from satorilib.wallet.evrmore.verify import verify
 from satorilib.wallet.evrmore.valid import isValidEvrmoreAddress
 from satorilib.wallet.evrmore.scripts import P2SHRedeemScripts
+from satorilib.wallet.identity import Identity
+from satorilib.wallet.evrmore.identity import EvrmoreIdentity
 
 class EvrmoreWallet(Wallet):
 
@@ -72,6 +74,7 @@ class EvrmoreWallet(Wallet):
         super().__init__(
             identity=identity,
             cachePath=cachePath,
+            electrumx=electrumx,
             reserve=reserve,
             watchAssets=watchAssets,
             skipSave=skipSave,

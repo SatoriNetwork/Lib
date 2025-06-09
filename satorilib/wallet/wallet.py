@@ -17,6 +17,7 @@ from satorilib.wallet.utils.transaction import TxUtils
 from satorilib.wallet.utils.validate import Validate
 from satorilib.wallet.concepts.balance import Balance
 from satorilib.wallet.concepts.transaction import TransactionResult, TransactionFailure, TransactionStruct
+from satorilib.wallet.identity import Identity, IdentityBase
 
 
 class TxCreationValidation(Enum):
@@ -197,7 +198,8 @@ class Wallet(WalletBase):
             f'\n  currency: {self.currency},'
             f'\n  balance: {self.balance},'
             f'\n  stats: {self.stats},'
-            f'\n  banner: {self.banner})')+
+            f'\n  banner: {self.banner})'
+        )
 
     ### Ethereum ################################################################
 

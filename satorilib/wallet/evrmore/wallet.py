@@ -62,7 +62,7 @@ class EvrmoreWallet(Wallet):
     def __init__(
         self,
         identity: EvrmoreIdentity,
-        electrumx: Electrumx = None,
+        electrumx: Union[Electrumx, None] = None,
         cachePath: Union[str, None] = None,
         reserve: float = 0,
         watchAssets: list[str] = None,
@@ -79,8 +79,7 @@ class EvrmoreWallet(Wallet):
             watchAssets=watchAssets,
             skipSave=skipSave,
             pullFullTransactions=pullFullTransactions,
-            balanceUpdatedCallback=balanceUpdatedCallback,
-            **kwargs)
+            balanceUpdatedCallback=balanceUpdatedCallback)
         self.scripts = P2SHRedeemScripts()
 
     def maybeConnect(self, electrumx = None):

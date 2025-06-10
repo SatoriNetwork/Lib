@@ -129,6 +129,7 @@ class Wallet(WalletBase):
         self,
         walletPath: Union[str,None] = None,
         password: Union[str,None] = None,
+        electrumx: Union[Electrumx, None] = None,
         cachePath: Union[str,None] = None,
         identity: Union[Identity, None] = None,
         reserve: float = 0.25,
@@ -157,8 +158,8 @@ class Wallet(WalletBase):
         self.maxBridgeAmount: float = 500
         #self.burnAddress: str = 'EL1BS6HmwY1KoeqBokKjUMcWbWsn5kamGv' # testing
         self.password = password
-        self.walletPath = walletPath
-        self.cachePath = cachePath or walletPath.replace('.yaml', '.cache.joblib')
+        self.walletPath = identity.walletPath or walletPath
+        self.cachePath = cachePath or self.walletPath.replace('.yaml', '.cache.joblib')
         # maintain minimum amount of currency at all times to cover fees - server only
         self.reserveAmount = reserve
         self.reserve = TxUtils.asSats(reserve)
@@ -174,7 +175,7 @@ class Wallet(WalletBase):
         self.cache = {}
         self.transactions: list[TransactionStruct] = []
         self.assetTransactions = []
-        self.electrumx: Electrumx = None # type: ignore
+        self.electrumx: Electrumx = electrumx # type: ignore
         self.unspentCurrency = None
         self.unspentAssets = None
         self.status = None

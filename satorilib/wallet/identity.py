@@ -439,7 +439,6 @@ class IdentityBase():
         plaintext = f.decrypt(ciphertext)
         return plaintext
 
-
     @staticmethod
     def encrypt(
         shared: bytes,
@@ -708,7 +707,7 @@ class Identity(IdentityBase):
             'pubkey': self.pubkey,
             'address': self.address,
             **({'challenge': self.challenge(challengeId) if challengeId else {}}),
-            **({'signature': self.sign(challenged)} if challenged else {}),
+            **({'signature': self.sign(challenged)} if challenged else {}), # TODO: "and not signature"? to avoid calling self.sign() if already provided
             **({'signature': signature} if signature else {})}
 
     def hash160ToAddress(self, pubKeyHash: Union[str, bytes]) -> str:

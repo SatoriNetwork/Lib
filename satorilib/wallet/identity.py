@@ -199,8 +199,8 @@ class IdentityBase():
                 _entropy == self._entropy and
                 _entropyStr == self._entropyStr and
                 words == self.words and
-                privateKey == self.privateKey and
-                publicKey == self.publicKey and
+                privateKey == self.privkey and
+                publicKey == self.pubkey and
                 address == self.address and
                 scripthash == self.scripthash)
         

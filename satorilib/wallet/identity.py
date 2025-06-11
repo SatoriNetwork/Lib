@@ -46,6 +46,7 @@ from satorilib import config
 from satorilib.disk.utils import safetify
 from satorilib.wallet.utils.transaction import TxUtils
 from satorilib.wallet.concepts import authenticate
+import json
 
 
 class IdentityBase():
@@ -127,7 +128,7 @@ class IdentityBase():
             self._entropyStr = self._entropy
             self._entropy = base64.b64decode(self._entropy)
         
-        if self._entropy is not None:
+        if self._entropy is not None and len(self._entropyStr) == 44:
             # Generate everything from entropy
             self.generateObjects()
             # Store provided values for validation
@@ -135,7 +136,7 @@ class IdentityBase():
             stored_public_key = yaml.get('publicKey', '')
             stored_address = yaml.get(self.symbol, {}).get('address')
             stored_scripthash = yaml.get('scripthash', '')
-            
+
             # Validate if stored values match derived values
             if stored_private_key and stored_private_key != self.privkey:
                 logging.warning('Stored private key does not match entropy-derived key')
@@ -148,8 +149,8 @@ class IdentityBase():
             return
 
         # Case 2: Private key is present but no entropy
-        self.privateKey = yaml.get('privateKey', '')
-        if self.privateKey:
+        if len(yaml.get('privateKey', '')) == 52:
+            self.privateKey = yaml.get('privateKey', '')
             self._privateKeyObj = self._generatePrivateKey()
             if self._privateKeyObj:
                 self._addressObj = self._generateAddress()
@@ -581,7 +582,8 @@ class Identity(IdentityBase):
 
     @property
     def isEncrypted(self) -> bool:
-        return ' ' not in (self.words or '')
+        # return ' ' not in (self.words or '')
+        return len(self.privkey) != 52
 
     @property
     def isDecrypted(self) -> bool:

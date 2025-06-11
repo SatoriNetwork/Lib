@@ -143,7 +143,7 @@ class EvrmoreWallet(Wallet):
     # signature ###############################################################
 
     def sign(self, message: str):
-        return signMessage(self._privateKeyObj, message)
+        return signMessage(self.identity._privateKeyObj, message)
 
     def verify(self, message: str, sig: bytes, address: Union[str, None] = None):
         return verify(

@@ -97,6 +97,9 @@ class WalletBase:
         """Forward close operation to identity"""
         self.identity.close()
 
+    def open(self, password: Union[str, None] = None) -> None:
+        self.identity.open(password)
+
     def loadFromYaml(self, yaml: Union[dict, None] = None) -> None:
         """Forward YAML loading to identity"""
         self.identity.loadFromYaml(yaml)
@@ -107,6 +110,9 @@ class WalletBase:
 
     def setAlias(self, alias: Union[str, None] = None) -> None:
         self.identity.setAlias(alias)
+
+    def authPayload(self, asDict: bool = False, challenge: str = None) -> Union[str, dict]:
+        return self.identity.authPayload(asDict=asDict, challenge=challenge)
 
 
 class Wallet(WalletBase):
@@ -204,7 +210,7 @@ class Wallet(WalletBase):
         if self.isDecrypted:
             try:
                 from satorilib.wallet.ethereum.wallet import EthereumWallet
-                return EthereumWallet.generateAccount(self._entropy)
+                return EthereumWallet.generateAccount(self.identity._entropy)
             except Exception as e:
                 logging.error('error with eth account:', e)
         return None

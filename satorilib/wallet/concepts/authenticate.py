@@ -10,7 +10,7 @@ def authPayload(wallet, challenge: str = None):
     challenge = challenge or getFullDateMessage()
     return {
         'message': challenge,
-        'pubkey': wallet.publicKey,
+        'pubkey': wallet.pubkey,
         'address': wallet.address,
         'signature': wallet.sign(challenge).decode()}
 

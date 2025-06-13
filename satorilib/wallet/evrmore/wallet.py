@@ -180,7 +180,7 @@ class EvrmoreWallet(Wallet):
         return CEvrmoreSecret.from_secret_bytes(self._entropy, compressed=compressed)
 
     def _generateAddress(self, pub=None):
-        return P2PKHEvrmoreAddress.from_pubkey(pub or self._privateKeyObj.pub)
+        return P2PKHEvrmoreAddress.from_pubkey(pub or self.identity._privateKeyObj.pub)
 
     def _generateScriptPubKeyFromAddress(self, address: str):
         return CEvrmoreAddress(address).to_scriptPubKey()
@@ -353,7 +353,7 @@ class EvrmoreWallet(Wallet):
             # allow for overrirde, should probably allow for override as address str:
             #if str(CEvrmoreAddress(self.address)).to_scriptPubKey() != scriptPubKey:
             #    raise TransactionFailure('tx: scriptPubKey mismatch')
-            if CEvrmoreAddress(self.address).to_scriptPubKey() != self._addressObj.to_scriptPubKey():
+            if CEvrmoreAddress(self.address).to_scriptPubKey() != self.identity._addressObj.to_scriptPubKey():
                 raise TransactionFailure('tx: scriptPubKey mismatch')
             txout = CMutableTxOut(
                 currencyChange,
@@ -459,7 +459,7 @@ class EvrmoreWallet(Wallet):
         if redeem_script:
             # This is a P2SH input
             sighash = SignatureHash(redeem_script, tx, i, sighashFlag)
-            sig = self._privateKeyObj.sign(sighash) + bytes([sighashFlag])
+            sig = self.identity._privateKeyObj.sign(sighash) + bytes([sighashFlag])
             
             if signatures:
                 # Multi-sig case
@@ -475,8 +475,8 @@ class EvrmoreWallet(Wallet):
         else:
             # Regular P2PKH input
             sighash = SignatureHash(txinScriptPubKey, tx, i, sighashFlag)
-            sig = self._privateKeyObj.sign(sighash) + bytes([sighashFlag])
-            txin.scriptSig = CScript([sig, self._privateKeyObj.pub])
+            sig = self.identity._privateKeyObj.sign(sighash) + bytes([sighashFlag])
+            txin.scriptSig = CScript([sig, self.identity._privateKeyObj.pub])
 
         try:
             # For P2SH, we need to verify against the redeem script

@@ -4,6 +4,7 @@ from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret
 from satorilib.wallet.identity import Identity
 from satorilib.wallet.evrmore.sign import signMessage
 from satorilib.wallet.evrmore.verify import verify
+
 class EvrmoreIdentity(Identity):
 
     def __init__(self, walletPath: str, password: Union[str, None] = None):

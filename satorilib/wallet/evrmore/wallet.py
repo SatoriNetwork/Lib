@@ -1,10 +1,12 @@
-from typing import Union, Callable
+from typing import Union, Callable, Dict
+import datetime as dt
 from evrmore import SelectParams
 from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret, P2SHEvrmoreAddress
 from evrmore.core.scripteval import VerifyScript, SCRIPT_VERIFY_P2SH
 from evrmore.core.script import (
     CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, 
-    OP_EVR_ASSET, OP_DROP, OP_RETURN, SIGHASH_ANYONECANPAY)
+    OP_EVR_ASSET, OP_DROP, OP_RETURN, SIGHASH_ANYONECANPAY, OP_IF, OP_ELSE, OP_ENDIF, 
+    OP_CHECKMULTISIG, OP_CHECKLOCKTIMEVERIFY, OP_CHECKSEQUENCEVERIFY)
 from evrmore.core import b2x, lx, COutPoint, CMutableTxOut, CMutableTxIn, CMutableTransaction, Hash160
 from evrmore.core.scripteval import EvalScriptError
 from satorilib import logging
@@ -16,8 +18,8 @@ from satorilib.wallet.evrmore.sign import signMessage
 from satorilib.wallet.evrmore.verify import verify
 from satorilib.wallet.evrmore.valid import isValidEvrmoreAddress
 from satorilib.wallet.evrmore.scripts import P2SHRedeemScripts
-
-
+from satorilib.wallet.identity import Identity
+from satorilib.wallet.evrmore.identity import EvrmoreIdentity
 
 class EvrmoreWallet(Wallet):
 
@@ -27,29 +29,28 @@ class EvrmoreWallet(Wallet):
 
     @staticmethod
     def create(
-        walletPath: str = '/Satori/Neuron/wallet/wallet.yaml',
+        walletPath: Union[str,None] = None,
+        cachePath: Union[str,None] = None,
+        password: Union[str,None] = None,
+        identity: Union[Identity, None] = None,
         reserve: float = 0,
-        isTestnet: bool = False,
-        password: Union[str, None] = None,
-        electrumx: Electrumx = None,
-        useElectrumx: bool = True,
-        kind: str = 'wallet',
         watchAssets: list[str] = None,
         skipSave: bool = False,
         pullFullTransactions: bool = True,
+        balanceUpdatedCallback: Union[Callable, None] = None,
+        electrumx: Electrumx = None,
         hostPort: str = None,
         persistent: bool = False,
-        balanceUpdatedCallback: Union[Callable, None] = None,
         cachedPeersFile: Union[str, None] = None,
     ) -> 'EvrmoreWallet':
         return EvrmoreWallet(
-            walletPath=walletPath,
+            identity=identity or EvrmoreIdentity(walletPath=walletPath, password=password),
+            electrumx=electrumx or Electrumx.create(
+                hostPort=hostPort, 
+                persistent=persistent,
+                cachedPeersFile=cachedPeersFile),
+            cachePath=cachePath,
             reserve=reserve,
-            isTestnet=isTestnet,
-            password=password,
-            electrumx=electrumx,
-            useElectrumx=useElectrumx,
-            kind=kind,
             watchAssets=watchAssets,
             skipSave=skipSave,
             pullFullTransactions=pullFullTransactions,
@@ -60,59 +61,42 @@ class EvrmoreWallet(Wallet):
 
     def __init__(
         self,
-        walletPath: str,
-        reserve: float = .25,
-        isTestnet: bool = False,
-        password: Union[str, None] = None,
-        electrumx: Electrumx = None,
-        useElectrumx: bool = True,
-        kind: str = 'wallet',
+        identity: EvrmoreIdentity,
+        electrumx: Union[Electrumx, None] = None,
+        cachePath: Union[str, None] = None,
+        reserve: float = 0,
         watchAssets: list[str] = None,
         skipSave: bool = False,
         pullFullTransactions: bool = True,
-        hostPort: str = None,
-        persistent: bool = False,
         balanceUpdatedCallback: Union[Callable, None] = None,
-        cachedPeersFile: Union[Callable, None] = None,
         **kwargs
     ):
         super().__init__(
-            walletPath,
+            identity=identity,
+            cachePath=cachePath,
+            electrumx=electrumx,
             reserve=reserve,
-            isTestnet=isTestnet,
-            password=password,
             watchAssets=watchAssets,
             skipSave=skipSave,
             pullFullTransactions=pullFullTransactions,
-            useElectrumx=useElectrumx,
-            balanceUpdatedCallback=balanceUpdatedCallback,
-            **kwargs)
-        self.kind = kind
-        self.persistent = persistent
-        self.cachedPeersFile = cachedPeersFile
-        self.hostPort = hostPort
-        self.maybeConnect(electrumx)
+            balanceUpdatedCallback=balanceUpdatedCallback)
         self.scripts = P2SHRedeemScripts()
 
     def maybeConnect(self, electrumx = None):
-        if self.useElectrumx:
-            if self.electrumx is None:
-                self.electrumx = (
-                    electrumx or
-                    Electrumx.create(
-                        hostPort=self.hostPort, 
-                        persistent= self.persistent,
-                        cachedPeersFile=self.cachedPeersFile))
-                return self.electrumx is not None
-            elif self.electrumx.isConnected:
+        if self.electrumx is None:
+            self.electrumx = Electrumx.create(
+                    hostPort=self.hostPort, 
+                    persistent= self.persistent,
+                    cachedPeersFile=self.cachedPeersFile)
+            return self.electrumx is not None
+        elif self.electrumx.isConnected:
+            return True
+        else:
+            if self.electrumx.reconnect():
                 return True
             else:
-                if self.electrumx.reconnect():
-                    return True
-                else:
-                    self.electrumx = None
-                    return self.maybeConnect(electrumx)
-        return False
+                self.electrumx = None
+                return self.maybeConnect(electrumx)
 
     @property
     def symbol(self) -> str:
@@ -159,7 +143,7 @@ class EvrmoreWallet(Wallet):
     # signature ###############################################################
 
     def sign(self, message: str):
-        return signMessage(self._privateKeyObj, message)
+        return signMessage(self.identity._privateKeyObj, message)
 
     def verify(self, message: str, sig: bytes, address: Union[str, None] = None):
         return verify(
@@ -182,6 +166,8 @@ class EvrmoreWallet(Wallet):
 
     def _generatePrivateKey(self, compressed: bool = True, privkey: Union[str, bytes, None] = None):
         SelectParams('mainnet')
+        if not self._entropy:
+            privkey = privkey or self.privateKey
         if privkey:
             if isinstance(privkey, str):
                 #return CEvrmoreSecret.from_secret_bytes(bytes.fromhex(privkey), compressed=compressed) # bytes below
@@ -194,7 +180,7 @@ class EvrmoreWallet(Wallet):
         return CEvrmoreSecret.from_secret_bytes(self._entropy, compressed=compressed)
 
     def _generateAddress(self, pub=None):
-        return P2PKHEvrmoreAddress.from_pubkey(pub or self._privateKeyObj.pub)
+        return P2PKHEvrmoreAddress.from_pubkey(pub or self.identity._privateKeyObj.pub)
 
     def _generateScriptPubKeyFromAddress(self, address: str):
         return CEvrmoreAddress(address).to_scriptPubKey()
@@ -367,7 +353,7 @@ class EvrmoreWallet(Wallet):
             # allow for overrirde, should probably allow for override as address str:
             #if str(CEvrmoreAddress(self.address)).to_scriptPubKey() != scriptPubKey:
             #    raise TransactionFailure('tx: scriptPubKey mismatch')
-            if CEvrmoreAddress(self.address).to_scriptPubKey() != self._addressObj.to_scriptPubKey():
+            if CEvrmoreAddress(self.address).to_scriptPubKey() != self.identity._addressObj.to_scriptPubKey():
                 raise TransactionFailure('tx: scriptPubKey mismatch')
             txout = CMutableTxOut(
                 currencyChange,
@@ -406,7 +392,6 @@ class EvrmoreWallet(Wallet):
             utxo_key = f"{b2x(txin.prevout.hash)}:{txin.prevout.n}"
             redeem_script = redeem_scripts.get(utxo_key) if redeem_scripts else None
             other_sigs = signatures.get(utxo_key) if signatures else None
-            
             self._signInput(
                 tx=tx,
                 i=i,
@@ -474,7 +459,7 @@ class EvrmoreWallet(Wallet):
         if redeem_script:
             # This is a P2SH input
             sighash = SignatureHash(redeem_script, tx, i, sighashFlag)
-            sig = self._privateKeyObj.sign(sighash) + bytes([sighashFlag])
+            sig = self.identity._privateKeyObj.sign(sighash) + bytes([sighashFlag])
             
             if signatures:
                 # Multi-sig case
@@ -490,8 +475,8 @@ class EvrmoreWallet(Wallet):
         else:
             # Regular P2PKH input
             sighash = SignatureHash(txinScriptPubKey, tx, i, sighashFlag)
-            sig = self._privateKeyObj.sign(sighash) + bytes([sighashFlag])
-            txin.scriptSig = CScript([sig, self._privateKeyObj.pub])
+            sig = self.identity._privateKeyObj.sign(sighash) + bytes([sighashFlag])
+            txin.scriptSig = CScript([sig, self.identity._privateKeyObj.pub])
 
         try:
             # For P2SH, we need to verify against the redeem script
@@ -538,8 +523,6 @@ class EvrmoreWallet(Wallet):
 
     def _deserialize(self, serialTx: bytes) -> CMutableTransaction:
         return CMutableTransaction.deserialize(serialTx)
-
-
 
     def createP2SHTransaction(
         self,

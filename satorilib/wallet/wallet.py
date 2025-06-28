@@ -1877,7 +1877,11 @@ class Wallet(WalletBase):
         if ready:
             return sendDirect()
         elif partialReady:
-            return sendIndirect()
+            #return sendIndirect()
+            return TransactionResult(
+                result=None,
+                success=False,
+                msg=f'No EVR in wallet, EVR is required as a transaction fee to send SATORI.')
         return TransactionResult(
             result=None,
             success=False,

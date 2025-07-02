@@ -372,6 +372,7 @@ class SatoriServerClient(object):
             """Clean and sanitize stream data"""
             return sanitizeJson(streams)
 
+        print("getSearchStreamsPaginated")
         try:
             page = max(1, page)
             per_page = min(max(1, per_page), 200)
@@ -390,7 +391,7 @@ class SatoriServerClient(object):
             response = self._makeUnauthenticatedCall(
                 function=requests.post,
                 endpoint='/streams/search/paginated',
-                payload=json.dumps(payload),  # This should just be json.dumps(payload)
+                payload=json.dumps(payload),
             )
             response_data = response.json()
             

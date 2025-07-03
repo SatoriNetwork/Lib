@@ -420,6 +420,50 @@ class SatoriServerClient(object):
             logging.error(f"Error in getSearchStreamsPaginated: {str(e)}")
             return [], 0
 
+    def marketStreamsSetPrice(self, streamUuid: str = None, pricePerObs: float = None) -> bool:
+        """
+        Set the price per observation for a stream.
+        
+        Args:
+            streamUuid: A StreamUuid we wish to set the price for
+            pricePerObs: The price per observation we wish to set
+            
+        Returns:
+            bool: True if the price per observation request was successful, False otherwise
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/market/streams/set/price',
+                payload=json.dumps({
+                    'streamUuid': streamUuid,
+                    'pricePerObs': pricePerObs}))
+            return response.status_code == 200
+        except Exception as e:
+            logging.error(f"Error setting price per observation: {str(e)}")
+            return False
+
+    def marketBuyStream(self, streamUuid: str = None) -> bool:
+        """
+        Buy a stream by sending a request to the server.
+        
+        Args:
+            streamUuid: A StreamUuid we wish to buy
+            
+        Returns:
+            bool: True if the buy request was successful, False otherwise
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.post,
+                endpoint='/market/streams/buy',
+                payload=json.dumps({'streamUuid': streamUuid}))
+            return response.status_code == 200
+        except Exception as e:
+            logging.error(f"Error predicting stream: {str(e)}")
+            return False
+        
+
     def incrementVote(self, streamId: str):
         return self._makeAuthenticatedCall(
             function=requests.post,
@@ -446,7 +490,7 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/request/stream/specific',
-                payload={'streamId': streamId})
+                payload=json.dumps({'streamId': streamId}))
             return response.status_code == 200
         except Exception as e:
             logging.error(f"Error predicting stream: {str(e)}")
@@ -464,7 +508,7 @@ class SatoriServerClient(object):
             response = self._makeAuthenticatedCall(
                 function=requests.post,
                 endpoint='/flag/stream',
-                payload={'streamId': streamId})
+                payload=json.dumps({'streamId': streamId}))
             return response.status_code == 200
         except Exception as e:
             logging.error(f"Error flagging stream: {str(e)}")

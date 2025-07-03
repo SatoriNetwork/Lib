@@ -332,6 +332,7 @@ class Stream:
         pinned: int = None,
         reason: StreamId = None,
         reason_is_primary: bool = None,
+        price_per_obs: float = None,
         **kwargs,
     ):
         self.streamId = streamId
@@ -351,6 +352,7 @@ class Stream:
         self.pinned = pinned
         self.reason = reason
         self.reason_is_primary = reason_is_primary
+        self.price_per_obs = price_per_obs
         self.kwargs = kwargs
 
     def __str__(self):

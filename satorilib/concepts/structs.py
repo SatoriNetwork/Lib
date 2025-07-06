@@ -80,7 +80,13 @@ class StreamId:
 
     @property
     def uuid(self) -> str:
-        return str(StreamId.generateUUID(self))
+        try:
+            return str(StreamId.generateUUID(self))
+        except Exception as e:
+            # Debug logging for UUID generation issues
+            import logging
+            logging.error(f"Error generating UUID for StreamId: {self.mapId}, error: {e}")
+            return ""
 
     @property
     def id(self)-> tuple[str, str, str, Union[str, None]]:
@@ -429,7 +435,6 @@ class StreamOverview:
         accuracy: float = "-",
         prediction: float = "-",
         price_per_obs: float = 0.0,
-        streamIdPredictor: StreamId = None,
     ):
         self.streamId = streamId
         self.subscribers = subscribers
@@ -441,7 +446,6 @@ class StreamOverview:
         self.errs = errs or []
         self.predictions = predictions or []
         self.price_per_obs = price_per_obs
-        self.streamIdPredictor = streamIdPredictor
         # self.dataset = dataset
 
     def load(self, streamOverview: "StreamOverview"):
@@ -455,7 +459,6 @@ class StreamOverview:
         self.errs = streamOverview.errs
         self.predictions = streamOverview.predictions
         self.price_per_obs = streamOverview.price_per_obs
-        self.streamIdPredictor = streamOverview.streamIdPredictor
         # self.dataset = streamOverview.dataset
 
     def __str__(self):
@@ -465,11 +468,10 @@ class StreamOverview:
                 **{
                     k: v
                     for k, v in vars(self).items()
-                    if k != "streamId" and k != "pinned" and k != "streamIdPredictor"
+                    if k != "streamId" and k != "pinned"
                 },
                 **{
                     "uuid": self.streamId.uuid,  # Oracle stream UUID
-                    "uuidPredictor": self.streamIdPredictor.uuid if self.streamIdPredictor else None,  # Prediction stream UUID
                     "pinned": 1 if self.pinned else 0,
                     "hashed": self.hashed,
                     "source": self.streamId.source,
@@ -544,12 +546,7 @@ class StreamOverviews:
                 values=[1, 2, 3],
                 predictions=[1, 2, 3],
                 price_per_obs=0.0,
-                streamIdPredictor=StreamId(
-                    source="Streamr",
-                    author="DATAUSD",
-                    stream="DATAUSD/binance/ticker_p",
-                    target="Close",
-                ),
+
             )
         ]
 
@@ -569,7 +566,6 @@ class StreamOverviews:
                 values=[1, 1, 1],
                 predictions=[1, 1, 1],
                 price_per_obs=0.0,
-                streamIdPredictor=None,
             )
         ]
 

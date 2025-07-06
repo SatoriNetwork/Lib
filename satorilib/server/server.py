@@ -427,7 +427,6 @@ class SatoriServerClient(object):
             """Clean and sanitize stream data"""
             return sanitizeJson(streams)
 
-        print("getSearchPredictionStreamsPaginated")
         try:
             page = max(1, page)
             per_page = min(max(1, per_page), 200)

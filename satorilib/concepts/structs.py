@@ -428,6 +428,8 @@ class StreamOverview:
         subscribers: int = "-",
         accuracy: float = "-",
         prediction: float = "-",
+        price_per_obs: float = 0.0,
+        streamIdPredictor: StreamId = None,
     ):
         self.streamId = streamId
         self.subscribers = subscribers
@@ -438,6 +440,8 @@ class StreamOverview:
         self.values = values or []
         self.errs = errs or []
         self.predictions = predictions or []
+        self.price_per_obs = price_per_obs
+        self.streamIdPredictor = streamIdPredictor
         # self.dataset = dataset
 
     def load(self, streamOverview: "StreamOverview"):
@@ -450,6 +454,8 @@ class StreamOverview:
         self.values = streamOverview.values
         self.errs = streamOverview.errs
         self.predictions = streamOverview.predictions
+        self.price_per_obs = streamOverview.price_per_obs
+        self.streamIdPredictor = streamOverview.streamIdPredictor
         # self.dataset = streamOverview.dataset
 
     def __str__(self):
@@ -459,16 +465,18 @@ class StreamOverview:
                 **{
                     k: v
                     for k, v in vars(self).items()
-                    if k != "streamId" and k != "pinned"
+                    if k != "streamId" and k != "pinned" and k != "streamIdPredictor"
                 },
                 **{
-                    "uuid": self.streamId.uuid,
+                    "uuid": self.streamId.uuid,  # Oracle stream UUID
+                    "uuidPredictor": self.streamIdPredictor.uuid if self.streamIdPredictor else None,  # Prediction stream UUID
                     "pinned": 1 if self.pinned else 0,
                     "hashed": self.hashed,
                     "source": self.streamId.source,
                     "author": self.streamId.author,
                     "stream": self.streamId.stream,
                     "target": self.streamId.target,
+                    "price_per_obs": self.price_per_obs,
                 },
             }
         )
@@ -535,6 +543,13 @@ class StreamOverviews:
                 # dataset=None,
                 values=[1, 2, 3],
                 predictions=[1, 2, 3],
+                price_per_obs=0.0,
+                streamIdPredictor=StreamId(
+                    source="Streamr",
+                    author="DATAUSD",
+                    stream="DATAUSD/binance/ticker_p",
+                    target="Close",
+                ),
             )
         ]
 
@@ -553,6 +568,8 @@ class StreamOverviews:
                 # dataset=None,
                 values=[1, 1, 1],
                 predictions=[1, 1, 1],
+                price_per_obs=0.0,
+                streamIdPredictor=None,
             )
         ]
 

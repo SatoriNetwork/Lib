@@ -443,6 +443,8 @@ class SatoriServerClient(object):
             logging.error(f"Error setting price per observation: {str(e)}")
             return False
 
+
+
     def marketBuyStream(self, streamUuid: str = None) -> bool:
         """
         Buy a stream by sending a request to the server.

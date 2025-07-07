@@ -497,7 +497,27 @@ class SatoriServerClient(object):
             logging.error(f"Error setting price per observation: {str(e)}")
             return False
 
-
+    def getCentrifugoToken(self) -> dict:
+        """
+        Get the centrifugo token for the user.
+        
+        Returns: {
+            "token": token,
+            "ws_url": CENTRIFUGO_WS_URL,
+            "expires_at": expires_at.isoformat() + "Z",
+            "user_id": user_id}
+        """
+        try:
+            response = self._makeAuthenticatedCall(
+                function=requests.get,
+                endpoint='/centrifugo/token')
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return {}
+        except Exception as e:
+            logging.error(f"Error setting price per observation: {str(e)}")
+            return False
 
     def marketBuyStream(self, streamUuid: str = None) -> bool:
         """

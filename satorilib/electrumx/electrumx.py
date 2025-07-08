@@ -224,6 +224,7 @@ class Electrumx(ElectrumxConnection):
         self.listenerStop = threading.Event()
         self.pingerStop = threading.Event()
         self.ensureConnectedLock = threading.Lock()
+        #if self.connected():
         self.startListener()
         self.persistent: bool = persistent
         self.cachedPeers: str = cachedPeers
@@ -422,8 +423,9 @@ class Electrumx(ElectrumxConnection):
                     continue
             except OSError as e:
                 # Typically errno = 9 here means 'Bad file descriptor'
-                logging.debug("Socket closed. Marking self.isConnected = False.")
-                self.isConnected = False
+                if self.isConnected == True:
+                    logging.debug(f"Socket closed. Marking self.isConnected = False. error: {e}")
+                    self.isConnected = False
             except Exception as e:
                 logging.debug(f"Socket error during receive: {str(e)}")
                 self.isConnected = False
@@ -481,7 +483,7 @@ class Electrumx(ElectrumxConnection):
         #    time.sleep(1)
         if self.persistent:
             self.pingerStop.set()
-        print('reconnecting')
+        logging.debug('reconnecting')
         with self.lock:
             if super().reconnect():
                 #self.startListener() # no need to restart listener, because we don't kill it when disconnetced now
@@ -497,7 +499,7 @@ class Electrumx(ElectrumxConnection):
 
     def connected(self) -> bool:
         if not super().connected():
-            print('not connected by super')
+            logging.debug('not connected by super')
             self.isConnected = False
             return False
         try:
@@ -508,14 +510,14 @@ class Electrumx(ElectrumxConnection):
             #traceback.print_stack()
             self.connection.settimeout(self.timeout)
             if response is None:
-                print('not connected by ping')
+                logging.debug('not connected by ping')
                 self.isConnected = False
                 return False
-            print('connected')
+            logging.debug('connected')
             self.isConnected = True
             return True
         except Exception as e:
-            print('err', e)
+            logging.debug(f'error in wallet.connected: {e}')
             if not self.persistent:
                 logging.error(f'checking connected - {e}')
             self.isConnected = False

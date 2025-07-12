@@ -151,3 +151,16 @@ async def subscribe_to_stream(client: Client, stream_id: str,
     subscription = client.new_subscription(channel, events=events)
     await subscription.subscribe()
     return subscription
+
+
+def publish_to_stream_rest(stream_uuid: str, data: dict, token: str):
+    import requests
+    response = requests.post(
+        'https://gatekeeper.satorinet.io/api/publish',
+        headers={'Authorization': f'Bearer {token}'},
+        json={
+            'channel': f'streams:{stream_uuid}',
+            'data': data
+        }
+    )
+    return response

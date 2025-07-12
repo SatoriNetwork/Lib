@@ -538,7 +538,6 @@ class SatoriServerClient(object):
         except Exception as e:
             logging.error(f"Error predicting stream: {str(e)}")
             return False
-        
 
     def incrementVote(self, streamId: str):
         return self._makeAuthenticatedCall(

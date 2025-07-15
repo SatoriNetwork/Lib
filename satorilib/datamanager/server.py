@@ -1,4 +1,5 @@
 import websockets
+from websockets.protocol import State
 import pandas as pd
 from typing import Any, Union
 from io import StringIO
@@ -92,7 +93,7 @@ class DataServer:
             for uuid in peer.publications:
                 disconnectMsg = Message(DataClientApi.streamInactive.createResponse(uuid))
                 await self.updateSubscribers(disconnectMsg)
-            if not peer.websocket.closed:
+            if peer.websocket and peer.websocket.state is not State.CLOSED:
                 await peer.websocket.close()
             del self.connectedClients[peerAddr]
             debug(f"Cleaned up connection for peer: {peerAddr}", print=True)

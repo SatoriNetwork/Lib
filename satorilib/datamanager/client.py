@@ -1,5 +1,6 @@
 import asyncio
 import websockets
+from websockets.protocol import State
 import json
 import time
 import queue
@@ -39,7 +40,7 @@ class DataClient:
         peer = self.peers.get((host, port))
         if peer is None:
             return False
-        if peer.websocket is None or peer.websocket.closed:
+        if peer.websocket is None or peer.websocket.state is State.CLOSED:
             return False
         if peer.listener is None or peer.listener.done():
             return False

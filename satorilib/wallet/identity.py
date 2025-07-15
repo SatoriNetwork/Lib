@@ -562,7 +562,7 @@ class Identity(IdentityBase):
         return (
             f'{self.chain}Wallet('
             f'\n  encrypted: {self.isEncrypted},'
-            f'\n  publicKey: {self.publicKey},'
+            f'\n  publicKey: {self.publicKey or self.pubkey},'
             #f'\n  privateKey: {self.privateKey},'
             #f'\n  words: {self.words},'
             f'\n  address: {self.address},'
@@ -627,10 +627,10 @@ class Identity(IdentityBase):
                     content={
                         'entropy': self._entropyStr,
                         'words': self.words,
-                        'privateKey': self.privateKey,
+                        'privateKey': self.privateKey or self.privkey,
                     }),
                 **{
-                    'publicKey': self.publicKey,
+                    'publicKey': self.publicKey or self.pubkey,
                     'scripthash': self.scripthash,
                     self.symbol: {
                         'address': self.address,

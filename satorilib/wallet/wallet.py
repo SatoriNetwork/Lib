@@ -114,6 +114,11 @@ class WalletBase:
     def authPayload(self, asDict: bool = False, challenge: str = None) -> Union[str, dict]:
         return self.identity.authPayload(asDict=asDict, challenge=challenge)
 
+    def saveAsVault(self, password: str, vaultPath: str = None) -> None:
+        vaultPath = vaultPath or self.walletPath.replace('wallet-', 'vault-')
+        self.identity.password = password
+        self.identity.save(path=vaultPath)
+
 
 class Wallet(WalletBase):
 

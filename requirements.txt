@@ -34,7 +34,8 @@ base58==2.1.1
 
 ## needed for Satori pubsub connection
 websocket-client==1.4.2 # not sure if we need this
-websockets==10.4 # import websocket; websocket.WebSocket()
+#websockets==10.4 # import websocket; websocket.WebSocket()
+websockets==15.0.1 # import websocket; websocket.WebSocket()
 
 # needed for encryption for wallet vault
 pycryptodome==3.20.0

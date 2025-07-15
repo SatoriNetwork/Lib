@@ -48,26 +48,26 @@ class CentrifugoClientEvents(ClientEventHandler):
 class CentrifugoSubscriptionEventHandler(SubscriptionEventHandler):
     def __init__(self, 
                  on_publication_callback: Optional[Callable[[PublicationContext], Any]] = None,
-                 stream_id: Optional[str] = None,
+                 stream_uuid: Optional[str] = None,
                  value_callback: Optional[Callable[[Any, dict], Any]] = None):
         """
         Initialize with optional callback functions for publication events.
         
         Args:
             on_publication_callback: Function to call when publication received (takes PublicationContext)
-            stream_id: Optional identifier for the stream (for logging purposes)
+            stream_uuid: Optional identifier for the stream (for logging purposes)
             value_callback: Function to call with extracted value and data (takes value, data)
         """
         self.on_publication_callback = on_publication_callback
-        self.stream_id = stream_id
+        self.stream_uuid = stream_uuid
         self.value_callback = value_callback
     
     async def on_publication(self, ctx: PublicationContext):
         data = ctx.pub.data
         
         # Log with stream ID if provided
-        if self.stream_id:
-            logger.info(f"Stream {self.stream_id} received: {data}")
+        if self.stream_uuid:
+            logger.info(f"Stream {self.stream_uuid} received: {data}")
         else:
             logger.info(f"Centrifugo Publication: {data}")
         
@@ -119,35 +119,35 @@ async def create_centrifugo_client(ws_url: str, token: str,
 
 
 def create_subscription_handler(on_publication_callback: Optional[Callable[[PublicationContext], Any]] = None,
-                              stream_id: Optional[str] = None,
+                              stream_uuid: Optional[str] = None,
                               value_callback: Optional[Callable[[Any, dict], Any]] = None) -> CentrifugoSubscriptionEventHandler:
     """Create and return a configured subscription event handler
     
     Args:
         on_publication_callback: Optional callback function for publication events
-        stream_id: Optional identifier for the stream (for logging purposes)
+        stream_uuid: Optional identifier for the stream (for logging purposes)
         value_callback: Function to call with extracted value and data (takes value, data)
     """
     return CentrifugoSubscriptionEventHandler(
         on_publication_callback=on_publication_callback,
-        stream_id=stream_id,
+        stream_uuid=stream_uuid,
         value_callback=value_callback
     )
 
 
-async def subscribe_to_stream(client: Client, stream_id: str, 
+async def subscribe_to_stream(client: Client, stream_uuid: str, 
                             events: CentrifugoSubscriptionEventHandler) -> Any:
     """Subscribe to a stream using the client
     
     Args:
         client: The Centrifugo client
-        stream_id: The stream ID to subscribe to
+        stream_uuid: The stream ID to subscribe to
         events: The subscription event handler
         
     Returns:
         The subscription object
     """
-    channel = f"streams:{stream_id}"
+    channel = f"streams:{stream_uuid}"
     subscription = client.new_subscription(channel, events=events)
     await subscription.subscribe()
     return subscription

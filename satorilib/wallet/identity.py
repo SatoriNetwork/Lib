@@ -721,15 +721,21 @@ class Identity(IdentityBase):
             return payload
         return json.dumps(payload)
     
-    def generateOtpPayload(self, input: str = '') -> dict[str, str]:
+    def generateOtpPayload(self, msg: str = '') -> dict[str, str]:
         ''' generate a one-time password using the wallet '''
+        # because we send only a compressed json string, 
+        # we need to convert the signature to a hex string, 
+        # and the server needs to handle it.
+        signature = self.sign(msg)
+        if isinstance(signature, bytes):
+            signature = signature.hex()
         return {
             'pubkey': self.pubkey,
             'address': self.address,
-            'message': input,
-            'signature': self.sign(input)}
+            'message': msg,
+            'signature': signature}
         
-    def generateCompressedOtpPayload(self, input: str = '') -> dict[str, str]:
+    def generateCompressedOtpPayload(self, msg: str = '') -> dict[str, str]:
         ''' generate a one-time password using the wallet '''
         from satorilib.utils import compress
-        return compress(json.dumps(self.generateOtpPayload(input)))
+        return compress(json.dumps(self.generateOtpPayload(msg)))

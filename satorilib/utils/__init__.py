@@ -6,3 +6,4 @@ from .name import getRandomName, getRandomQuote
 from .nested import Nested
 from .json import sanitizeJson
 from .uuidgenerator import generateUUID
+from .compression import compress, decompress

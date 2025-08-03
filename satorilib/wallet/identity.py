@@ -720,3 +720,16 @@ class Identity(IdentityBase):
         if asDict:
             return payload
         return json.dumps(payload)
+    
+    def generateOtpPayload(self, input: str = '') -> dict[str, str]:
+        ''' generate a one-time password using the wallet '''
+        return {
+            'pubkey': self.pubkey,
+            'address': self.address,
+            'message': input,
+            'signature': self.sign(input)}
+        
+    def generateCompressedOtpPayload(self, input: str = '') -> dict[str, str]:
+        ''' generate a one-time password using the wallet '''
+        from satorilib.utils import compress
+        return compress(json.dumps(self.generateOtpPayload(input)))

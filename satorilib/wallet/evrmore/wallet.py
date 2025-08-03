@@ -153,10 +153,6 @@ class EvrmoreWallet(Wallet):
 
     def generateOtp(self, msg: str = '') -> str:
         ''' generate a one-time password using the wallet '''
-        print('msg', msg)
-        print(self.identity.pubkey)
-        print(self.identity.address)
-        print(self.identity.sign(msg))
         return self.identity.generateCompressedOtpPayload(msg)
     
     # generation ##############################################################

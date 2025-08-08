@@ -119,11 +119,19 @@ def create_timerelease_script():
     print(f"Bob must wait {LOCKTIME_BLOCKS} blocks (~{LOCKTIME_BLOCKS} minutes)")
     
     # Create the redeem script
+    #redeem_script = P2SHRedeemScripts.simpleTimeRelease(
+    #    immediate_key=alice_wallet.pubkey,  # Alice can unlock anytime
+    #    delayed_key=bob_wallet.pubkey,      # Bob can unlock after timeout
+    #    locktime=locktime_block,             # Absolute block height
+    #    use_blocks=True
+    #)
+      # Option 3: Using a specific future date
+    specific_date = dt.datetime(2024, 12, 31, 12, 0, 0)  # Dec 31, 2024 at noon
     redeem_script = P2SHRedeemScripts.simpleTimeRelease(
-        immediate_key=alice_wallet.pubkey,  # Alice can unlock anytime
-        delayed_key=bob_wallet.pubkey,      # Bob can unlock after timeout
-        locktime=locktime_block,             # Absolute block height
-        use_blocks=True
+        immediate_key=alice_wallet.pubkey,
+        delayed_key=bob_wallet.pubkey,
+        locktime=specific_date,
+        use_blocks=False
     )
     
     # Generate P2SH address from redeem script

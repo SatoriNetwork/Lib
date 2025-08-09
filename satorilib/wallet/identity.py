@@ -308,7 +308,13 @@ class IdentityBase():
 
     @staticmethod
     def generateEntropy() -> bytes:
-        return secrets.token_bytes(32)
+        # secp256k1 order
+        n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+        while True:
+            potential_entropy = secrets.token_bytes(32)
+            pk = int.from_bytes(potential_entropy, 'big')
+            if 1 <= pk < n:
+                return potential_entropy
 
     def _generateWords(self):
         return mnemonic.Mnemonic('english').to_mnemonic(self._entropy or b'')

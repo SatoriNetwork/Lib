@@ -1,4 +1,4 @@
-from typing import Union, Callable, Dict
+from typing import Union, Callable, Dict, Sequence, Optional
 import datetime as dt
 from evrmore import SelectParams
 from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret, P2SHEvrmoreAddress
@@ -388,22 +388,22 @@ class EvrmoreWallet(Wallet):
         txins: list,
         txinScripts: list,
         txouts: list,
-        redeem_scripts: dict[str, CScript] = None,
-        signatures: dict[str, list[bytes]] = None,  # Map of tx_hash:pos to list of signatures
+        redeemScripts: dict[str, CScript] = None,   # Map of tx_hash:pos to redeem script
+        redeemParams: dict[str, list[bytes]] = None,# Map of tx_hash:pos to list of signatures and params
     ) -> CMutableTransaction:
         tx = CMutableTransaction(txins, txouts)
         for i, (txin, txinScriptPubKey) in enumerate(zip(txins, txinScripts)):
             utxo_key = f"{b2x(txin.prevout.hash)}:{txin.prevout.n}"
-            redeem_script = redeem_scripts.get(utxo_key) if redeem_scripts else None
-            other_sigs = signatures.get(utxo_key) if signatures else None
+            redeemScript = redeemScripts.get(utxo_key) if redeemScripts else None
+            script = txinScriptPubKey if not redeemScript else redeemScript
+            params = redeemParams.get(utxo_key) if redeemParams else None
             self._signInput(
                 tx=tx,
-                i=i,
+                vinIndex=i,
                 txin=txin,
-                txinScriptPubKey=txinScriptPubKey,
                 sighashFlag=SIGHASH_ALL,
-                redeem_script=redeem_script,
-                signatures=other_sigs)
+                script=script,
+                params=params)
         return tx
 
     def _createPartialOriginatorSimple(self, txins: list, txinScripts: list, txouts: list) -> CMutableTransaction:
@@ -414,7 +414,7 @@ class EvrmoreWallet(Wallet):
         for i, (txin, txinScriptPubKey) in enumerate(zip(txins, txinScripts)):
             self._signInput(
                 tx=tx,
-                i=i,
+                vinIndex=i,
                 txin=txin,
                 txinScriptPubKey=txinScriptPubKey,
                 sighashFlag=SIGHASH_ANYONECANPAY | SIGHASH_ALL)
@@ -433,66 +433,77 @@ class EvrmoreWallet(Wallet):
         ):
             self._signInput(
                 tx=tx,
-                i=i,
+                vinIndex=i,
                 txin=txin,
                 txinScriptPubKey=txinScriptPubKey,
                 sighashFlag=SIGHASH_ANYONECANPAY | SIGHASH_ALL)
         return tx
 
-    def _signInput(
+    def signatureForInput(
         self,
         tx: CMutableTransaction,
-        i: int,
+        vinIndex: int,
+        script: CScript,
+        sighashFlag: int = None,
+    ) -> bytes:
+        """Return DER signature + sighash byte for this input and script."""
+        sighashFlag = sighashFlag or SIGHASH_ALL
+        sighash = SignatureHash(script, tx, vinIndex, sighashFlag)
+        return self.identity._privateKeyObj.sign(sighash) + bytes([sighashFlag])
+
+    def _verifyInput(
+        self,
+        tx: CMutableTransaction,
+        vinIndex: int,
         txin: CMutableTxIn,
-        txinScriptPubKey: CScript,
-        sighashFlag: int,
-        redeem_script: CScript = None,
-        signatures: list[bytes] = None,  # For multi-sig, list of signatures from other signers
+        script: CScript,        # p2pkh: txinScriptPubKey   # p2sh: redeemScript
     ):
         """Sign a transaction input.
         
         Args:
             tx: The transaction to sign
-            i: Input index
+            vinIndex: Input index
             txin: The transaction input
             txinScriptPubKey: The scriptPubKey of the input
             sighashFlag: The sighash flag to use
-            redeem_script: For P2SH inputs, the redeem script
+            redeemScript: For P2SH inputs, the redeem script
             signatures: For multi-sig, list of signatures from other signers
         """
-        if redeem_script:
-            # This is a P2SH input
-            sighash = SignatureHash(redeem_script, tx, i, sighashFlag)
-            sig = self.identity._privateKeyObj.sign(sighash) + bytes([sighashFlag])
-            
-            if signatures:
-                # Multi-sig case
-                # Combine our signature with other signatures
-                all_sigs = signatures + [sig]
-                # Sort signatures by public key (required by Bitcoin)
-                all_sigs.sort()
-                # Create scriptSig: [sig1, sig2, ..., redeem_script]
-                txin.scriptSig = CScript(all_sigs + [redeem_script])
-            else:
-                # Single-sig P2SH case
-                txin.scriptSig = CScript([sig, redeem_script])
-        else:
-            # Regular P2PKH input
-            sighash = SignatureHash(txinScriptPubKey, tx, i, sighashFlag)
-            sig = self.identity._privateKeyObj.sign(sighash) + bytes([sighashFlag])
-            txin.scriptSig = CScript([sig, self.identity._privateKeyObj.pub])
-
         try:
-            # For P2SH, we need to verify against the redeem script
-            script_to_verify = redeem_script if redeem_script else txinScriptPubKey
             VerifyScript(
                 txin.scriptSig,
-                script_to_verify,
-                tx, i, (SCRIPT_VERIFY_P2SH,))
+                script,
+                tx, vinIndex, (SCRIPT_VERIFY_P2SH,))
         except EvalScriptError as e:
             # python-ravencoinlib doesn't support OP_RVN_ASSET in txinScriptPubKey
             if str(e) != 'EvalScript: unsupported opcode 0xc0':
                 raise EvalScriptError(e)
+
+    def _signInput(
+        self,
+        *
+        tx: CMutableTransaction,
+        vinIndex: int,
+        txin: CMutableTxIn,
+        sighashFlag: int,
+        script: CScript,                        # p2pkh: txinScriptPubKey   # p2sh: redeemScript
+        params: Optional[list[bytes]] = None,   # p2pkh: None               # p2sh: [..., sig?, ...]
+    ):
+        """Sign a transaction input.
+        Args:
+            tx: The transaction to sign
+            vinIndex: Input index
+            txin: The transaction input
+            sighashFlag: The sighash flag to use
+            script: the scriptPubKey of the sender for P2PKH, redeem script for P2SH
+            params: None for p2pkh, list of signatures and params for p2sh
+        """
+        if params is None: # P2PKH case
+            params = [self.signatureForInput(tx, vinIndex, script, sighashFlag)]
+            txin.scriptSig = CScript(params + [self.identity._privateKeyObj.pub])
+        else: # P2SH case
+            txin.scriptSig = CScript(params + [script])
+        self._verifyInput(tx, vinIndex, txin, params, script)
 
     # def _createPartialOriginator(self, txins: list, txinScripts: list, txouts: list) -> CMutableTransaction:
     #    ''' not completed - complex version SIGHASH_ANYONECANPAY | SIGHASH_SINGLE '''
@@ -871,9 +882,13 @@ class EvrmoreWallet(Wallet):
         old_sigs = [e for e in txin.scriptSig if isinstance(e, bytes)]
 
         # add Bob's sig
-        self._signInput(tx, 0, txin, script_pub, SIGHASH_ALL,
-                        redeem_script=redeem_script,
-                        signatures=old_sigs)
+        self._signInput(
+            tx=tx,
+            vinIndex=0,
+            txin=txin,
+            sighashFlag=SIGHASH_ALL,
+            script=script_pub, # wrong
+            params=old_sigs)
 
         return self._txToHex(tx)
 #Usage sketch

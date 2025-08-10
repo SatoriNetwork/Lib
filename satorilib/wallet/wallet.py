@@ -687,6 +687,7 @@ class Wallet(WalletBase):
         inputCount: int = 0,
         outputCount: int = 0,
         randomly: bool = False,
+        feeRate: int = 150000,
     ) -> tuple[list, int]:
         unspentCurrency = [
             x for x in self.unspentCurrency if x.get('value') > 0]
@@ -701,7 +702,8 @@ class Wallet(WalletBase):
         while (
             gatheredCurrencySats < sats + TxUtils.estimatedFee(
                 inputCount=inputCount + len(gatheredCurrencyUnspents),
-                outputCount=outputCount)
+                outputCount=outputCount,
+                feeRate=feeRate)
         ):
             if randomly:
                 randomUnspent = unspentCurrency.pop(
@@ -856,7 +858,247 @@ class Wallet(WalletBase):
 
     ### Transactions ###########################################################
 
-    # for server
+    def miningTransaction(
+        self,
+        scripts: dict[str: dict],
+        feeMultiplier: int = 1,
+        memo: str=None,
+        broadcast: bool = True,
+    ) -> tuple[str, dict[str: int]]:
+        ''' creates a transaction with multiple SATORI asset recipients '''
+        if len(scripts) == 0 or len(scripts) > 500:
+            raise TransactionFailure('too many or too few scripts')
+        satoriSats = 0
+        inferredVout = 0
+        for date, payload in scripts.items():
+            amount = payload['amount']
+            address = payload['p2sh_address']
+            size = len(payload['redeem_script'])
+            if (
+                amount <= 0 or
+                # not TxUtils.isAmountDivisibilityValid(
+                #    amount=amount,
+                #    divisibility=self.divisibility) or
+                not Validate.address(address, self.symbol) or
+                size < 1 or size > 50000
+            ):
+                logging.info(
+                    'amount', amount,
+                    'divisibility', self.divisibility,
+                    'address', address,
+                    'address valid:', Validate.address(address, self.symbol),
+                    'size', size,
+                    'TxUtils.isAmountDivisibilityValid(amount=amount,divisibility=self.divisibility)', TxUtils.isAmountDivisibilityValid(amount=amount, divisibility=self.divisibility), color='green')
+                raise TransactionFailure('miningTransaction bad params')
+            scripts[date]['vout'] = inferredVout
+            scripts[date]['sats'] = TxUtils.roundSatsDownToDivisibility(
+                sats=TxUtils.asSats(amount),
+                divisibility=self.divisibility)
+            satoriSats += scripts[date]['sats']
+        memoCount = 0
+        if memo is not None:
+            memoCount = 1
+        (
+            gatheredSatoriUnspents,
+            gatheredSatoriSats) = self._gatherSatoriUnspents(satoriSats)
+        (
+            gatheredCurrencyUnspents,
+            gatheredCurrencySats) = self._gatherCurrencyUnspents(
+                inputCount=len(gatheredSatoriUnspents),
+                outputCount=len(scripts) + 2 + memoCount,
+                feeRate=150000*feeMultiplier)
+        txins, txinScripts = self._compileInputs(
+            gatheredCurrencyUnspents=gatheredCurrencyUnspents,
+            gatheredSatoriUnspents=gatheredSatoriUnspents)
+        satsByAddress = {payload['p2sh_address']: payload['sats'] for payload in scripts.values()}
+        satoriOuts = self._compileSatoriOutputs(satsByAddress)
+        satoriChangeOut = self._compileSatoriChangeOutput(
+            satoriSats=satoriSats,
+            gatheredSatoriSats=gatheredSatoriSats)
+        currencyChangeOut = self._compileCurrencyChangeOutput(
+            gatheredCurrencySats=gatheredCurrencySats,
+            inputCount=len(txins),
+            outputCount=len(satsByAddress) + 2 + memoCount)  # satoriChange, currencyChange, memo
+        memoOut = None
+        if memo is not None:
+            memoOut = self._compileMemoOutput(memo)
+        tx = self._createTransaction(
+            txins=txins,
+            txinScripts=txinScripts,
+            txouts=satoriOuts + [
+                x for x in [satoriChangeOut, currencyChangeOut, memoOut]
+                if x is not None])
+        if broadcast:
+            funding_txid = self.broadcast(self._txToHex(tx))
+            for date, payload in scripts.items():
+                scripts[date]['funding_txid'] = funding_txid
+            return self._txToHex(tx),funding_txid, scripts
+        return self._txToHex(tx)
+    
+    def mintingTransaction(
+        self,
+        address: str,
+        amount: float,
+        feeMultiplier: int = 1,
+        memo: str=None,
+        broadcast: bool = True,
+        fundingTxId: str = None,
+        fundingVout: int = None,
+        redeemScript: bytes = None, #'CScript'
+        timedRelease: bool = True,
+    ) -> tuple[str, dict[str: int]]:
+        ''' claim locked tokens '''
+        from satorilib.wallet.evrmore.scripts.mining import unlock
+        if (
+            amount <= 0 or
+            # not TxUtils.isAmountDivisibilityValid(
+            #    amount=amount,
+            #    divisibility=self.divisibility) or
+            not Validate.address(address, self.symbol)
+        ):
+            raise TransactionFailure('mintingTransaction bad params')
+        redeemScripts = {f'{fundingTxId}:{fundingVout}': redeemScript}
+        redeemParams = {
+            f'{fundingTxId}:{fundingVout}': unlock.simpleTimeRelease(
+                wallet=self,
+                tx=fundingTxId,
+                vinIndex=fundingVout,
+                redeemScript=redeemScript,
+                timedRelease=timedRelease)}
+        if redeemParams[f'{fundingTxId}:{fundingVout}'] in [None, []]:
+            raise TransactionFailure('mintingTransaction bad params')
+        satoriSats = TxUtils.roundSatsDownToDivisibility(
+            sats=TxUtils.asSats(amount),
+            divisibility=self.divisibility)
+        (
+            gatheredSatoriUnspents,
+            gatheredSatoriSats) = self._gatherSatoriUnspents(satoriSats)
+        # gather currency in anticipation of fee
+        (
+            gatheredCurrencyUnspents,
+            gatheredCurrencySats) = self._gatherCurrencyUnspents(
+                inputCount=len(gatheredSatoriUnspents),
+                outputCount=3,
+                feeRate=150000*feeMultiplier)
+        txins, txinScripts = self._compileInputs(
+            gatheredCurrencyUnspents=gatheredCurrencyUnspents,
+            gatheredSatoriUnspents=gatheredSatoriUnspents,
+            redeemScripts=redeemScripts,
+            redeemParams=redeemParams)
+        satoriOuts = self._compileSatoriOutputs({address: satoriSats})
+        satoriChangeOut = self._compileSatoriChangeOutput(
+            satoriSats=satoriSats,
+            gatheredSatoriSats=gatheredSatoriSats)
+        currencyChangeOut = self._compileCurrencyChangeOutput(
+            gatheredCurrencySats=gatheredCurrencySats,
+            inputCount=len(txins),
+            outputCount=3)
+        tx = self._createTransaction(
+            txins=txins,
+            txinScripts=txinScripts,
+            txouts=satoriOuts + [
+                x for x in [satoriChangeOut, currencyChangeOut]
+                if x is not None],
+            redeemScripts=redeemScripts,
+            redeemParams=redeemParams)
+        return self.broadcast(self._txToHex(tx))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        if (
+            amount <= 0 or
+            # not TxUtils.isAmountDivisibilityValid(
+            #     amount=amount,
+            #     divisibility=8) or
+            not Validate.address(address, self.symbol)
+        ):
+            raise TransactionFailure('bad params for currencyTransaction')
+        if amount == 0 or len(address) != :
+            raise TransactionFailure('too many or too few scripts')
+        satoriSats = 0
+        inferredVout = 0
+        for date, payload in scripts.items():
+            amount = payload['amount']
+            address = payload['p2sh_address']
+            size = len(payload['redeem_script'])
+            if (
+                amount <= 0 or
+                # not TxUtils.isAmountDivisibilityValid(
+                #    amount=amount,
+                #    divisibility=self.divisibility) or
+                not Validate.address(address, self.symbol) or
+                size < 1 or size > 50000
+            ):
+                logging.info(
+                    'amount', amount,
+                    'divisibility', self.divisibility,
+                    'address', address,
+                    'address valid:', Validate.address(address, self.symbol),
+                    'size', size,
+                    'TxUtils.isAmountDivisibilityValid(amount=amount,divisibility=self.divisibility)', TxUtils.isAmountDivisibilityValid(amount=amount, divisibility=self.divisibility), color='green')
+                raise TransactionFailure('miningTransaction bad params')
+            scripts[date]['vout'] = inferredVout
+            scripts[date]['sats'] = TxUtils.roundSatsDownToDivisibility(
+                sats=TxUtils.asSats(amount),
+                divisibility=self.divisibility)
+            satoriSats += scripts[date]['sats']
+            
+        memoCount = 0
+        if memo is not None:
+            memoCount = 1
+        (
+            gatheredSatoriUnspents,
+            gatheredSatoriSats) = self._gatherSatoriUnspents(satoriSats)
+        (
+            gatheredCurrencyUnspents,
+            gatheredCurrencySats) = self._gatherCurrencyUnspents(
+                inputCount=len(gatheredSatoriUnspents),
+                outputCount=len(scripts) + 2 + memoCount,
+                feeRate=150000*feeMultiplier
+                )
+        txins, txinScripts = self._compileInputs(
+            gatheredCurrencyUnspents=gatheredCurrencyUnspents,
+            gatheredSatoriUnspents=gatheredSatoriUnspents)
+        satsByAddress = {payload['p2sh_address']: payload['sats'] for payload in scripts.values()}
+        satoriOuts = self._compileSatoriOutputs(satsByAddress)
+        satoriChangeOut = self._compileSatoriChangeOutput(
+            satoriSats=satoriSats,
+            gatheredSatoriSats=gatheredSatoriSats)
+        currencyChangeOut = self._compileCurrencyChangeOutput(
+            gatheredCurrencySats=gatheredCurrencySats,
+            inputCount=len(txins),
+            outputCount=len(satsByAddress) + 2 + memoCount)  # satoriChange, currencyChange, memo
+        memoOut = None
+        if memo is not None:
+            memoOut = self._compileMemoOutput(memo)
+        tx = self._createTransaction(
+            txins=txins,
+            txinScripts=txinScripts,
+            txouts=satoriOuts + [
+                x for x in [satoriChangeOut, currencyChangeOut, memoOut]
+                if x is not None])
+        if broadcast:
+            funding_txid = self.broadcast(self._txToHex(tx))
+            for date, payload in scripts.items():
+                scripts[date]['funding_txid'] = funding_txid
+            return self._txToHex(tx),funding_txid, scripts
+        return self._txToHex(tx)
+
 
     def satoriDistribution(
         self,
@@ -918,10 +1160,8 @@ class Wallet(WalletBase):
             return self.broadcast(self._txToHex(tx))
         return self._txToHex(tx)
 
-    # for neuron
     def currencyTransaction(self, amount: float, address: str):
         ''' creates a transaction to just send rvn '''
-        ''' unused, untested '''
         if (
             amount <= 0 or
             # not TxUtils.isAmountDivisibilityValid(
@@ -955,7 +1195,6 @@ class Wallet(WalletBase):
                 if x is not None])
         return self.broadcast(self._txToHex(tx))
 
-    # for neuron
     def satoriTransaction(self, amount: float, address: str):
         ''' creates a transaction to send satori to one address '''
         if (

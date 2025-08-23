@@ -1,9 +1,20 @@
 from satorilib.wallet.wallet import Wallet
+from satorilib.wallet.evrmore import scripts
 from satorilib.wallet.evrmore import EvrmoreWallet
 from satorilib.wallet.ethereum.wallet import EthereumWallet
 from satorilib.wallet.ravencoin import RavencoinWallet
 from satorilib.wallet.utils.transaction import TxUtils
 from satorilib.wallet.utils.validate import Validate
+
+__all__ = [
+    "Wallet",
+    "EvrmoreWallet",
+    "EthereumWallet",
+    "RavencoinWallet",
+    "TxUtils",
+    "Validate",
+    "scripts",
+]
 
 # not needed yet, just an example of return data from electrumx servers
 # def parseTx(txStruct):

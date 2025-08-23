@@ -7,17 +7,16 @@ from evrmore.core.script import (
     CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, 
     OP_EVR_ASSET, OP_DROP, OP_RETURN, SIGHASH_ANYONECANPAY, OP_IF, OP_ELSE, OP_ENDIF, 
     OP_CHECKMULTISIG, OP_CHECKLOCKTIMEVERIFY, OP_CHECKSEQUENCEVERIFY)
-from evrmore.core import b2x, lx, COutPoint, CMutableTxOut, CMutableTxIn, CMutableTransaction, Hash160
+from evrmore.core import b2lx, b2x, lx, COutPoint, CMutableTxOut, CMutableTxIn, CMutableTransaction, Hash160
 from evrmore.core.scripteval import EvalScriptError
 from satorilib import logging
 from satorilib.electrumx import Electrumx
 from satorilib.wallet.concepts.transaction import AssetTransaction, TransactionFailure
 from satorilib.wallet.utils.transaction import TxUtils
 from satorilib.wallet.wallet import Wallet
-from satorilib.wallet.evrmore.sign import signMessage
-from satorilib.wallet.evrmore.verify import verify
-from satorilib.wallet.evrmore.valid import isValidEvrmoreAddress
-from satorilib.wallet.evrmore.scripts import P2SHRedeemScripts
+from satorilib.wallet.evrmore.utils.sign import signMessage
+from satorilib.wallet.evrmore.utils.verify import verify
+from satorilib.wallet.evrmore.utils.valid import isValidEvrmoreAddress
 from satorilib.wallet.identity import Identity
 from satorilib.wallet.evrmore.identity import EvrmoreIdentity
 
@@ -80,7 +79,6 @@ class EvrmoreWallet(Wallet):
             skipSave=skipSave,
             pullFullTransactions=pullFullTransactions,
             balanceUpdatedCallback=balanceUpdatedCallback)
-        self.scripts = P2SHRedeemScripts()
 
     def maybeConnect(self, electrumx = None):
         if self.electrumx is None:
@@ -223,7 +221,7 @@ class EvrmoreWallet(Wallet):
         self,
         gatheredCurrencyUnspents: list = None,
         gatheredSatoriUnspents: list = None,
-        redeem_scripts: dict[str, CScript] = None,  # Map of tx_hash:pos to redeem script
+        redeemScripts: dict[str, CScript] = None,  # Map of tx_hash:pos to redeem script
     ) -> tuple[list, list]:
         # currency vins
         txins = []
@@ -232,17 +230,18 @@ class EvrmoreWallet(Wallet):
             tx_hash = utxo.get('tx_hash')
             tx_pos = utxo.get('tx_pos')
             txin = CMutableTxIn(COutPoint(lx(tx_hash), tx_pos))
-            
+            #redeemScript = None
             # If we have a scriptPubKey in the UTXO, use it directly
             if 'scriptPubKey' in utxo:
                 txinScriptPubKey = CScript(bytes.fromhex(utxo.get('scriptPubKey')))
+                #redeemScript = redeemScripts.get(f"{tx_hash}:{tx_pos}") if redeemScripts else None
             else:
                 # No scriptPubKey provided, we need to construct one
-                utxo_key = f"{tx_hash}:{tx_pos}"
-                if redeem_scripts and utxo_key in redeem_scripts:
+                utxoKey = f"{tx_hash}:{tx_pos}"
+                if redeemScripts and utxoKey in redeemScripts:
                     # Construct P2SH scriptPubKey from redeem script
-                    redeem_script = redeem_scripts[utxo_key]
-                    txinScriptPubKey = P2SHEvrmoreAddress.from_redeemScript(redeem_script).to_scriptPubKey()
+                    redeemScript = redeemScripts[utxoKey]
+                    txinScriptPubKey = P2SHEvrmoreAddress.from_redeemScript(redeemScript).to_scriptPubKey()
                 else:
                     # Construct standard P2PKH scriptPubKey
                     txinScriptPubKey = CScript([
@@ -259,24 +258,26 @@ class EvrmoreWallet(Wallet):
             tx_hash = utxo.get('tx_hash')
             tx_pos = utxo.get('tx_pos')
             txin = CMutableTxIn(COutPoint(lx(tx_hash), tx_pos))
-            
+            littleEValue = bytes.fromhex(
+                AssetTransaction.satoriHex(self.symbol) +
+                TxUtils.padHexStringTo8Bytes(TxUtils.intToLittleEndianHex(int(utxo.get('value'))))
+            )
+            #redeemScript = None       
             # If we have a scriptPubKey in the UTXO, use it directly
             if 'scriptPubKey' in utxo:
                 txinScriptPubKey = CScript(bytes.fromhex(utxo.get('scriptPubKey')))
+                #redeemScript = redeemScripts.get(f"{tx_hash}:{tx_pos}") if redeemScripts else None
             else:
                 # No scriptPubKey provided, we need to construct one
-                utxo_key = f"{tx_hash}:{tx_pos}"
-                if redeem_scripts and utxo_key in redeem_scripts:
+                utxoKey = f"{tx_hash}:{tx_pos}"
+                if redeemScripts and utxoKey in redeemScripts:
                     # Construct P2SH scriptPubKey from redeem script and add asset data
-                    redeem_script = redeem_scripts[utxo_key]
-                    base_script = P2SHEvrmoreAddress.from_redeemScript(redeem_script).to_scriptPubKey()
+                    redeemScript = redeemScripts[utxoKey]
+                    baseScript = P2SHEvrmoreAddress.from_redeemScript(redeemScript).to_scriptPubKey()
                     txinScriptPubKey = CScript([
-                        *base_script,
+                        *baseScript,
                         OP_EVR_ASSET,
-                        bytes.fromhex(
-                            AssetTransaction.satoriHex(self.symbol) +
-                            TxUtils.padHexStringTo8Bytes(
-                                TxUtils.intToLittleEndianHex(int(utxo.get('value'))))),
+                        littleEValue,
                         OP_DROP])
                 else:
                     # Construct standard P2PKH scriptPubKey with asset data
@@ -287,36 +288,164 @@ class EvrmoreWallet(Wallet):
                         OP_EQUALVERIFY,
                         OP_CHECKSIG,
                         OP_EVR_ASSET,
-                        bytes.fromhex(
-                            AssetTransaction.satoriHex(self.symbol) +
-                            TxUtils.padHexStringTo8Bytes(
-                                TxUtils.intToLittleEndianHex(int(utxo.get('value'))))),
+                        littleEValue,
                         OP_DROP])
             txins.append(txin)
             txinScripts.append(txinScriptPubKey)
         return txins, txinScripts
 
-    def _compileSatoriOutputs(self, satsByAddress: dict[str, int] = None) -> list:
-        txouts = []
-        for address, sats in satsByAddress.items():
-            txout = CMutableTxOut(
-                0,
-                CScript([
-                    *CEvrmoreAddress(address).to_scriptPubKey(),
-                    OP_EVR_ASSET,
-                    bytes.fromhex(
-                        AssetTransaction.satoriHex(self.symbol) +
-                        TxUtils.padHexStringTo8Bytes(
-                            TxUtils.intToLittleEndianHex(sats))),
-                    OP_DROP]))
-            txouts.append(txout)
-        return txouts
+    @staticmethod
+    def _cltvNumberFrom(dtOrInt: Union[dt.datetime, int]) -> int:
+        if isinstance(dtOrInt, int):
+            # block height or unix ts (caller ensures correct type)
+            return dtOrInt
+        if isinstance(dtOrInt, dt.datetime):
+            d = dtOrInt if dtOrInt.tzinfo else dtOrInt.replace(tzinfo=dt.timezone.utc)
+            ts = int(d.astimezone(dt.timezone.utc).timestamp())
+            # CLTV timestamp must be >= 500,000,000
+            if ts < 500_000_000:
+                raise ValueError("CLTV timestamp must be >= 500,000,000")
+            return ts
+        raise TypeError("redeemDates value must be datetime or int")
+    
+    ### compiling p2sh transactions #####################################################################
 
-    def _compileCurrencyOutputs(self, currencySats: int, address: str) -> list[CMutableTxOut]:
-        return [CMutableTxOut(
-            currencySats,
-            CEvrmoreAddress(address).to_scriptPubKey()
-        )]
+    def _compileClaimOnP2SH(
+        self,
+        address: str,
+        redeemScript: bytes,
+        redeemParams: Callable,
+        currencySats: float=0,
+        satoriSats: float=0,
+        feeOverride: Optional[int] = None,
+        fundingTxId: str = None,
+        fundingVout: int = None,
+        date: Optional[dt.datetime] = None,
+        extraVins: Optional[list[CMutableTxIn]] = None,
+        extraVinsTxinScripts: Optional[list[CScript]] = None,
+        extraVouts: Optional[list[CMutableTxOut]] = None,
+    ) -> CMutableTransaction:
+        ''' limitation: only one input '''
+        txins = [CMutableTxIn(COutPoint(lx(fundingTxId), fundingVout))] + (extraVins or [])
+        print('extraVouts', extraVouts)
+        txouts = (
+            self._compileCurrencyOutputs(address=address, sats=currencySats - feeOverride)
+            if currencySats > 0 else []
+        ) + (
+            self._compileSatoriOutputs(address=address, sats=satoriSats)
+            if satoriSats > 0 else []
+        ) + (extraVouts or [])
+        print('txouts', txouts)
+        tx = CMutableTransaction(txins, txouts)
+        if date:
+            lock = EvrmoreWallet._cltvNumberFrom(date)
+            if getattr(tx, "nLockTime", 0) < lock:
+                tx.nLockTime = lock
+            if getattr(tx, "nVersion", 1) < 2: tx.nVersion = 2
+            # make this input non-final (nLockTime only counts if at least one input is non-final)
+            tx.vin[0].nSequence = 0xFFFFFFFE
+        sighash = SignatureHash(redeemScript, tx, 0, SIGHASH_ALL)
+        sig = self.identity._privateKeyObj.sign(sighash) + bytes([SIGHASH_ALL])
+        txins[0].scriptSig = redeemParams(sig=sig) + redeemScript
+        for i, (txin, txinScriptPubKey) in enumerate(zip(txins, [None] + (extraVinsTxinScripts or []))):
+            if i == 0:
+                continue
+            self._signInput(
+                tx=tx,
+                vinIndex=i,
+                txin=txin,
+                sighashFlag=SIGHASH_ALL,
+                lockingScript=txinScriptPubKey)
+        return tx
+    
+    def _compileClaimOnP2SHMultiSigStart(
+        self,
+        address: str,
+        currencySats: float=0,
+        satoriSats: float=0,
+        feeOverride: Optional[int] = None,
+        fundingTxId: str = None,
+        fundingVout: int = None,
+        date: Optional[dt.datetime] = None,
+        extraVins: Optional[list[CMutableTxIn]] = None,
+        extraVouts: Optional[list[CMutableTxOut]] = None,
+    ) -> CMutableTransaction:
+        ''' limitation: only one input '''
+        txins = [CMutableTxIn(COutPoint(lx(fundingTxId), fundingVout))] + (extraVins or [])
+        txouts = (
+            self._compileCurrencyOutputs(address=address, sats=currencySats - feeOverride)
+            if currencySats > 0 else []
+        ) + (
+            self._compileSatoriOutputs(address=address, sats=satoriSats)
+            if satoriSats > 0 else []
+        ) + (extraVouts or [])
+        tx = CMutableTransaction(txins, txouts)
+        if date:
+            lock = EvrmoreWallet._cltvNumberFrom(date)
+            if getattr(tx, "nLockTime", 0) < lock:
+                tx.nLockTime = lock
+            if getattr(tx, "nVersion", 1) < 2: tx.nVersion = 2
+            # make this input non-final (nLockTime only counts if at least one input is non-final)
+            tx.vin[0].nSequence = 0xFFFFFFFE
+        return tx
+    
+    def _compileClaimOnP2SHMultiSigMiddle(
+        self,
+        tx: CMutableTransaction,
+        redeemScript: bytes,
+        vinIndex: int = 0,
+        sighashFlag: int = SIGHASH_ALL,
+    ) -> bytes:
+        ''' produces a signature for the input at vinIndex '''
+        sighash = SignatureHash(redeemScript, tx, vinIndex, sighashFlag)
+        sig = self.identity._privateKeyObj.sign(sighash) + bytes([sighashFlag])
+        return sig
+            
+    def _compileClaimOnP2SHMultiSigEnd(
+        self,
+        tx: CMutableTransaction,
+        redeemScript: bytes,
+        redeemParams: Callable,
+        extraVinsTxinScripts: Optional[list[CScript]] = None,
+    ) -> CMutableTransaction:
+        ''' assumption: txins[0] is the p2sh input that is being signed '''
+        tx.vin[0].scriptSig = redeemParams() + redeemScript
+        for i, (txin, txinScriptPubKey) in enumerate(zip(tx.vin, [None] + (extraVinsTxinScripts or []))):
+            if i == 0:
+                continue
+            self._signInput(
+                tx=tx,
+                vinIndex=i,
+                txin=txin,
+                sighashFlag=SIGHASH_ALL,
+                lockingScript=txinScriptPubKey)
+        assert all(len(bytes(v.scriptSig)) > 0 for v in tx.vin), "unsigned input(s)"
+        return tx
+    
+    ### compiling transactions ########################################################################
+
+    def _compileSatoriOutput(self, address: str, sats: int) -> CMutableTxOut:
+        return CMutableTxOut(
+            0,
+            CScript([
+                *CEvrmoreAddress(address).to_scriptPubKey(),
+                OP_EVR_ASSET,
+                bytes.fromhex(
+                    AssetTransaction.satoriHex(self.symbol) +
+                    TxUtils.padHexStringTo8Bytes(
+                        TxUtils.intToLittleEndianHex(sats))),
+                OP_DROP]))
+    
+    def _compileSatoriOutputs(self, satsByAddress: dict[str, int] = None, address: str = None, sats: int = None) -> list[CMutableTxOut]:
+        return [self._compileSatoriOutput(address, sats)] if address and sats else [self._compileSatoriOutput(address, sats) for address, sats in satsByAddress.items()] if satsByAddress else []
+
+    def _compileCurrencyOutput(self, address: str, sats: int) -> CMutableTxOut:
+        return CMutableTxOut(
+            sats,
+            CEvrmoreAddress(address).to_scriptPubKey())
+
+    def _compileCurrencyOutputs(self, satsByAddress: dict[str, int] = None, address: str = None, sats: int = None) -> list[CMutableTxOut]:
+        return [self._compileCurrencyOutput(address, sats)] if address and sats else [self._compileCurrencyOutput(address, sats) for address, sats in satsByAddress.items()] if satsByAddress else []
 
     def _compileSatoriChangeOutput(
         self,
@@ -343,14 +472,11 @@ class EvrmoreWallet(Wallet):
         self,
         currencySats: int = 0,
         gatheredCurrencySats: int = 0,
-        inputCount: int = 0,
-        outputCount: int = 0,
+        fee: int = 0,
         scriptPubKey: CScript = None,
         returnSats: bool = False,
     ) -> Union[CMutableTxOut, None, tuple[CMutableTxOut, int]]:
-        currencyChange = gatheredCurrencySats - currencySats - TxUtils.estimatedFee(
-            inputCount=inputCount,
-            outputCount=outputCount)
+        currencyChange = gatheredCurrencySats - currencySats - fee
         if currencyChange > 0:
             if str(CEvrmoreAddress(self.address)) != self.address:
                 raise TransactionFailure('tx: address mismatch')
@@ -368,7 +494,9 @@ class EvrmoreWallet(Wallet):
             return txout
         if currencyChange < 0:
             # go back and get more?
-            raise TransactionFailure('tx: not enough currency to send')
+            raise TransactionFailure(f'tx: not enough currency to send. tried to send {currencySats} but only have {gatheredCurrencySats}, change after fee: {currencyChange}.')
+        if returnSats:
+            return None, currencyChange
         return None
 
     def _compileMemoOutput(self, memo: str) -> Union[CMutableTxOut, None]:
@@ -388,21 +516,53 @@ class EvrmoreWallet(Wallet):
         txins: list,
         txinScripts: list,
         txouts: list,
-        redeemScripts: dict[str, CScript] = None,   # Map of tx_hash:pos to redeem script
-        redeemParams: dict[str, list[bytes]] = None,# Map of tx_hash:pos to list of signatures and params
+        redeemScripts: Optional[dict[str, CScript]] = None,   # Map of tx_hash:pos to redeem script
+        redeemParams: Optional[dict[str, Callable]] = None,# Map of tx_hash:pos to callable unlocking script
+        redeemDates: Optional[dict[str, dt.datetime]] = None,
     ) -> CMutableTransaction:
+        def _cltvNumberFrom(dtOrInt: Union[dt.datetime, int]) -> int:
+            if isinstance(dtOrInt, int):
+                # block height or unix ts (caller ensures correct type)
+                return dtOrInt
+            if isinstance(dtOrInt, dt.datetime):
+                d = dtOrInt if dtOrInt.tzinfo else dtOrInt.replace(tzinfo=dt.timezone.utc)
+                ts = int(d.astimezone(dt.timezone.utc).timestamp())
+                # CLTV timestamp must be >= 500,000,000
+                if ts < 500_000_000:
+                    raise ValueError("CLTV timestamp must be >= 500,000,000")
+                return ts
+            raise TypeError("redeemDates value must be datetime or int")
+
         tx = CMutableTransaction(txins, txouts)
         for i, (txin, txinScriptPubKey) in enumerate(zip(txins, txinScripts)):
-            utxo_key = f"{b2x(txin.prevout.hash)}:{txin.prevout.n}"
-            redeemScript = redeemScripts.get(utxo_key) if redeemScripts else None
-            script = txinScriptPubKey if not redeemScript else redeemScript
-            params = redeemParams.get(utxo_key) if redeemParams else None
+            #utxoKey = f"{b2x(txin.prevout.hash)}:{txin.prevout.n}"
+            utxoKey = f"{b2lx(txin.prevout.hash)}:{txin.prevout.n}"
+            redeemScript = redeemScripts.get(utxoKey) if redeemScripts else None
+            # Require params when a redeemScript is present (P2SH spends)
+            params = None
+            if redeemScript is not None:
+                if (redeemParams or {}).get(utxoKey) is None:
+                    raise TransactionFailure(f"missing redeemParams for {utxoKey}")
+                unlockingScriptFunction = redeemParams.get(utxoKey)
+                params = unlockingScriptFunction(
+                    tx=tx,
+                    vinIndex=i,
+                    redeemScript=redeemScript)
+            lockingScript = redeemScript or txinScriptPubKey
+            date = redeemDates.get(utxoKey) if redeemDates else None
+            if date:
+                lock = _cltvNumberFrom(date)
+                if getattr(tx, "nLockTime", 0) < lock:
+                    tx.nLockTime = lock
+                if getattr(tx, "nVersion", 1) < 2: tx.nVersion = 2
+                # make this input non-final (nLockTime only counts if at least one input is non-final)
+                tx.vin[i].nSequence = 0xFFFFFFFE
             self._signInput(
                 tx=tx,
                 vinIndex=i,
                 txin=txin,
                 sighashFlag=SIGHASH_ALL,
-                script=script,
+                lockingScript=lockingScript,
                 params=params)
         return tx
 
@@ -416,7 +576,7 @@ class EvrmoreWallet(Wallet):
                 tx=tx,
                 vinIndex=i,
                 txin=txin,
-                txinScriptPubKey=txinScriptPubKey,
+                lockingScript=txinScriptPubKey,
                 sighashFlag=SIGHASH_ANYONECANPAY | SIGHASH_ALL)
         return tx
 
@@ -435,7 +595,7 @@ class EvrmoreWallet(Wallet):
                 tx=tx,
                 vinIndex=i,
                 txin=txin,
-                txinScriptPubKey=txinScriptPubKey,
+                lockingScript=txinScriptPubKey,
                 sighashFlag=SIGHASH_ANYONECANPAY | SIGHASH_ALL)
         return tx
 
@@ -443,12 +603,12 @@ class EvrmoreWallet(Wallet):
         self,
         tx: CMutableTransaction,
         vinIndex: int,
-        script: CScript,
+        lockingScript: CScript,
         sighashFlag: int = None,
     ) -> bytes:
         """Return DER signature + sighash byte for this input and script."""
         sighashFlag = sighashFlag or SIGHASH_ALL
-        sighash = SignatureHash(script, tx, vinIndex, sighashFlag)
+        sighash = SignatureHash(lockingScript, tx, vinIndex, sighashFlag)
         return self.identity._privateKeyObj.sign(sighash) + bytes([sighashFlag])
 
     def _verifyInput(
@@ -456,7 +616,7 @@ class EvrmoreWallet(Wallet):
         tx: CMutableTransaction,
         vinIndex: int,
         txin: CMutableTxIn,
-        script: CScript,        # p2pkh: txinScriptPubKey   # p2sh: redeemScript
+        lockingScript: CScript,        # p2pkh: txinScriptPubKey   # p2sh: redeemScript
     ):
         """Sign a transaction input.
         
@@ -469,24 +629,25 @@ class EvrmoreWallet(Wallet):
             redeemScript: For P2SH inputs, the redeem script
             signatures: For multi-sig, list of signatures from other signers
         """
+        flags = [SCRIPT_VERIFY_P2SH]  # add others if you like (| SCRIPT_VERIFY_STRICTENC, etc.)
         try:
             VerifyScript(
                 txin.scriptSig,
-                script,
-                tx, vinIndex, (SCRIPT_VERIFY_P2SH,))
+                lockingScript,
+                tx, vinIndex, flags)
         except EvalScriptError as e:
             # python-ravencoinlib doesn't support OP_RVN_ASSET in txinScriptPubKey
-            if str(e) != 'EvalScript: unsupported opcode 0xc0':
-                raise EvalScriptError(e)
+            if "unsupported opcode" not in str(e):
+                raise
 
     def _signInput(
         self,
-        *
+        *,
         tx: CMutableTransaction,
         vinIndex: int,
         txin: CMutableTxIn,
         sighashFlag: int,
-        script: CScript,                        # p2pkh: txinScriptPubKey   # p2sh: redeemScript
+        lockingScript: CScript,                    # p2pkh: txinScriptPubKey   # p2sh: redeemScript
         params: Optional[list[bytes]] = None,   # p2pkh: None               # p2sh: [..., sig?, ...]
     ):
         """Sign a transaction input.
@@ -495,15 +656,15 @@ class EvrmoreWallet(Wallet):
             vinIndex: Input index
             txin: The transaction input
             sighashFlag: The sighash flag to use
-            script: the scriptPubKey of the sender for P2PKH, redeem script for P2SH
+            lockingScript: the scriptPubKey of the sender for P2PKH, redeem script for P2SH
             params: None for p2pkh, list of signatures and params for p2sh
         """
         if params is None: # P2PKH case
-            params = [self.signatureForInput(tx, vinIndex, script, sighashFlag)]
+            params = [self.signatureForInput(tx, vinIndex, lockingScript, sighashFlag)]
             txin.scriptSig = CScript(params + [self.identity._privateKeyObj.pub])
         else: # P2SH case
-            txin.scriptSig = CScript(params + [script])
-        self._verifyInput(tx, vinIndex, txin, params, script)
+            txin.scriptSig = CScript(params + [lockingScript])
+        self._verifyInput(tx, vinIndex, txin, lockingScript)
 
     # def _createPartialOriginator(self, txins: list, txinScripts: list, txouts: list) -> CMutableTransaction:
     #    ''' not completed - complex version SIGHASH_ANYONECANPAY | SIGHASH_SINGLE '''
@@ -578,8 +739,8 @@ class EvrmoreWallet(Wallet):
         txouts = []
         for address, amount in outputs:
             txouts.extend(self._compileCurrencyOutputs(
-                TxUtils.asSats(amount),
-                address
+                address=address,
+                sats=TxUtils.asSats(amount),
             ))
             
         # Add memo output if provided
@@ -887,7 +1048,7 @@ class EvrmoreWallet(Wallet):
             vinIndex=0,
             txin=txin,
             sighashFlag=SIGHASH_ALL,
-            script=script_pub, # wrong
+            lockingScript=script_pub, # wrong
             params=old_sigs)
 
         return self._txToHex(tx)

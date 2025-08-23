@@ -1,82 +1,88 @@
-from typing import List
+from typing import List, Optional
 from evrmore.core import CMutableTransaction
-from evrmore.core.script import CScript, OP_0, OP_1
-from satorilib.wallet import EvrmoreWallet
+from evrmore.core.script import CScript, OP_0, OP_1, OP_TRUE, OP_FALSE
 
 
-def simpleTimeRelease(
+## we don't actually need to do the signing here
+#def simpleTimeOriginal(
+#    *,
+#    wallet: 'EvrmoreWallet',
+#    tx: CMutableTransaction,
+#    vinIndex: int,
+#    redeemScript: CScript,
+#    sighashFlag: int = None,
+#    timedRelease: bool = True,
+#) -> List[object]:
+#    """
+#    Returns: [sig, 1] for timed release
+#    Returns: [sig, 0] for immediate release
+#    """
+#    sig = wallet.signatureForInput(redeemScript, tx, vinIndex, sighashFlag)
+#    params = OP_1 if timedRelease else OP_0
+#    return [sig, params]
+
+
+def simpleTime(
     *,
-    wallet: EvrmoreWallet,
-    tx: CMutableTransaction,
-    vinIndex: int,
-    redeemScript: CScript,
-    sighashFlag: int = None,
+    sig: bytes,
     timedRelease: bool = True,
 ) -> List[object]:
     """
     Returns: [sig, 1] for timed release
     Returns: [sig, 0] for immediate release
     """
-    sig = wallet.signatureForInput(tx, vinIndex, redeemScript, sighashFlag)
-    op = OP_1 if timedRelease else OP_0
-    return [sig, op]
+    params = OP_1 if timedRelease else OP_0
+    return CScript([sig, params])
 
 
-def enhancedSimpleTimeRelease(
+def multiTime(
     *,
-    wallet: EvrmoreWallet,
-    tx: CMutableTransaction,
-    vinIndex: int,
-    redeemScript: CScript,
-    sighashFlag: int = None,
+    sig: bytes,
     timedRelease: int = 3,
 ) -> List[object]:
     """
     Returns: [sig, 1, 1] for timed release 3
     Returns: [sig, 1, 0] for timed release 2
     Returns: [sig, 0, 1] for timed release 1
-    Returns: [sig, 0, 0] for immediate release
+    Returns: [sig, 0, 0] for timed release 0 (immediate)
     """
-    sig = wallet.signatureForInput(tx, vinIndex, redeemScript, sighashFlag)
     if timedRelease == 3:
-        op = [1, 1]
+        params = [OP_TRUE, OP_TRUE]
     elif timedRelease == 2:
-        op = [1, 0]
+        params = [OP_FALSE, OP_TRUE]
     elif timedRelease == 1:
-        op = [0, 1]
+        params = [OP_TRUE, OP_FALSE]
     else:
-        op = [0, 0]
-    return [sig, *op]
+        params = [OP_FALSE, OP_FALSE]
+    return CScript([sig, *params])
 
 
-def enhancedSimpleTimeReleaseWithMultiSig(
+def multiTimeMultisig(
     *,
-    wallet: EvrmoreWallet,
-    multi_wallet_1: EvrmoreWallet,
-    multi_wallet_2: EvrmoreWallet,
-    multi_wallet_3: EvrmoreWallet,
-    multi_wallet_4: EvrmoreWallet,
-    multi_wallet_5: EvrmoreWallet,
-    tx: CMutableTransaction,
-    vinIndex: int,
-    redeemScript: CScript,
-    sighashFlag: int = None,
+    sig: bytes,
+    sig2: Optional[bytes] = None,
+    sig3: Optional[bytes] = None,
+    sig4: Optional[bytes] = None,
+    sig5: Optional[bytes] = None,
     timedRelease: int = 3,
 ) -> List[object]:
     """
     Returns: [sig, 1, 1] for timed release 3
-    Returns: [sig, 1, 0] for timed release 2
-    Returns: [sig, 0, 1] for timed release 1
-    Returns: [sig, 0, 0] for immediate release
+    Returns: [sig, 0, 1] for timed release 2
+    Returns: [sig, 1, 0] for timed release 1 (multi-sig, immediate)
+    Returns: [sig, 0, 0] for timed release 0 (immediate)
     """
-    sig = wallet.signatureForInput(tx, vinIndex, redeemScript, sighashFlag)
     if timedRelease == 3:
-        op = [1, 1]
+        params = [sig, OP_TRUE, OP_TRUE]
     elif timedRelease == 2:
-        op = [1, 0]
+        params = [sig, OP_FALSE, OP_TRUE]
     elif timedRelease == 1:
-        op = [0, 1]
+        #sig2 = sig2.signatureForInput(tx, vinIndex, redeemScript, sighashFlag)
+        #sig3 = sig3.signatureForInput(tx, vinIndex, redeemScript, sighashFlag)
+        #sig4 = sig4.signatureForInput(tx, vinIndex, redeemScript, sighashFlag)
+        #sig5 = sig5.signatureForInput(tx, vinIndex, redeemScript, sighashFlag)
+        params = [OP_0, sig, sig2, sig3, sig4, sig5, OP_TRUE, OP_FALSE]
     else:
-        op = [0, 0]
-    return [sig, *op]
+        params = [sig, OP_FALSE, OP_FALSE]
+    return CScript(params)
     

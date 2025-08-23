@@ -2,7 +2,7 @@
 """
 Manual Test Script for Simple Time Release P2SH
 
-This script provides functions to manually test the simpleTimeRelease P2SH implementation.
+This script provides functions to manually test the simpleTimeLock P2SH implementation.
 Run each step sequentially and verify the expected outcomes.
 
 REQUIREMENTS:
@@ -21,7 +21,7 @@ import time
 import datetime as dt
 from typing import Tuple
 from satorilib.wallet.evrmore.wallet import EvrmoreWallet
-from satorilib.wallet.evrmore.scripts import P2SHRedeemScripts
+from satorilib.wallet.evrmore.scripts import simpleTimeLock
 from satorilib.electrumx import Electrumx
 from evrmore.core import b2x, lx
 from evrmore.core.script import CScript
@@ -119,7 +119,7 @@ def create_timerelease_script():
     print(f"Bob must wait {LOCKTIME_BLOCKS} blocks (~{LOCKTIME_BLOCKS} minutes)")
     
     # Create the redeem script
-    #redeem_script = P2SHRedeemScripts.simpleTimeRelease(
+    #redeem_script = simpleTimeLock(
     #    immediate_key=alice_wallet.pubkey,  # Alice can unlock anytime
     #    delayed_key=bob_wallet.pubkey,      # Bob can unlock after timeout
     #    locktime=locktime_block,             # Absolute block height
@@ -127,7 +127,7 @@ def create_timerelease_script():
     #)
       # Option 3: Using a specific future date
     specific_date = dt.datetime(2024, 12, 31, 12, 0, 0)  # Dec 31, 2024 at noon
-    redeem_script = P2SHRedeemScripts.simpleTimeRelease(
+    redeem_script = simpleTimeLock(
         immediate_key=alice_wallet.pubkey,
         delayed_key=bob_wallet.pubkey,
         locktime=specific_date,
@@ -428,7 +428,7 @@ def test_script_only():
     bob_pubkey = "02" + "22" * 32    # Dummy compressed pubkey
     
     # Create script with block-based locktime
-    script_blocks = P2SHRedeemScripts.simpleTimeRelease(
+    script_blocks = simpleTimeLock(
         immediate_key=alice_pubkey,
         delayed_key=bob_pubkey,
         locktime=750000,  # Some future block
@@ -440,7 +440,7 @@ def test_script_only():
     
     # Create script with timestamp-based locktime
     future_time = dt.datetime.now() + dt.timedelta(days=1)
-    script_time = P2SHRedeemScripts.simpleTimeRelease(
+    script_time = simpleTimeLock(
         immediate_key=alice_pubkey,
         delayed_key=bob_pubkey,
         locktime=future_time,

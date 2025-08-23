@@ -8,8 +8,7 @@ P2SH (Pay-to-Script-Hash) allows locking funds to a script hash rather than a si
 
 ### Key Components
 
-1. **Redeem Script Creation** (`evrmore/scripts.py`)
-   - Contains `P2SHRedeemScripts` class
+1. **Redeem Script Creation** (`evrmore/scripts/`)
    - Generates various types of redeem scripts for different channel types
 
 2. **Channel Management** (`evrmore/wallet.py`)

@@ -2,8 +2,8 @@ from typing import Union
 from evrmore import SelectParams
 from evrmore.wallet import P2PKHEvrmoreAddress, CEvrmoreAddress, CEvrmoreSecret
 from satorilib.wallet.identity import Identity
-from satorilib.wallet.evrmore.sign import signMessage
-from satorilib.wallet.evrmore.verify import verify
+from satorilib.wallet.evrmore.utils.sign import signMessage
+from satorilib.wallet.evrmore.utils.verify import verify
 
 class EvrmoreIdentity(Identity):
 

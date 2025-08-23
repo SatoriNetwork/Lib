@@ -2,7 +2,7 @@ from typing import List, Tuple, Optional, Dict
 from evrmore.wallet import CEvrmoreSecret
 from evrmore.core.script import CScript, OP_0
 from evrmore.core import CMutableTransaction
-from satorilib.wallet.evrmore.sign import signForPubkey
+from satorilib.wallet.evrmore.utils.sign import signForPubkey
 
 
 def multisig2Of2(

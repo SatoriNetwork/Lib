@@ -10,6 +10,26 @@ class TxUtils():
     evrBurnMintAddressMain: str = 'EXBurnMintXXXXXXXXXXXXXXXXXXXbdK5E'
     evrBurnMintAddressTest: str = 'n1BurnMintXXXXXXXXXXXXXXXXXXbVTQiY'
 
+    feeRatePerVin: int = 150000
+    feeRatePerVout: int = 150000
+    feeRate: int = 1100
+    defaultFee: int = 250000
+
+    @staticmethod
+    def getTxSize(txhex: str) -> int:
+        return len(txhex) // 2
+    
+    @staticmethod
+    def getTxFee(txhex: str, fee_rate: int, unit: str = "sat/vB") -> int:
+        size_bytes: int = TxUtils.getTxSize(txhex)
+        if unit == "sat/vB":
+            return size_bytes * fee_rate
+        elif unit == "sat/kB":
+            return math.ceil(size_bytes / 1000) * fee_rate
+        else:
+            raise ValueError("unknown fee unit")
+        
+
     @staticmethod
     def estimateMultisigFee(
         inputCount: int,

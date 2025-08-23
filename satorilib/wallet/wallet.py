@@ -1,11 +1,13 @@
-from typing import Union, Callable
+from typing import Union, Callable, Optional, Sequence
 import os
 import json
-import joblib
 import threading
+import datetime as dt
+from functools import partial
 from enum import Enum
 from random import randrange
 from decimal import Decimal
+import joblib
 from satorilib import logging
 from satorilib.utils import system
 from satorilib.disk.utils import safetify
@@ -542,7 +544,7 @@ class Wallet(WalletBase):
         self,
         asDict: bool = False,
         challenge: str = None,
-        vaultInfo:dict = None,
+        vaultInfo: dict = None,
     ) -> Union[str, dict]:
         payload = {
             **self.identity.authPayload(asDict=True, challenge=challenge),
@@ -688,22 +690,23 @@ class Wallet(WalletBase):
         outputCount: int = 0,
         randomly: bool = False,
         feeRate: int = 150000,
+        feeOverride: Optional[int] = None,
     ) -> tuple[list, int]:
         unspentCurrency = [
             x for x in self.unspentCurrency if x.get('value') > 0]
         unspentCurrency = sorted(unspentCurrency, key=lambda x: x['value'])
         haveCurrency = sum([x.get('value') for x in unspentCurrency])
-        if (haveCurrency < sats + self.reserve):
+        if (haveCurrency < sats + (feeOverride or self.reserve)):
             raise TransactionFailure(
                 'tx: must retain a reserve of currency to cover fees')
         gatheredCurrencySats = 0
         gatheredCurrencyUnspents = []
         encounteredDust = False
         while (
-            gatheredCurrencySats < sats + TxUtils.estimatedFee(
+            gatheredCurrencySats < sats + (feeOverride or TxUtils.estimatedFee(
                 inputCount=inputCount + len(gatheredCurrencyUnspents),
                 outputCount=outputCount,
-                feeRate=feeRate)
+                feeRate=feeRate))
         ):
             if randomly:
                 randomUnspent = unspentCurrency.pop(
@@ -724,9 +727,9 @@ class Wallet(WalletBase):
             gatheredCurrencySats = 0
             gatheredCurrencyUnspents = []
             while (
-                gatheredCurrencySats < sats + TxUtils.estimatedFee(
+                gatheredCurrencySats < sats + (feeOverride or TxUtils.estimatedFee(
                     inputCount=inputCount + len(gatheredCurrencyUnspents),
-                    outputCount=outputCount)
+                    outputCount=outputCount))
             ):
                 if randomly:
                     randomUnspent = unspentCurrency.pop(
@@ -802,7 +805,7 @@ class Wallet(WalletBase):
         #
         # todo: you could generalize this to send any asset. but not necessary.
 
-    def _compileCurrencyOutputs(self, currencySats: int, address: str) -> list['CMutableTxOut']:
+    def _compileCurrencyOutputs(self, satsByAddress: dict[str, int]=None, currencySats: int=None, address: str=None) -> list['CMutableTxOut']:
         ''' compile currency outputs'''
 
     def _compileSatoriChangeOutput(
@@ -816,8 +819,7 @@ class Wallet(WalletBase):
         self,
         currencySats: int = 0,
         gatheredCurrencySats: int = 0,
-        inputCount: int = 0,
-        outputCount: int = 0,
+        fee: int = 0,
         scriptPubKey: 'CScript' = None,
         returnSats: bool = False,
     ) -> Union['CMutableTxOut', None, tuple['CMutableTxOut', int]]:
@@ -856,17 +858,22 @@ class Wallet(WalletBase):
     def broadcast(self, txHex: str) -> str:
         return self.electrumx.api.broadcast(txHex)
 
-    ### Transactions ###########################################################
 
-    def miningTransaction(
+    ############################################################################
+    ### Transactions ###########################################################
+    ############################################################################
+    
+    ### p2sh - lock ########################################################################
+
+    def produceSimpleTime(
         self,
-        scripts: dict[str: dict],
-        feeMultiplier: int = 1,
+        scripts: dict[str, dict],
         memo: str=None,
         broadcast: bool = True,
-    ) -> tuple[str, dict[str: int]]:
+        feeOverride: Optional[int] = None,
+    ) -> tuple[str, str, dict[str, dict]]:
         ''' creates a transaction with multiple SATORI asset recipients '''
-        if len(scripts) == 0 or len(scripts) > 500:
+        if len(scripts) == 0 or len(scripts) > 1000:
             raise TransactionFailure('too many or too few scripts')
         satoriSats = 0
         inferredVout = 0
@@ -889,12 +896,13 @@ class Wallet(WalletBase):
                     'address valid:', Validate.address(address, self.symbol),
                     'size', size,
                     'TxUtils.isAmountDivisibilityValid(amount=amount,divisibility=self.divisibility)', TxUtils.isAmountDivisibilityValid(amount=amount, divisibility=self.divisibility), color='green')
-                raise TransactionFailure('miningTransaction bad params')
-            scripts[date]['vout'] = inferredVout
-            scripts[date]['sats'] = TxUtils.roundSatsDownToDivisibility(
+                raise TransactionFailure('produceSimpleTime bad params')
+            scripts[date]['funding_vout'] = inferredVout
+            scripts[date]['satori_sats'] = TxUtils.roundSatsDownToDivisibility(
                 sats=TxUtils.asSats(amount),
                 divisibility=self.divisibility)
-            satoriSats += scripts[date]['sats']
+            satoriSats += scripts[date]['satori_sats']
+            inferredVout += 1
         memoCount = 0
         if memo is not None:
             memoCount = 1
@@ -904,21 +912,23 @@ class Wallet(WalletBase):
         (
             gatheredCurrencyUnspents,
             gatheredCurrencySats) = self._gatherCurrencyUnspents(
+                feeOverride=feeOverride,
                 inputCount=len(gatheredSatoriUnspents),
-                outputCount=len(scripts) + 2 + memoCount,
-                feeRate=150000*feeMultiplier)
+                outputCount=len(scripts) + 2 + memoCount)
         txins, txinScripts = self._compileInputs(
             gatheredCurrencyUnspents=gatheredCurrencyUnspents,
             gatheredSatoriUnspents=gatheredSatoriUnspents)
-        satsByAddress = {payload['p2sh_address']: payload['sats'] for payload in scripts.values()}
+        satsByAddress = {payload['p2sh_address']: payload['satori_sats'] for payload in scripts.values()}
         satoriOuts = self._compileSatoriOutputs(satsByAddress)
         satoriChangeOut = self._compileSatoriChangeOutput(
             satoriSats=satoriSats,
             gatheredSatoriSats=gatheredSatoriSats)
-        currencyChangeOut = self._compileCurrencyChangeOutput(
-            gatheredCurrencySats=gatheredCurrencySats,
+        fee = feeOverride or TxUtils.estimatedFee(
             inputCount=len(txins),
             outputCount=len(satsByAddress) + 2 + memoCount)  # satoriChange, currencyChange, memo
+        currencyChangeOut = self._compileCurrencyChangeOutput(
+            gatheredCurrencySats=gatheredCurrencySats,
+            fee=fee)
         memoOut = None
         if memo is not None:
             memoOut = self._compileMemoOutput(memo)
@@ -928,188 +938,783 @@ class Wallet(WalletBase):
             txouts=satoriOuts + [
                 x for x in [satoriChangeOut, currencyChangeOut, memoOut]
                 if x is not None])
-        if broadcast:
-            funding_txid = self.broadcast(self._txToHex(tx))
-            for date, payload in scripts.items():
-                scripts[date]['funding_txid'] = funding_txid
-            return self._txToHex(tx),funding_txid, scripts
-        return self._txToHex(tx)
-    
-    def mintingTransaction(
+        requiredFee = TxUtils.getTxFee(self._txToHex(tx), TxUtils.feeRate)
+        print('estimated fee:', fee, 'actual fee:', requiredFee)
+        if requiredFee * 0.99 < fee < requiredFee * 1.25:
+            if broadcast:
+                funding_txid = self.broadcast(self._txToHex(tx))
+                for date, payload in scripts.items():
+                    scripts[date]['funding_txid'] = funding_txid
+                return self._txToHex(tx), funding_txid, scripts
+            return self._txToHex(tx), '', scripts
+        return self.produceSimpleTime(
+            scripts=scripts,
+            memo=memo,
+            broadcast=broadcast,
+            feeOverride=requiredFee)
+
+    def produceSimpleTimeCurrency(
         self,
-        address: str,
-        amount: float,
-        feeMultiplier: int = 1,
+        scripts: dict[str, dict],
         memo: str=None,
         broadcast: bool = True,
+        feeOverride: Optional[int] = None,
+    ) -> tuple[str, str, dict[str, dict]]:
+        ''' creates a transaction with multiple currency recipients '''
+        if len(scripts) == 0 or len(scripts) > 500:
+            raise TransactionFailure('too many or too few scripts')
+        currencySats = 0
+        inferredVout = 0
+        for date, payload in scripts.items():
+            amount = payload['amount']
+            address = payload['p2sh_address']
+            size = len(payload['redeem_script'])
+            if (
+                amount <= 0 or
+                # not TxUtils.isAmountDivisibilityValid(
+                #    amount=amount,
+                #    divisibility=self.divisibility) or
+                not Validate.address(address, self.symbol) or
+                size < 1 or size > 50000
+            ):
+                logging.info(
+                    'amount', amount,
+                    'divisibility', self.divisibility,
+                    'address', address,
+                    'address valid:', Validate.address(address, self.symbol),
+                    'size', size,
+                    'TxUtils.isAmountDivisibilityValid(amount=amount,divisibility=self.divisibility)', TxUtils.isAmountDivisibilityValid(amount=amount, divisibility=self.divisibility), color='green')
+                raise TransactionFailure('produceSimpleTimeCurrency bad params')
+            scripts[date]['funding_vout'] = inferredVout
+            scripts[date]['currency_sats'] = TxUtils.roundSatsDownToDivisibility(
+                sats=TxUtils.asSats(amount),
+                divisibility=self.divisibility)
+            currencySats += scripts[date]['currency_sats']
+            inferredVout += 1
+        memoCount = 0
+        if memo is not None:
+            memoCount = 1
+        (
+            gatheredCurrencyUnspents,
+            gatheredCurrencySats) = self._gatherCurrencyUnspents(
+                feeOverride=feeOverride,
+                sats=currencySats,
+                inputCount=1,
+                outputCount=len(scripts) + 1 + memoCount)
+        txins, txinScripts = self._compileInputs(
+            gatheredCurrencyUnspents=gatheredCurrencyUnspents)
+        satsByAddress = {payload['p2sh_address']: payload['currency_sats'] for payload in scripts.values()}
+        currencyOuts = self._compileCurrencyOutputs(satsByAddress)
+        fee = feeOverride or TxUtils.estimatedFee(
+            inputCount=len(txins),
+            outputCount=len(satsByAddress) + 1 + memoCount)  # currencyChange, memo
+        currencyChangeOut = self._compileCurrencyChangeOutput(
+            currencySats=currencySats,
+            gatheredCurrencySats=gatheredCurrencySats,
+            fee=fee)
+        memoOut = None
+        if memo is not None:
+            memoOut = self._compileMemoOutput(memo)
+        tx = self._createTransaction(
+            txins=txins,
+            txinScripts=txinScripts,
+            txouts=currencyOuts + [
+                x for x in [currencyChangeOut, memoOut]
+                if x is not None])
+        requiredFee = TxUtils.getTxFee(self._txToHex(tx), TxUtils.feeRate)
+        print('estimated fee:', fee, 'actual fee:', requiredFee)
+        if requiredFee * 0.99 < fee < requiredFee * 1.25:
+            if broadcast:
+                funding_txid = self.broadcast(self._txToHex(tx))
+                for date, payload in scripts.items():
+                    scripts[date]['funding_txid'] = funding_txid
+                return self._txToHex(tx), funding_txid, scripts
+            return self._txToHex(tx), '', scripts
+        return self.produceSimpleTimeCurrency(
+            scripts=scripts,
+            memo=memo,
+            broadcast=broadcast,
+            feeOverride=requiredFee)
+    
+    def produceMultiTimeMultisig(
+        self,
+        scripts: dict[str, dict],
+        memo: str=None,
+        broadcast: bool = True,
+        feeOverride: Optional[int] = None,
+    ) -> tuple[str, str, dict[str, dict]]:
+        ''' creates a transaction with multiple currency recipients '''
+        if len(scripts) == 0 or len(scripts) > 1000:
+            raise TransactionFailure('too many or too few scripts')
+        satoriSats = 0
+        inferredVout = 0
+        for date, payload in scripts.items():
+            amount = payload['amount']
+            address = payload['p2sh_address']
+            size = len(payload['redeem_script'])
+            if (
+                amount <= 0 or
+                # not TxUtils.isAmountDivisibilityValid(
+                #    amount=amount,
+                #    divisibility=self.divisibility) or
+                not Validate.address(address, self.symbol) or
+                size < 1 or size > 50000
+            ):
+                logging.info(
+                    'amount', amount,
+                    'divisibility', self.divisibility,
+                    'address', address,
+                    'address valid:', Validate.address(address, self.symbol),
+                    'size', size,
+                    'TxUtils.isAmountDivisibilityValid(amount=amount,divisibility=self.divisibility)', TxUtils.isAmountDivisibilityValid(amount=amount, divisibility=self.divisibility), color='green')
+                raise TransactionFailure('produceMultiTimeMultisig bad params')
+            scripts[date]['funding_vout'] = inferredVout
+            scripts[date]['satori_sats'] = TxUtils.roundSatsDownToDivisibility(
+                sats=TxUtils.asSats(amount),
+                divisibility=self.divisibility)
+            satoriSats += scripts[date]['satori_sats']
+            inferredVout += 1
+        memoCount = 0
+        if memo is not None:
+            memoCount = 1
+        (
+            gatheredSatoriUnspents,
+            gatheredSatoriSats) = self._gatherSatoriUnspents(satoriSats)
+        (
+            gatheredCurrencyUnspents,
+            gatheredCurrencySats) = self._gatherCurrencyUnspents(
+                feeOverride=feeOverride,
+                inputCount=len(gatheredSatoriUnspents),
+                outputCount=len(scripts) + 2 + memoCount)
+        txins, txinScripts = self._compileInputs(
+            gatheredCurrencyUnspents=gatheredCurrencyUnspents,
+            gatheredSatoriUnspents=gatheredSatoriUnspents)
+        satsByAddress = {payload['p2sh_address']: payload['satori_sats'] for payload in scripts.values()}
+        satoriOuts = self._compileSatoriOutputs(satsByAddress)
+        satoriChangeOut = self._compileSatoriChangeOutput(
+            satoriSats=satoriSats,
+            gatheredSatoriSats=gatheredSatoriSats)
+        fee = feeOverride or TxUtils.estimatedFee(
+            inputCount=len(txins),
+            outputCount=len(satsByAddress) + 2 + memoCount)  # currencyChange, memo
+        currencyChangeOut = self._compileCurrencyChangeOutput(
+            gatheredCurrencySats=gatheredCurrencySats,
+            fee=fee)
+        memoOut = None
+        if memo is not None:
+            memoOut = self._compileMemoOutput(memo)
+        tx = self._createTransaction(
+            txins=txins,
+            txinScripts=txinScripts,
+            txouts=satoriOuts + [
+                x for x in [satoriChangeOut, currencyChangeOut, memoOut]
+                if x is not None])
+        requiredFee = TxUtils.getTxFee(self._txToHex(tx), TxUtils.feeRate)
+        print('estimated fee:', fee, 'actual fee:', requiredFee)
+        if requiredFee * 0.99 < fee < requiredFee * 1.25:
+            if broadcast:
+                funding_txid = self.broadcast(self._txToHex(tx))
+                for date, payload in scripts.items():
+                    scripts[date]['funding_txid'] = funding_txid
+                return self._txToHex(tx), funding_txid, scripts
+            return self._txToHex(tx), '', scripts
+        return self.produceMultiTimeMultisig(
+            scripts=scripts,
+            memo=memo,
+            broadcast=broadcast,
+            feeOverride=requiredFee)
+
+    def produceMultiTimeMultisigCurrency(
+        self,
+        scripts: dict[str, dict],
+        memo: str=None,
+        broadcast: bool = True,
+        feeOverride: Optional[int] = None,
+    ) -> tuple[str, str, dict[str, dict]]:
+        ''' creates a transaction with multiple currency recipients '''
+        if len(scripts) == 0 or len(scripts) > 500:
+            raise TransactionFailure('too many or too few scripts')
+        currencySats = 0
+        inferredVout = 0
+        for date, payload in scripts.items():
+            amount = payload['amount']
+            address = payload['p2sh_address']
+            size = len(payload['redeem_script'])
+            if (
+                amount <= 0 or
+                # not TxUtils.isAmountDivisibilityValid(
+                #    amount=amount,
+                #    divisibility=self.divisibility) or
+                not Validate.address(address, self.symbol) or
+                size < 1 or size > 50000
+            ):
+                logging.info(
+                    'amount', amount,
+                    'divisibility', self.divisibility,
+                    'address', address,
+                    'address valid:', Validate.address(address, self.symbol),
+                    'size', size,
+                    'TxUtils.isAmountDivisibilityValid(amount=amount,divisibility=self.divisibility)', TxUtils.isAmountDivisibilityValid(amount=amount, divisibility=self.divisibility), color='green')
+                raise TransactionFailure('produceMultiTimeMultisigCurrency bad params')
+            scripts[date]['funding_vout'] = inferredVout
+            scripts[date]['currency_sats'] = TxUtils.roundSatsDownToDivisibility(
+                sats=TxUtils.asSats(amount),
+                divisibility=self.divisibility)
+            currencySats += scripts[date]['currency_sats']
+            inferredVout += 1
+        memoCount = 0
+        if memo is not None:
+            memoCount = 1
+        (
+            gatheredCurrencyUnspents,
+            gatheredCurrencySats) = self._gatherCurrencyUnspents(
+                feeOverride=feeOverride,
+                sats=currencySats,
+                inputCount=1,
+                outputCount=len(scripts) + 1 + memoCount)
+        txins, txinScripts = self._compileInputs(
+            gatheredCurrencyUnspents=gatheredCurrencyUnspents)
+        satsByAddress = {payload['p2sh_address']: payload['currency_sats'] for payload in scripts.values()}
+        currencyOuts = self._compileCurrencyOutputs(satsByAddress)
+        fee = feeOverride or TxUtils.estimatedFee(
+            inputCount=len(txins),
+            outputCount=len(satsByAddress) + 1 + memoCount)  # currencyChange, memo
+        currencyChangeOut = self._compileCurrencyChangeOutput(
+            currencySats=currencySats,
+            gatheredCurrencySats=gatheredCurrencySats,
+            fee=fee)
+        memoOut = None
+        if memo is not None:
+            memoOut = self._compileMemoOutput(memo)
+        tx = self._createTransaction(
+            txins=txins,
+            txinScripts=txinScripts,
+            txouts=currencyOuts + [
+                x for x in [currencyChangeOut, memoOut]
+                if x is not None])
+        requiredFee = TxUtils.getTxFee(self._txToHex(tx), TxUtils.feeRate)
+        print('estimated fee:', fee, 'actual fee:', requiredFee)
+        if requiredFee * 0.99 < fee < requiredFee * 1.25:
+            if broadcast:
+                funding_txid = self.broadcast(self._txToHex(tx))
+                for date, payload in scripts.items():
+                    scripts[date]['funding_txid'] = funding_txid
+                return self._txToHex(tx), funding_txid, scripts
+            return self._txToHex(tx), '', scripts
+        return self.produceMultiTimeMultisigCurrency(
+            scripts=scripts,
+            memo=memo,
+            broadcast=broadcast,
+            feeOverride=requiredFee)
+
+    ### p2sh - unlock ########################################################################
+    
+    def simpleTimeTransaction(
+        self,
+        address: str,
+        lockedAmount: float,
+        memo: str=None,
+        broadcast: bool = True,
+        feeOverride: Optional[int] = None,
         fundingTxId: str = None,
         fundingVout: int = None,
         redeemScript: bytes = None, #'CScript'
         timedRelease: bool = True,
-    ) -> tuple[str, dict[str: int]]:
+        date: Optional[dt.datetime] = None,
+    ) -> tuple[str, dict[str, int]]:
         ''' claim locked tokens '''
         from satorilib.wallet.evrmore.scripts.mining import unlock
         if (
-            amount <= 0 or
+            lockedAmount <= 0 or
             # not TxUtils.isAmountDivisibilityValid(
             #    amount=amount,
             #    divisibility=self.divisibility) or
             not Validate.address(address, self.symbol)
         ):
-            raise TransactionFailure('mintingTransaction bad params')
-        redeemScripts = {f'{fundingTxId}:{fundingVout}': redeemScript}
-        redeemParams = {
-            f'{fundingTxId}:{fundingVout}': unlock.simpleTimeRelease(
-                wallet=self,
-                tx=fundingTxId,
-                vinIndex=fundingVout,
-                redeemScript=redeemScript,
-                timedRelease=timedRelease)}
-        if redeemParams[f'{fundingTxId}:{fundingVout}'] in [None, []]:
-            raise TransactionFailure('mintingTransaction bad params')
+            raise TransactionFailure('simpleTimeTransaction bad params')
+        redeemParams = partial(
+            unlock.simpleTime,
+            timedRelease=timedRelease)
         satoriSats = TxUtils.roundSatsDownToDivisibility(
-            sats=TxUtils.asSats(amount),
+            sats=TxUtils.asSats(lockedAmount),
             divisibility=self.divisibility)
-        (
-            gatheredSatoriUnspents,
-            gatheredSatoriSats) = self._gatherSatoriUnspents(satoriSats)
-        # gather currency in anticipation of fee
+        fee = feeOverride or TxUtils.defaultFee
         (
             gatheredCurrencyUnspents,
             gatheredCurrencySats) = self._gatherCurrencyUnspents(
-                inputCount=len(gatheredSatoriUnspents),
-                outputCount=3,
-                feeRate=150000*feeMultiplier)
+                feeOverride=fee)
         txins, txinScripts = self._compileInputs(
             gatheredCurrencyUnspents=gatheredCurrencyUnspents,
-            gatheredSatoriUnspents=gatheredSatoriUnspents,
-            redeemScripts=redeemScripts,
-            redeemParams=redeemParams)
-        satoriOuts = self._compileSatoriOutputs({address: satoriSats})
-        satoriChangeOut = self._compileSatoriChangeOutput(
-            satoriSats=satoriSats,
-            gatheredSatoriSats=gatheredSatoriSats)
+            )
         currencyChangeOut = self._compileCurrencyChangeOutput(
             gatheredCurrencySats=gatheredCurrencySats,
-            inputCount=len(txins),
-            outputCount=3)
-        tx = self._createTransaction(
-            txins=txins,
-            txinScripts=txinScripts,
-            txouts=satoriOuts + [
-                x for x in [satoriChangeOut, currencyChangeOut]
-                if x is not None],
-            redeemScripts=redeemScripts,
-            redeemParams=redeemParams)
-        return self.broadcast(self._txToHex(tx))
+            fee=fee)
+        memoOut = self._compileMemoOutput(memo)
+        tx = self._compileClaimOnP2SH(
+            redeemScript=redeemScript,
+            redeemParams=redeemParams,
+            address=address,
+            satoriSats=satoriSats,
+            feeOverride=fee,
+            fundingTxId=fundingTxId,
+            fundingVout=fundingVout,
+            date=date,
+            extraVins=txins,
+            extraVinsTxinScripts=txinScripts,
+            extraVouts=currencyChangeOut + ([memoOut] if memoOut else []))
+        requiredFee = TxUtils.getTxFee(self._txToHex(tx), TxUtils.feeRate)
+        print('estimated fee:', fee, 'actual fee:', requiredFee)
+        if requiredFee * 0.99 < fee < requiredFee * 1.25:
+            if broadcast:
+                return self.broadcast(self._txToHex(tx))
+            return tx.serialize().hex()
+        return self.simpleTimeTransaction(
+            address=address,
+            lockedAmount=lockedAmount,
+            memo=memo,
+            broadcast=broadcast,
+            fundingTxId=fundingTxId,
+            fundingVout=fundingVout,
+            redeemScript=redeemScript,
+            timedRelease=timedRelease,
+            date=date,
+            feeOverride=requiredFee)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    def simpleTimeCurrencyTransaction(
+        self,
+        address: str,
+        lockedAmount: float,
+        memo: str=None,
+        broadcast: bool = True,
+        feeOverride: Optional[int] = None,
+        fundingTxId: str = None,
+        fundingVout: int = None,
+        redeemScript: bytes = None, #'CScript'
+        timedRelease: bool = True,
+        date: Optional[dt.datetime] = None,
+    ) -> tuple[str, dict[str, int]]:
+        ''' claim locked tokens '''
+        from satorilib.wallet.evrmore.scripts.mining import unlock
         if (
-            amount <= 0 or
+            lockedAmount <= 0 or
             # not TxUtils.isAmountDivisibilityValid(
-            #     amount=amount,
-            #     divisibility=8) or
+            #    amount=amount,
+            #    divisibility=self.divisibility) or
             not Validate.address(address, self.symbol)
         ):
-            raise TransactionFailure('bad params for currencyTransaction')
-        if amount == 0 or len(address) != :
-            raise TransactionFailure('too many or too few scripts')
-        satoriSats = 0
-        inferredVout = 0
-        for date, payload in scripts.items():
-            amount = payload['amount']
-            address = payload['p2sh_address']
-            size = len(payload['redeem_script'])
-            if (
-                amount <= 0 or
-                # not TxUtils.isAmountDivisibilityValid(
-                #    amount=amount,
-                #    divisibility=self.divisibility) or
-                not Validate.address(address, self.symbol) or
-                size < 1 or size > 50000
-            ):
-                logging.info(
-                    'amount', amount,
-                    'divisibility', self.divisibility,
-                    'address', address,
-                    'address valid:', Validate.address(address, self.symbol),
-                    'size', size,
-                    'TxUtils.isAmountDivisibilityValid(amount=amount,divisibility=self.divisibility)', TxUtils.isAmountDivisibilityValid(amount=amount, divisibility=self.divisibility), color='green')
-                raise TransactionFailure('miningTransaction bad params')
-            scripts[date]['vout'] = inferredVout
-            scripts[date]['sats'] = TxUtils.roundSatsDownToDivisibility(
-                sats=TxUtils.asSats(amount),
-                divisibility=self.divisibility)
-            satoriSats += scripts[date]['sats']
-            
-        memoCount = 0
-        if memo is not None:
-            memoCount = 1
-        (
-            gatheredSatoriUnspents,
-            gatheredSatoriSats) = self._gatherSatoriUnspents(satoriSats)
+            raise TransactionFailure('SimpleTimeReleaseCurrencyTransaction bad params')
+        redeemParams = partial(
+            unlock.simpleTime,
+            timedRelease=timedRelease)
+        currencySats = TxUtils.roundSatsDownToDivisibility(
+            sats=TxUtils.asSats(lockedAmount),
+            divisibility=self.divisibility)
+        fee = feeOverride or TxUtils.defaultFee
+        memoOut = self._compileMemoOutput(memo)
+        tx = self._compileClaimOnP2SH(
+            redeemScript=redeemScript,
+            redeemParams=redeemParams,
+            address=address,
+            currencySats=currencySats,
+            feeOverride=fee,
+            fundingTxId=fundingTxId,
+            fundingVout=fundingVout,
+            extraVouts=[memoOut] if memoOut else [],
+            date=date)
+        requiredFee = TxUtils.getTxFee(self._txToHex(tx), TxUtils.feeRate)
+        print('estimated fee:', fee, 'actual fee:', requiredFee)
+        if requiredFee * 0.99 < fee < requiredFee * 1.25:            
+            if broadcast:
+                return self.broadcast(self._txToHex(tx))
+            return tx.serialize().hex()
+        return self.simpleTimeCurrencyTransaction(
+            address=address,
+            lockedAmount=lockedAmount,
+            memo=memo,
+            broadcast=broadcast,
+            fundingTxId=fundingTxId,
+            fundingVout=fundingVout,
+            redeemScript=redeemScript,
+            timedRelease=timedRelease,
+            date=date,
+            feeOverride=requiredFee)
+
+    def multiTimeMultisigCurrencyTransaction(
+        self,
+        address: str,
+        lockedAmount: float,
+        memo: str=None,
+        broadcast: bool = True,
+        feeOverride: Optional[int] = None,
+        fundingTxId: str = None,
+        fundingVout: int = None,
+        redeemScript: bytes = None, #'CScript'
+        timedRelease: bool = True,
+        date: Optional[dt.datetime] = None,
+        multisigMap: Optional[dict[str, bytes]] = None, # ordered pubkeys: signatures
+    ) -> tuple[str, dict[str, int]]:
+        ''' claim locked tokens '''
+        if (
+            lockedAmount <= 0 or
+            # not TxUtils.isAmountDivisibilityValid(
+            #    amount=amount,
+            #    divisibility=self.divisibility) or
+            not Validate.address(address, self.symbol)
+        ):
+            raise TransactionFailure('SimpleTimeReleaseCurrencyTransaction bad params')
+        if multisigMap is None:
+            return self.multiTimeNotMultisigCurrencyTransaction(
+                address=address,
+                lockedAmount=lockedAmount,
+                memo=memo,
+                broadcast=broadcast,
+                feeOverride=feeOverride,
+                fundingTxId=fundingTxId,
+                fundingVout=fundingVout,
+                redeemScript=redeemScript,
+                timedRelease=timedRelease,
+                date=date)
+        return self.multiTimeMultisigCurrencyTransactionStart(
+                address=address,
+                lockedAmount=lockedAmount,
+                memo=memo,
+                feeOverride=feeOverride,
+                fundingTxId=fundingTxId, 
+                fundingVout=fundingVout,
+                date=date)
+
+    def multiTimeNotMultisigCurrencyTransaction(
+        self,
+        address: str,
+        lockedAmount: float,
+        memo: str=None,
+        broadcast: bool = True,
+        feeOverride: Optional[int] = None,
+        fundingTxId: str = None,
+        fundingVout: int = None,
+        redeemScript: bytes = None, #'CScript'
+        timedRelease: int = 3,
+        date: Optional[dt.datetime] = None,
+    ) -> tuple[str, dict[str, int]]:
+        ''' claim locked tokens '''
+        from satorilib.wallet.evrmore.scripts.mining import unlock
+        redeemParams = partial(
+            unlock.multiTimeMultisig,
+            timedRelease=timedRelease)
+        currencySats = TxUtils.roundSatsDownToDivisibility(
+            sats=TxUtils.asSats(lockedAmount),
+            divisibility=self.divisibility)
+        fee = feeOverride or TxUtils.defaultFee
+        memoOut = self._compileMemoOutput(memo)
+        tx = self._compileClaimOnP2SH(
+            redeemScript=redeemScript,
+            redeemParams=redeemParams,
+            address=address,
+            currencySats=currencySats,
+            feeOverride=fee,
+            fundingTxId=fundingTxId,
+            fundingVout=fundingVout,
+            extraVouts=[memoOut] if memoOut else [],
+            date=date)
+        requiredFee = TxUtils.getTxFee(self._txToHex(tx), TxUtils.feeRate)
+        print('estimated fee:', fee, 'actual fee:', requiredFee)
+        if requiredFee * 0.99 < fee < requiredFee * 1.25:            
+            if broadcast:
+                return self.broadcast(self._txToHex(tx))
+            return tx.serialize().hex()
+        return self.multiTimeNotMultisigCurrencyTransaction(
+            address=address,
+            lockedAmount=lockedAmount,
+            memo=memo,
+            broadcast=broadcast,
+            fundingTxId=fundingTxId,
+            fundingVout=fundingVout,
+            redeemScript=redeemScript,
+            timedRelease=timedRelease,
+            date=date,
+            feeOverride=requiredFee)    
+
+    def multiTimeMultisigCurrencyTransactionStart(
+        self,
+        address: str,
+        lockedAmount: float,
+        memo: str=None,
+        feeOverride: Optional[int] = None,
+        fundingTxId: str = None,
+        fundingVout: int = None,
+        date: Optional[dt.datetime] = None,
+    ) -> tuple[str, dict[str, int]]:
+        ''' claim locked tokens '''
+        currencySats = TxUtils.roundSatsDownToDivisibility(
+            sats=TxUtils.asSats(lockedAmount),
+            divisibility=self.divisibility)
+        fee = feeOverride or TxUtils.defaultFee*4
+        memoOut = self._compileMemoOutput(memo)
+        tx = self._compileClaimOnP2SHMultiSigStart(
+            address=address,
+            currencySats=currencySats,
+            feeOverride=fee,
+            fundingTxId=fundingTxId,
+            fundingVout=fundingVout,
+            extraVouts=[memoOut] if memoOut else [],
+            date=date)
+        return tx
+
+    def multiTimeMultisigCurrencyTransactionMiddle(
+        self,
+        tx: bytes = None, # CMutableTransaction
+        redeemScript: bytes = None, # 'CScript'
+        vinIndex: int = 0,
+        sighashFlag: int = None,
+    ) -> bytes:
+        ''' create a signature for the input at vinIndex '''
+        return self._compileClaimOnP2SHMultiSigMiddle(
+            tx=tx,
+            redeemScript=redeemScript, 
+            vinIndex=vinIndex,
+            **({sighashFlag: sighashFlag} if sighashFlag else {}))
+    
+    def multiTimeMultisigCurrencyTransactionEnd(
+        self,
+        tx: bytes, # CMutableTransaction
+        signatures: list[bytes],
+        extraVinsTxinScripts: Optional[list[bytes]] = None,
+        broadcast: bool = True,
+        feeOverride: int = 93500,
+        redeemScript: bytes = None, #'CScript'
+        timedRelease: bool = True,
+    ) -> tuple[str, dict[str, int]]:
+        ''' claim locked tokens '''
+        from satorilib.wallet.evrmore.scripts.mining import unlock
+        redeemParams = partial(
+            unlock.multiTimeMultisig,
+            sig=signatures[0],
+            sig2=signatures[1],
+            sig3=signatures[2],
+            sig4=signatures[3],
+            sig5=signatures[4],
+            timedRelease=timedRelease)
+        fee = feeOverride
+        tx = self._compileClaimOnP2SHMultiSigEnd(
+            tx=tx,
+            redeemScript=redeemScript,
+            redeemParams=redeemParams,
+            extraVinsTxinScripts=extraVinsTxinScripts)
+        requiredFee = TxUtils.getTxFee(self._txToHex(tx), TxUtils.feeRate)
+        print('estimated fee:', fee, 'actual fee:', requiredFee)
+        if fee >= requiredFee:            
+            if broadcast:
+                return self.broadcast(self._txToHex(tx))
+            return tx.serialize().hex()
+        raise TransactionFailure('fee too low')
+    
+    def multiTimeMultisigTransaction(
+        self,
+        address: str,
+        lockedAmount: float,
+        memo: str=None,
+        broadcast: bool = True,
+        feeOverride: Optional[int] = None,
+        fundingTxId: str = None,
+        fundingVout: int = None,
+        redeemScript: bytes = None, #'CScript'
+        timedRelease: bool = True,
+        date: Optional[dt.datetime] = None,
+        multisigMap: Optional[dict[str, bytes]] = None, # ordered pubkeys: signatures
+    ) -> tuple[str, dict[str, int]]:
+        ''' claim locked tokens '''
+        if (
+            lockedAmount <= 0 or
+            # not TxUtils.isAmountDivisibilityValid(
+            #    amount=amount,
+            #    divisibility=self.divisibility) or
+            not Validate.address(address, self.symbol)
+        ):
+            raise TransactionFailure('SimpleTimeReleaseCurrencyTransaction bad params')
+        if multisigMap is None:
+            return self.multiTimeNotMultisigTransaction(
+                address=address,
+                lockedAmount=lockedAmount,
+                memo=memo,
+                broadcast=broadcast,
+                feeOverride=feeOverride,
+                fundingTxId=fundingTxId,
+                fundingVout=fundingVout,
+                redeemScript=redeemScript,
+                timedRelease=timedRelease,
+                date=date)
+        return self.multiTimeMultisigTransactionStart(
+                address=address,
+                lockedAmount=lockedAmount,
+                memo=memo,
+                feeOverride=feeOverride,
+                fundingTxId=fundingTxId, 
+                fundingVout=fundingVout,
+                date=date)
+
+    def multiTimeNotMultisigTransaction(
+        self,
+        address: str,
+        lockedAmount: float,
+        memo: str=None,
+        broadcast: bool = True,
+        feeOverride: Optional[int] = None,
+        fundingTxId: str = None,
+        fundingVout: int = None,
+        redeemScript: bytes = None, #'CScript'
+        timedRelease: int = 3,
+        date: Optional[dt.datetime] = None,
+    ) -> tuple[str, dict[str, int]]:
+        ''' claim locked tokens '''
+        from satorilib.wallet.evrmore.scripts.mining import unlock
+        redeemParams = partial(
+            unlock.multiTimeMultisig,
+            timedRelease=timedRelease)
+        satoriSats = TxUtils.roundSatsDownToDivisibility(
+            sats=TxUtils.asSats(lockedAmount),
+            divisibility=self.divisibility)
+        fee = feeOverride or TxUtils.defaultFee
+        
         (
             gatheredCurrencyUnspents,
             gatheredCurrencySats) = self._gatherCurrencyUnspents(
-                inputCount=len(gatheredSatoriUnspents),
-                outputCount=len(scripts) + 2 + memoCount,
-                feeRate=150000*feeMultiplier
-                )
+                feeOverride=fee)
         txins, txinScripts = self._compileInputs(
             gatheredCurrencyUnspents=gatheredCurrencyUnspents,
-            gatheredSatoriUnspents=gatheredSatoriUnspents)
-        satsByAddress = {payload['p2sh_address']: payload['sats'] for payload in scripts.values()}
-        satoriOuts = self._compileSatoriOutputs(satsByAddress)
-        satoriChangeOut = self._compileSatoriChangeOutput(
-            satoriSats=satoriSats,
-            gatheredSatoriSats=gatheredSatoriSats)
+            )
         currencyChangeOut = self._compileCurrencyChangeOutput(
             gatheredCurrencySats=gatheredCurrencySats,
-            inputCount=len(txins),
-            outputCount=len(satsByAddress) + 2 + memoCount)  # satoriChange, currencyChange, memo
-        memoOut = None
-        if memo is not None:
-            memoOut = self._compileMemoOutput(memo)
-        tx = self._createTransaction(
-            txins=txins,
-            txinScripts=txinScripts,
-            txouts=satoriOuts + [
-                x for x in [satoriChangeOut, currencyChangeOut, memoOut]
-                if x is not None])
-        if broadcast:
-            funding_txid = self.broadcast(self._txToHex(tx))
-            for date, payload in scripts.items():
-                scripts[date]['funding_txid'] = funding_txid
-            return self._txToHex(tx),funding_txid, scripts
-        return self._txToHex(tx)
+            fee=fee)
 
+        memoOut = self._compileMemoOutput(memo)
+        tx = self._compileClaimOnP2SH(
+            redeemScript=redeemScript,
+            redeemParams=redeemParams,
+            address=address,
+            satoriSats=satoriSats,
+            feeOverride=fee,
+            fundingTxId=fundingTxId,
+            fundingVout=fundingVout,
+            date=date,
+            extraVins=txins,
+            extraVinsTxinScripts=txinScripts,
+            extraVouts=([currencyChangeOut] if currencyChangeOut else []) + ([memoOut] if memoOut else []))
+        requiredFee = TxUtils.getTxFee(self._txToHex(tx), TxUtils.feeRate)
+        print('estimated fee:', fee, 'actual fee:', requiredFee)
+        if requiredFee * 0.99 < fee < requiredFee * 1.25:            
+            if broadcast:
+                return self.broadcast(self._txToHex(tx))
+            return tx.serialize().hex()
+        return self.multiTimeNotMultisigTransaction(
+            address=address,
+            lockedAmount=lockedAmount,
+            memo=memo,
+            broadcast=broadcast,
+            fundingTxId=fundingTxId,
+            fundingVout=fundingVout,
+            redeemScript=redeemScript,
+            timedRelease=timedRelease,
+            date=date,
+            feeOverride=requiredFee)    
+
+    def multiTimeMultisigTransactionStart(
+        self,
+        address: str,
+        lockedAmount: float,
+        memo: str=None,
+        feeOverride: Optional[int] = None,
+        fundingTxId: str = None,
+        fundingVout: int = None,
+        date: Optional[dt.datetime] = None,
+    ) -> tuple[str, dict[str, int]]:
+        ''' claim locked tokens '''
+        satoriSats = TxUtils.roundSatsDownToDivisibility(
+            sats=TxUtils.asSats(lockedAmount),
+            divisibility=self.divisibility)
+        fee = feeOverride or TxUtils.defaultFee*4
+        (
+            gatheredCurrencyUnspents,
+            gatheredCurrencySats) = self._gatherCurrencyUnspents(
+                feeOverride=fee)
+        txins, txinScripts = self._compileInputs(
+            gatheredCurrencyUnspents=gatheredCurrencyUnspents,
+            )
+        currencyChangeOut = self._compileCurrencyChangeOutput(
+            gatheredCurrencySats=gatheredCurrencySats,
+            fee=fee)
+        memoOut = self._compileMemoOutput(memo)
+        tx = self._compileClaimOnP2SHMultiSigStart(
+            address=address,
+            satoriSats=satoriSats,
+            feeOverride=fee,
+            fundingTxId=fundingTxId,
+            fundingVout=fundingVout,
+            date=date,
+            extraVins=txins,
+            extraVouts=([currencyChangeOut] if currencyChangeOut else []) + ([memoOut] if memoOut else []))
+        return tx, txinScripts
+
+    def multiTimeMultisigTransactionMiddle(
+        self,
+        tx: bytes = None, # CMutableTransaction
+        redeemScript: bytes = None, # 'CScript'
+        vinIndex: int = 0,
+        sighashFlag: int = None,
+    ) -> bytes:
+        ''' create a signature for the input at vinIndex '''
+        return self._compileClaimOnP2SHMultiSigMiddle(
+            tx=tx,
+            redeemScript=redeemScript, 
+            vinIndex=vinIndex,
+            **({sighashFlag: sighashFlag} if sighashFlag else {}))
+    
+    def multiTimeMultisigTransactionEnd(
+        self,
+        tx: bytes, # CMutableTransaction
+        signatures: list[bytes],
+        extraVinsTxinScripts: Optional[list[bytes]] = None,
+        broadcast: bool = True,
+        feeOverride: int = 93500,
+        redeemScript: bytes = None, #'CScript'
+        timedRelease: bool = True,
+    ) -> tuple[str, dict[str, int]]:
+        ''' claim locked tokens '''
+        from satorilib.wallet.evrmore.scripts.mining import unlock
+        redeemParams = partial(
+            unlock.multiTimeMultisig,
+            sig=signatures[0],
+            sig2=signatures[1],
+            sig3=signatures[2],
+            sig4=signatures[3],
+            sig5=signatures[4],
+            timedRelease=timedRelease)
+        fee = feeOverride
+        tx = self._compileClaimOnP2SHMultiSigEnd(
+            tx=tx,
+            redeemScript=redeemScript,
+            redeemParams=redeemParams,
+            extraVinsTxinScripts=extraVinsTxinScripts)
+        requiredFee = TxUtils.getTxFee(self._txToHex(tx), TxUtils.feeRate)
+        print('estimated fee:', fee, 'actual fee:', requiredFee)
+        if fee >= requiredFee:            
+            if broadcast:
+                return self.broadcast(self._txToHex(tx))
+            return tx.serialize().hex()
+        raise TransactionFailure('fee too low - start over completely')
+
+    ### p2pkh ########################################################################
 
     def satoriDistribution(
         self,
-        amountByAddress: dict[str: float],
+        amountByAddress: dict[str, float],
         memo: str=None,
         broadcast: bool = True,
+        feeOverride: Optional[int] = None,
     ) -> str:
         ''' creates a transaction with multiple SATORI asset recipients '''
         if len(amountByAddress) == 0 or len(amountByAddress) > 1000:
             raise TransactionFailure('too many or too few recipients')
-        satsByAddress: dict[str: int] = {}
+        satsByAddress: dict[str, int] = {}
         for address, amount in amountByAddress.items():
             if (
                 amount <= 0 or
@@ -1134,6 +1739,7 @@ class Wallet(WalletBase):
         (
             gatheredCurrencyUnspents,
             gatheredCurrencySats) = self._gatherCurrencyUnspents(
+                feeOverride=feeOverride,
                 inputCount=len(gatheredSatoriUnspents),
                 outputCount=len(satsByAddress) + 2 + memoCount)
         txins, txinScripts = self._compileInputs(
@@ -1143,10 +1749,12 @@ class Wallet(WalletBase):
         satoriChangeOut = self._compileSatoriChangeOutput(
             satoriSats=satoriSats,
             gatheredSatoriSats=gatheredSatoriSats)
-        currencyChangeOut = self._compileCurrencyChangeOutput(
-            gatheredCurrencySats=gatheredCurrencySats,
+        fee = feeOverride or TxUtils.estimatedFee(
             inputCount=len(txins),
             outputCount=len(satsByAddress) + 2 + memoCount)  # satoriChange, currencyChange, memo
+        currencyChangeOut = self._compileCurrencyChangeOutput(
+            gatheredCurrencySats=gatheredCurrencySats,
+            fee=fee)
         memoOut = None
         if memo is not None:
             memoOut = self._compileMemoOutput(memo)
@@ -1156,11 +1764,25 @@ class Wallet(WalletBase):
             txouts=satoriOuts + [
                 x for x in [satoriChangeOut, currencyChangeOut, memoOut]
                 if x is not None])
+        #requiredFee = TxUtils.getTxFee(self._txToHex(tx), TxUtils.feeRate)
+        #print('estimated fee:', fee, 'actual fee:', requiredFee)
+        #if requiredFee * 0.99 < fee < requiredFee * 1.25:
         if broadcast:
             return self.broadcast(self._txToHex(tx))
         return self._txToHex(tx)
+        #return self.satoriDistribution(
+        #    amountByAddress=amountByAddress,
+        #    memo=memo,
+        #    broadcast=broadcast,
+        #    feeOverride=requiredFee)
 
-    def currencyTransaction(self, amount: float, address: str):
+    def currencyTransaction(
+        self, 
+        amount: float,
+        address: str,
+        broadcast: bool = True,
+        feeOverride: Optional[int] = None,
+    ):
         ''' creates a transaction to just send rvn '''
         if (
             amount <= 0 or
@@ -1176,26 +1798,38 @@ class Wallet(WalletBase):
         (
             gatheredCurrencyUnspents,
             gatheredCurrencySats) = self._gatherCurrencyUnspents(
+                feeOverride=feeOverride,
                 sats=currencySats,
                 inputCount=0,
                 outputCount=1)
         txins, txinScripts = self._compileInputs(
             gatheredCurrencyUnspents=gatheredCurrencyUnspents)
-        currencyOuts = self._compileCurrencyOutputs(currencySats, address)
+        currencyOuts = self._compileCurrencyOutputs(address=address, sats=currencySats)
+        fee = feeOverride or TxUtils.estimatedFee(
+            inputCount=len(txins),
+            outputCount=2)
         currencyChangeOut = self._compileCurrencyChangeOutput(
             currencySats=currencySats,
             gatheredCurrencySats=gatheredCurrencySats,
-            inputCount=len(txins),
-            outputCount=2)
+            fee=fee)
         tx = self._createTransaction(
             txins=txins,
             txinScripts=txinScripts,
             txouts=currencyOuts + [
                 x for x in [currencyChangeOut]
                 if x is not None])
-        return self.broadcast(self._txToHex(tx))
+        requiredFee = TxUtils.getTxFee(self._txToHex(tx), TxUtils.feeRate)
+        print('estimated fee:', fee, 'actual fee:', requiredFee)
+        if requiredFee * 0.99 < fee < requiredFee * 1.25:
+            if broadcast:
+                return self.broadcast(self._txToHex(tx))
+            return self._txToHex(tx)
+        return self.currencyTransaction(
+            amount=amount,
+            address=address,
+            feeOverride=requiredFee)
 
-    def satoriTransaction(self, amount: float, address: str):
+    def satoriTransaction(self, amount: float, address: str, feeOverride: Optional[int] = None):
         ''' creates a transaction to send satori to one address '''
         if (
             amount <= 0 or
@@ -1215,6 +1849,7 @@ class Wallet(WalletBase):
         (
             gatheredCurrencyUnspents,
             gatheredCurrencySats) = self._gatherCurrencyUnspents(
+                feeOverride=feeOverride,
                 inputCount=len(gatheredSatoriUnspents),
                 outputCount=3)
         txins, txinScripts = self._compileInputs(
@@ -1224,19 +1859,34 @@ class Wallet(WalletBase):
         satoriChangeOut = self._compileSatoriChangeOutput(
             satoriSats=satoriSats,
             gatheredSatoriSats=gatheredSatoriSats)
-        currencyChangeOut = self._compileCurrencyChangeOutput(
-            gatheredCurrencySats=gatheredCurrencySats,
+        fee = feeOverride or TxUtils.estimatedFee(
             inputCount=len(txins),
             outputCount=3)
+        currencyChangeOut = self._compileCurrencyChangeOutput(
+            gatheredCurrencySats=gatheredCurrencySats,
+            fee=fee)
         tx = self._createTransaction(
             txins=txins,
             txinScripts=txinScripts,
             txouts=satoriOuts + [
                 x for x in [satoriChangeOut, currencyChangeOut]
                 if x is not None])
-        return self.broadcast(self._txToHex(tx))
+        requiredFee = TxUtils.getTxFee(self._txToHex(tx), TxUtils.feeRate)
+        print('estimated fee:', fee, 'actual fee:', requiredFee)
+        if requiredFee * 0.99 < fee < requiredFee * 1.25:
+            return self.broadcast(self._txToHex(tx))
+        return self.satoriTransaction(
+            amount=amount,
+            address=address,
+            feeOverride=requiredFee)
 
-    def satoriAndCurrencyTransaction(self, satoriAmount: float, currencyAmount: float, address: str):
+    def satoriAndCurrencyTransaction(
+        self,
+        satoriAmount: float,
+        currencyAmount: float,
+        address: str,
+        feeOverride: Optional[int] = None,
+    ):
         ''' creates a transaction to send satori and currency to one address '''
         ''' unused, untested '''
         if (
@@ -1263,6 +1913,7 @@ class Wallet(WalletBase):
         (
             gatheredCurrencyUnspents,
             gatheredCurrencySats) = self._gatherCurrencyUnspents(
+                feeOverride=feeOverride,
                 sats=currencySats,
                 inputCount=len(gatheredSatoriUnspents),
                 outputCount=4)
@@ -1270,17 +1921,19 @@ class Wallet(WalletBase):
             gatheredCurrencyUnspents=gatheredCurrencyUnspents,
             gatheredSatoriUnspents=gatheredSatoriUnspents)
         satoriOuts = self._compileSatoriOutputs({address: satoriSats})
-        currencyOuts = self._compileCurrencyOutputs(currencySats, address)
+        currencyOuts = self._compileCurrencyOutputs(address=address, sats=currencySats)
         satoriChangeOut = self._compileSatoriChangeOutput(
             satoriSats=satoriSats,
             gatheredSatoriSats=gatheredSatoriSats)
-        currencyChangeOut = self._compileCurrencyChangeOutput(
-            currencySats=currencySats,
-            gatheredCurrencySats=gatheredCurrencySats,
+        fee = feeOverride or TxUtils.estimatedFee(
             inputCount=(
                 len(gatheredSatoriUnspents) +
                 len(gatheredCurrencyUnspents)),
             outputCount=4)
+        currencyChangeOut = self._compileCurrencyChangeOutput(
+            currencySats=currencySats,
+            gatheredCurrencySats=gatheredCurrencySats,
+            fee=fee)
         tx = self._createTransaction(
             txins=txins,
             txinScripts=txinScripts,
@@ -1288,7 +1941,15 @@ class Wallet(WalletBase):
                 satoriOuts + currencyOuts + [
                     x for x in [satoriChangeOut, currencyChangeOut]
                     if x is not None]))
-        return self.broadcast(self._txToHex(tx))
+        requiredFee = TxUtils.getTxFee(self._txToHex(tx), TxUtils.feeRate)
+        print('estimated fee:', fee, 'actual fee:', requiredFee)
+        if requiredFee * 0.99 < fee < requiredFee * 1.25:
+            return self.broadcast(self._txToHex(tx))
+        return self.satoriAndCurrencyTransaction(
+            satoriAmount=satoriAmount,
+            currencyAmount=currencyAmount,
+            address=address,
+            feeOverride=requiredFee)
 
     # def satoriOnlyPartial(self, amount: int, address: str, pullFeeFromAmount: bool = False) -> str:
     #    '''
@@ -1378,6 +2039,7 @@ class Wallet(WalletBase):
     #    (
     #        gatheredCurrencyUnspents,
     #        gatheredCurrencySats) = self._gatherCurrencyUnspents(
+    #            feeOverride=feeOverride,
     #            inputCount=len(tx.vin) + 2,  # fee input could potentially be 2
     #            outputCount=len(tx.vout) + 2)  # claim output, change output
     #    txins, txinScripts = self._compileInputs(
@@ -1409,6 +2071,7 @@ class Wallet(WalletBase):
         feeSatsReserved: int = 0,
         completerAddress: str = None,
         changeAddress: str = None,
+        feeOverride: Optional[int] = None,
     ) -> tuple[str, int, str]:
         '''
         if people do not have a balance of rvn, they can still send satori.
@@ -1478,12 +2141,14 @@ class Wallet(WalletBase):
         if bridgeFeeOut is None:
             raise TransactionFailure('unable to generate bridge fee')
         # change out to server
-        currencyChangeOut, currencyChange = self._compileCurrencyChangeOutput(
-            gatheredCurrencySats=feeSatsReserved,
+        fee = feeOverride or TxUtils.estimatedFee(
             inputCount=len(gatheredSatoriUnspents),
             # len([mundoFeeOut, bridgeFeeOut, currencyChangeOut, memoOut]) +
             outputCount=len(satoriOuts) + 4 +
-            (1 if satoriChangeOut is not None else 0),
+            (1 if satoriChangeOut is not None else 0))
+        currencyChangeOut, currencyChange = self._compileCurrencyChangeOutput(
+            gatheredCurrencySats=feeSatsReserved,
+            fee=fee,
             scriptPubKey=self._generateScriptPubKeyFromAddress(changeAddress),
             returnSats=True)
         if currencyChangeOut is None:
@@ -1506,6 +2171,7 @@ class Wallet(WalletBase):
         feeSatsReserved: int = 0,
         completerAddress: str = None,
         changeAddress: str = None,
+        feeOverride: Optional[int] = None,
     ) -> tuple[str, int]:
         '''
         if people do not have a balance of evr, they can still send satori.
@@ -1561,12 +2227,14 @@ class Wallet(WalletBase):
         if mundoFeeOut is None:
             raise TransactionFailure('unable to generate mundo fee')
         # change out to server
-        currencyChangeOut, currencyChange = self._compileCurrencyChangeOutput(
-            gatheredCurrencySats=feeSatsReserved,
+        fee = feeOverride or TxUtils.estimatedFee(
             inputCount=len(gatheredSatoriUnspents),
             # len([mundoFeeOut, currencyChange]) +
             outputCount=len(satoriOuts) + 2 +
-            (1 if satoriChangeOut is not None else 0),
+            (1 if satoriChangeOut is not None else 0))
+        currencyChangeOut, currencyChange = self._compileCurrencyChangeOutput(
+            gatheredCurrencySats=feeSatsReserved,
+            fee=fee,
             scriptPubKey=self._generateScriptPubKeyFromAddress(changeAddress),
             returnSats=True)
         if currencyChangeOut is None:
@@ -1588,6 +2256,7 @@ class Wallet(WalletBase):
         changeAddress: Union[str, None] = None,
         completerAddress: Union[str, None] = None,
         bridgeTransaction: bool = False,
+        feeOverride: Optional[int] = None,
     ) -> str:
         '''
         a companion function to satoriOnlyPartialSimple which completes the
@@ -1684,7 +2353,11 @@ class Wallet(WalletBase):
             txinScripts=txinScripts)
         return self.broadcast(self._txToHex(tx))
 
-    def sendAllTransaction(self, address: str) -> str:
+    def sendAllTransaction(
+        self,
+        address: str,
+        feeOverride: Optional[int] = None,
+    ) -> str:
         '''
         sweeps all Satori and currency to the address. so it has to take the fee
         out of whatever is in the wallet rather than tacking it on at the end.
@@ -1725,15 +2398,21 @@ class Wallet(WalletBase):
                         sats=TxUtils.asSats(self.balance.amount),
                         divisibility=self.divisibility)}) +
                 (
-                    self._compileCurrencyOutputs(currencySatsLessFee, address)
+                    self._compileCurrencyOutputs(address=address, sats=currencySatsLessFee)
                     if currencySatsLessFee > 0 else []))
         else:
-            txouts = self._compileCurrencyOutputs(currencySatsLessFee, address)
+            txouts = self._compileCurrencyOutputs(address=address, sats=currencySatsLessFee)
         tx = self._createTransaction(
             txins=txins,
             txinScripts=txinScripts,
             txouts=txouts)
-        return self.broadcast(self._txToHex(tx))
+        requiredFee = TxUtils.getTxFee(self._txToHex(tx), TxUtils.feeRate)
+        print('estimated fee:', feeOverride, 'actual fee:', requiredFee)
+        if requiredFee * 0.99 < feeOverride < requiredFee * 1.25:
+            return self.broadcast(self._txToHex(tx))
+        return self.sendAllTransaction(
+            address=address,
+            feeOverride=requiredFee)
 
     # not finished
     # I thought this would be worth it, but
@@ -1775,7 +2454,7 @@ class Wallet(WalletBase):
     #                address: unspent.get('x') - self.mundoFee # on first item
     #                for unspent in gatheredSatoriUnspents
     #                }) +
-    #            self._compileCurrencyOutputs(currencySats, address))
+    #            self._compileCurrencyOutputs(address=address, sats=currencySats))
     #
     #    if not Validate.address(address, self.symbol):
     #        raise TransactionFailure('sendAllTransaction')
@@ -1811,6 +2490,7 @@ class Wallet(WalletBase):
         feeSatsReserved: int = 0,
         completerAddress: str = None,
         changeAddress: str = None,
+        feeOverride: Optional[int] = None,
         **kwargs
     ) -> tuple[str, int]:
         '''
@@ -1841,7 +2521,7 @@ class Wallet(WalletBase):
             gatheredSatoriUnspents=gatheredSatoriUnspents)
         sweepOuts = (
             (
-                self._compileCurrencyOutputs(currencySats, address)
+                self._compileCurrencyOutputs(address=address, sats=currencySats)
                 if currencySats > 0 else []) +
             self._compileSatoriOutputs(
                 {address:
@@ -1852,11 +2532,13 @@ class Wallet(WalletBase):
         mundoFeeOut = self._compileSatoriOutputs(
             {completerAddress: TxUtils.asSats(self.mundoFee)})[0]
         # change out to server
-        currencyChangeOut, currencyChange = self._compileCurrencyChangeOutput(
-            gatheredCurrencySats=feeSatsReserved,
+        fee = feeOverride or TxUtils.estimatedFee(
             inputCount=len(gatheredSatoriUnspents) +
             len(gatheredCurrencyUnspents),
-            outputCount=len(sweepOuts) + 2,
+            outputCount=len(sweepOuts) + 2)
+        currencyChangeOut, currencyChange = self._compileCurrencyChangeOutput(
+            gatheredCurrencySats=feeSatsReserved,
+            fee=fee,
             scriptPubKey=self._generateScriptPubKeyFromAddress(changeAddress),
             returnSats=True)
         # since it's a send all, there's no change outputs

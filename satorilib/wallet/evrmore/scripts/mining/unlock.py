@@ -1,25 +1,5 @@
 from typing import List, Optional
-from evrmore.core import CMutableTransaction
 from evrmore.core.script import CScript, OP_0, OP_1, OP_TRUE, OP_FALSE
-
-
-## we don't actually need to do the signing here
-#def simpleTimeOriginal(
-#    *,
-#    wallet: 'EvrmoreWallet',
-#    tx: CMutableTransaction,
-#    vinIndex: int,
-#    redeemScript: CScript,
-#    sighashFlag: int = None,
-#    timedRelease: bool = True,
-#) -> List[object]:
-#    """
-#    Returns: [sig, 1] for timed release
-#    Returns: [sig, 0] for immediate release
-#    """
-#    sig = wallet.signatureForInput(redeemScript, tx, vinIndex, sighashFlag)
-#    params = OP_1 if timedRelease else OP_0
-#    return [sig, params]
 
 
 def simpleTime(

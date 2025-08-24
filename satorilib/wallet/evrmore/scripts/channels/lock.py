@@ -11,13 +11,13 @@ CSV_UNIT_SECS = 512
 CSV_MAX_UNITS = 0xFFFF     # 16 bits # 33,553,920 s = 559,232 min ≈ 388.36 days
 
 
-def renewableThunderChannel(
+def thunderChannel(
     sender: Union[bytes, str], 
     receiver: Union[bytes, str], 
     blocks: Union[int, None] = None, 
     minutes: Union[int, None] = None,
 ) -> CScript:
-    """Create a renewable timed multi-signature redeem script.
+    """Create a persistent timed multi-signature redeem script.
     
     Args:
         sender: public key in bytes or hex strings
@@ -43,10 +43,21 @@ def renewableThunderChannel(
         The time is measured in units of 512 seconds (~8.5 minutes)
         The lower 16 bits hold the actual value (max 65535)
         For example:
-        For 1 hour: 7 units (3600 ÷ 512 = ~7)
+        For nearly 1 hour: 7 units (3600 ÷ 512 = ~7.03 or 7*512 = 3584)
         Value: 0x00400007 (4194311 decimal)
-        For 1 day: 168 units (86400 ÷ 512 = 168)
+        For 1 day: 168 units (86400 ÷ 512 = 168.789 or 168*512 = 86016)
         Value: 0x004000A8 (4194472 decimal)
+    
+    Usecase:
+        a permanent (though possibly itermittent) economic relationship between the two parties exists,
+        and the receiver periodically claims funds from the sender
+        (at a shorter time interval than the lockout period).
+        Since the pattern is to load the channel with a large amount of funds upfront,
+        then issue incremental funds to the receiver over time, 
+        this can be thought as a "reloadable" or "renewable" channel:
+        once it is depleted, the channel can be reloaded with a new amount of funds 
+        (though, the lockout period cannot be changed).
+        Because the channel is persistent it always exists and can be "reloaded" or "renewed".
     """
     if (blocks is None) == (minutes is None):
         raise ValueError("Specify exactly one of blocks or minutes")
@@ -84,7 +95,7 @@ def renewableThunderChannel(
 CLTV_TS_THRESHOLD = 500_000_000  # <=> block-height mode below this, timestamp mode at/above this
 
 
-def nonrenewableThunderChannel(
+def thunderExpiring(
     sender: Union[bytes, str], 
     receiver: Union[bytes, str], 
     blocks: Union[int, None] = None, 
@@ -112,6 +123,13 @@ def nonrenewableThunderChannel(
                 <SENDER_PUB> OP_CHECKSIG
             OP_ENDIF
             ```
+    Usecase:
+        a temporary economic relationship between the two parties exists,
+        and the receiver may intend to wait til just before timeout 
+        or til all the funds are sent before claiming.
+        The channel is not persistent, it only exists for the duration of the lockout period. 
+        After that the guarantee that the sender cannot reclaim the funds is lost,
+        so the channel is said to be not "reloadable" or "renewable".
     """
     if (blocks is None) == (timestamp is None):
         raise ValueError("Specify exactly one of `blocks` or `timestamp`")
